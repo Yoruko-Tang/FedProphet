@@ -1,8 +1,3 @@
-#!/usr/bin/env python
-# -*- coding: utf-8 -*-
-# Python version: 3.6
-
-import copy
 import torch
 import numpy as np
 # from random import Random
@@ -85,21 +80,4 @@ def exp_details(args):
     print('    Selection Strategy    : {}'.format(args.strategy))
     return
 
-if __name__ == "__main__":
-    from options import args_parser
-    import matplotlib.pyplot as plt
-    ALL_LETTERS = np.array(list("\n !\"&'(),-.0123456789:;>?ABCDEFGHIJKLMNOPQRSTUVWXYZ[]abcdefghijklmnopqrstuvwxyz}"))
-    args = args_parser()
-    args.dataset = 'sent'
-    args.shards_per_client=1
-    print(args.dataset)
-    train_dataset, test_dataset, user_groups, user_groups_test,weights = get_dataset(args)
-    print(len(train_dataset))
-    print(len(test_dataset))
-    # print(train_dataset[100][0].max())
-    # print(''.join(ALL_LETTERS[train_dataset[0][0].numpy()].tolist()))
-    # print(''.join(ALL_LETTERS[train_dataset[0][1].numpy()].tolist()))
-    print(args.num_users)
-    plt.hist(weights,bins=20)
-    plt.show()
-    
+
