@@ -123,17 +123,19 @@ class FedCBS_Selector(Selector):
 
         return  final_single_client_select_ls
     
-    def stat_update(self, epoch, selected_clients, stat_info = None, sys_info = None, **kwargs):
+    def stat_update(self, epoch=None, selected_clients=None, data_matrix = None, **kwargs):
         """
         stat_info: should be the local loss of selected clients at the end of this round
         sys_info: should be the true training + communication time of selected clients
         """
-        self.epoch = epoch + 1
+        if epoch is not None:
+            self.epoch = epoch
         # update statistcal and systematic utility
-        self.T_pull[selected_clients] = self.T_pull[selected_clients] + 1
+        if selected_clients is not None:
+            self.T_pull[selected_clients] = self.T_pull[selected_clients] + 1
         
-        if stat_info is not None:
-            self.data_matrix = stat_info # the number of each class on each client, N x C
+        if data_matrix is not None:
+            self.data_matrix = data_matrix # the number of each class on each client, N x C
             self.num_classes = self.data_matrix.shape[1]
             self.data_size_client = np.sum(self.data_matrix,axis=1)
             self.S = np.matmul(self.data_matrix,self.data_matrix.transpose())

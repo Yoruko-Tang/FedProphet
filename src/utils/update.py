@@ -207,14 +207,14 @@ def federated_train_worker(args,global_model,idxs,train_dataset,user_groups,loca
         epoch_local_losses.append(test_loss)
     
 
-def test_inference(args, model, test_dataset):
+def test_inference(model, test_dataset,device = torch.device('cpu')):
     """ Returns the test accuracy and loss.
     """
 
     model.eval()
     loss, total, correct = 0.0, 0.0, 0.0
 
-    device = 'cuda' if args.gpu else 'cpu'
+
     model.to(device)
     criterion = F.cross_entropy
     testloader = DataLoader(test_dataset, batch_size=128,

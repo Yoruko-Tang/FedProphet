@@ -79,35 +79,44 @@ class Oort_Selector(Selector):
         selection = np.append(exploitation_selection,exploration_selection)
         return selection
     
-    def stat_update(self, epoch, selected_clients, stat_info, sys_info, **kwargs):
+    def stat_update(self, epoch=None, selected_clients=None, stat_info=None, sys_info=None, **kwargs):
         """
-        stat_info: should be the local loss of selected clients at the end of this round
+        stat_info: should be the local (training) loss of selected clients at the end of this round
         sys_info: should be the true training + communication time of selected clients
         """
-        self.round = epoch + 1
+        if epoch is not None:
+            self.round = epoch
         # update statistcal and systematic utility
-        self.stat_utils[selected_clients] = np.array(stat_info)*self.weights[selected_clients]
-        self.sys_utils[selected_clients] = np.array(sys_info)
-        self.explored_clients = list(set(self.explored_clients+selected_clients.tolist()))
-        self.last_inv_round[selected_clients] = self.round
-        
+        if stat_info is not None:
+            if selected_clients is not None:
+                stat_info = stat_info["train_loss"]
+                self.explored_clients = list(set(self.explored_clients+selected_clients.tolist()))
+                self.last_inv_round[selected_clients] = self.round
+            else:
+                stat_info = stat_info["val_loss"]
+            self.stat_utils[selected_clients] = np.array(stat_info)*self.weights[selected_clients]
+            # update T
+            if len(self.explored_clients)>0:
+                self.utils_hist.append(np.mean(self.stat_utils[self.explored_clients]))
+                if self.round >= 2 * self.W and self.round % self.W == 0:
+
+                    utilLastPacerRounds = sum(self.utils_hist[-2*self.W:-self.W])
+                    utilCurrentPacerRounds = sum(self.utils_hist[-self.W:])
+
+                    # Cumulated statistical utility becomes flat, so we need a bump by relaxing the pacer
+                    if abs(utilCurrentPacerRounds - utilLastPacerRounds) <= utilLastPacerRounds * 0.1:
+                        self.T = self.T + self.delta
+
+                    # change sharply -> we decrease the pacer step
+                    elif abs(utilCurrentPacerRounds - utilLastPacerRounds) >= utilLastPacerRounds * 5:
+                        self.T = max(self.delta, self.T - self.delta)
+
+        if sys_info is not None:
+            self.sys_utils[selected_clients] = np.array(sys_info)
+    
         if len(self.explored_clients)==self.total_client_num:
             self.epsilon = 0.0
-        else:
+        elif epoch is not None:
             self.epsilon = max([self.epsilon*self.epsilon_decay,self.min_epsilon])
 
-        # update T
-        self.utils_hist.append(np.mean(self.stat_utils[self.explored_clients]))
-        if self.round >= 2 * self.W and self.round % self.W == 0:
-
-            utilLastPacerRounds = sum(self.utils_hist[-2*self.W:-self.W])
-            utilCurrentPacerRounds = sum(self.utils_hist[-self.W:])
-
-            # Cumulated statistical utility becomes flat, so we need a bump by relaxing the pacer
-            if abs(utilCurrentPacerRounds - utilLastPacerRounds) <= utilLastPacerRounds * 0.1:
-                self.T = self.T + self.delta
-
-            # change sharply -> we decrease the pacer step
-            elif abs(utilCurrentPacerRounds - utilLastPacerRounds) >= utilLastPacerRounds * 5:
-                self.T = max(self.delta, self.T - self.delta)
-
+        

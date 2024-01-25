@@ -32,8 +32,10 @@ class AFL_Selector(Selector):
         idxs_users = np.append(sel1,sel2)
         return idxs_users
     
-    def stat_update(self, epoch, selected_clients, stat_info, sys_info=None, **kwargs):
+    def stat_update(self, selected_clients=None, stat_info=None, **kwargs):
         """
         stat_info: should be the global loss of selected clients at the beginning of this round
         """
-        self.loss_value[selected_clients] = np.array(stat_info)*np.sqrt(self.weights[selected_clients])
+        if stat_info is not None:
+            stat_info = stat_info["val_loss"][selected_clients]
+            self.loss_value[selected_clients] = np.array(stat_info)*np.sqrt(self.weights[selected_clients])

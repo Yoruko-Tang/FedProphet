@@ -715,24 +715,33 @@ class FedCor_Selector(Selector):
         idxs_users = self.gpr.Select_Clients(select_num,self.epsilon,self.weights,self.dynamic_C,self.dynamic_TH)
         return idxs_users
     
-    def stat_update(self, epoch, selected_clients, stat_info = None, sys_info = None, verbose=True, **kwargs):
+    def stat_update(self, epoch=None, selected_clients=None, stat_info = None, sys_info = None, server = None, verbose=True, **kwargs):
         """
         stat_info: should be the loss changes of all clients in this round
         sys_info: should be the estimated training + communication cost of all clients 
         """
-        self.round = epoch
-        if self.round >= self.gpr_begin: # store training samples
-            if stat_info is not None:
+        if epoch is not None:
+            self.round = epoch
+        if stat_info is not None and self.round >= self.gpr_begin: # sample and store training samples
+            if server is not None and (self.round <= self.gpr_warmup or self.round%self.train_interval==0):
+                print("Training with Random Selection For GPR Training:")
+                m = max(int(server.train_frac * server.num_users), 1)
+                random_idxs_users = np.random.choice(range(server.num_users), m, replace=False)
+                new_model = server.train_idx(idxs_users = random_idxs_users)
+                new_stat_info = server.val(new_model)
+                stat_info = new_stat_info["val_loss"]-stat_info["val_loss"]
                 self.gpr.Update_Training_Data([np.arange(self.total_client_num),],[stat_info,],epoch=self.round)
         if self.round >= self.gpr_warmup: # update annealing factor
             self.epsilon = self.greedy_epsilon
-            self.gpr.Update_Discount(selected_clients,self.gpr_beta)
+            if selected_clients is not None:
+                self.gpr.Update_Discount(selected_clients,self.gpr_beta)
         if self.round == self.gpr_warmup or (self.round>self.gpr_warmup and self.round%self.train_interval==0): # training round for GP
             print("Training GPR")
             self.gpr.Train(lr = 1e-2,llr = 1e-2,max_epoches=5000 if self.round == self.gpr_warmup else 500,schedule_lr=False,update_mean=self.update_mean,weight_decay=1e-4,verbose=verbose)
             self.gpr.Reset_Discount() # reset discount after each training
         
-        self.gpr.Update_System_Stat(np.arange(self.total_client_num),sys_info) # update systematic information
+        if sys_info is not None:
+            self.gpr.Update_System_Stat(np.arange(self.total_client_num),sys_info) # update systematic information
 
 
 # if __name__=='__main__':

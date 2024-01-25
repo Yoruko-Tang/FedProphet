@@ -19,8 +19,10 @@ class PowerD_Selector(Selector):
         idxs_users = A[np.argsort(self.loss_value[A])[-select_num:]]
         return idxs_users
     
-    def stat_update(self, epoch, selected_clients, stat_info, sys_info=None, **kwargs):
+    def stat_update(self, stat_info = None,**kwargs):
         """
         stat_info: should be the global loss of all clients at the end of this round
         """
-        self.loss_value = np.array(stat_info)
+        if stat_info is not None:
+            stat_info = stat_info["val_loss"]
+            self.loss_value = np.array(stat_info)

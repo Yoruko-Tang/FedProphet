@@ -106,20 +106,22 @@ class Harmony_Selector(Selector):
         return B
 
                     
-    def stat_update(self, epoch, selected_clients, stat_info=None, sys_info=None,**kwargs):
+    def stat_update(self, epoch=None, selected_clients=None, data_matrix=None, sys_info=None,**kwargs):
         """
         stat_info: should be the data matrix of all clients in this round
         sys_info: should be the estimated runtime of all clients 
         """
-        self.round = epoch + 1
-        self.client_select_time[selected_clients] = self.client_select_time[selected_clients] + 1
-        self.explored_clients = list(set(self.explored_clients+selected_clients.tolist()))
+        if epoch is not None:
+            self.round = epoch
+        if selected_clients is not None:
+            self.client_select_time[selected_clients] = self.client_select_time[selected_clients] + 1
+            self.explored_clients = list(set(self.explored_clients+selected_clients.tolist()))
 
         if len(self.explored_clients)==self.total_client_num:
             self.epsilon = 0.0
         
-        if stat_info is not None: # update the data matrix 
-            self.data_matrix =  stat_info# the number of each class on each client, N x C
+        if data_matrix is not None: # update the data matrix 
+            self.data_matrix =  data_matrix# the number of each class on each client, N x C
             self.dist_client = self.data_matrix/np.sum(self.data_matrix,axis=1,keepdims=True) # [P_i]
             self.dist_class = np.sum(self.data_matrix,axis=0)/np.sum(self.data_matrix) # P_exp
             self.stat_utils = np.array([Harmony_Selector.KL_Div(self.dist_client[i],self.dist_class) for i in range(self.total_client_num)])

@@ -33,6 +33,7 @@ def args_parser():
                         help='use all clients (including which are not updated in this round) for averaging')
     parser.add_argument('--FedProx',action='store_true',
                         help='use FedProx')
+    parser.add_argument('--FedBN',action='store_true',help="Whether to use FedBN")
     parser.add_argument('--mu',type = float, default=0.0,
                         help = 'mu in FedProx')
     parser.add_argument('--dynamic_mu',action = 'store_true',
@@ -43,16 +44,27 @@ def args_parser():
                         help='model name')
     parser.add_argument('--pretrained',action="store_true",default=False,
                         help="Whether to use pretrained model from torchvision")
-    parser.add_argument('--kernel_sizes', type=int, default=[5,5],nargs="*",
-                        help='kernel size in each convolutional layer')
-    parser.add_argument('--num_filters', type=int, default=[32,64],nargs = "*",
-                        help="number of filters in each convolutional layer.")
-    parser.add_argument('--padding', action='store_true', 
-                        help='use padding in each convolutional layer')
-    parser.add_argument('--mlp_layers',type= int,default=[64,],nargs="*",
-                        help="numbers of dimensions of each hidden layer in MLP, or fc layers in CNN")
-    parser.add_argument('--depth',type = int,default = 20, 
-                        help = "The depth of ResNet. Only valid when model is resnet")
+    
+    # Adversarial Training
+    parser.add_argument('--adv_warmup',type = int,default = 0,help='length of warm up phase')
+    parser.add_argument('--adv_train', type = float, default = 0.0,
+                        help = 'The fraction of clients that use adversarial samples for training')
+    parser.add_argument('--adv_attack',type = str, choices=['PGD','BIM','FGSM','FGSM_RS'],default='PGD',
+                        help = 'Kind of adversarial attack')
+    parser.add_argument('--adv_epsilon',type = float,nargs="*", default=[0.15,])
+    parser.add_argument('--adv_alpha',type = float,nargs="*", default=[0.01,])
+    parser.add_argument('--adv_T', type = int, default=15)
+    parser.add_argument('--adv_sample_ratio', type = float,default=1.0,
+                        help = 'Ratio of adversarial training samples')
+    parser.add_argument('--adv_cluster',action = 'store_true',help = "Clustered adversarial training")
+
+    parser.add_argument('--adv_test', action = 'store_true',
+                        help = 'Use adversarial samples for test')
+    parser.add_argument('--advt_attack',type = str, choices=['PGD','BIM','FGSM','FGSM_RS'],default='PGD',
+                        help = 'Kind of adversarial attack in test time')
+    parser.add_argument('--advt_epsilon',type = float, default=0.15)
+    parser.add_argument('--advt_alpha',type = float, default=0.01)
+    parser.add_argument('--advt_T', type = int, default=15)
     
     # utils arguments
     parser.add_argument('--dataset', type=str, default='mnist', 
@@ -75,7 +87,8 @@ def args_parser():
                         help='verbose')
     parser.add_argument('--seed', type=int, default=None, nargs='*', 
                         help='random seed')
-
+    parser.add_argument('--test_every', type=int, default=1,
+                        help="test inference internal")
     parser.add_argument('--target_accuracy',type=float,default=None,
                         help='stop at a specified test accuracy')
 
