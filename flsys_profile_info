@@ -1,0 +1,14 @@
+Client 	        GFLOPS (peak)   Memory (GB)
+tesla_v100	    15670           32
+rtx_2080	    10070           8
+gtx_1080	    8873            8
+quadro_p5000	5304            16
+gtx970	        3920            4
+quadro_m2200	2122            4
+rtx_3080        29000           10
+adreno_750      4730            24          
+ryzen_9_3950	1038            16
+i7_7820	        913.5           8
+geforce_940	    881.7           2 
+m2_gpu	        3600            24
+a17_gpu         2147            8
