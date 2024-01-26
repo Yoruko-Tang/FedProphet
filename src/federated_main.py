@@ -12,6 +12,7 @@ from client import *
 from server import *
 from selection import *
 from monitor import *
+from scheduler import *
 
 
 from utils.options import args_parser
@@ -54,14 +55,6 @@ if __name__ == '__main__':
         if seed is not None:
             setup_seed(seed)
 
-
-        ## ==================================Build Clients==================================
-        if args.adv_train == 0:
-            client_type = ST_Client
-        # Todo: add other types of clients
-            
-        clients = [client_type(train_dataset,user_groups[i],device=device, **args) for i in range(args.num_users)]
-        
         ## ==================================Build Model==================================
         # try to get the model from torchvision.models with pretraining
         global_model = get_net(modelname = args.model,
@@ -69,6 +62,17 @@ if __name__ == '__main__':
                                pretrained = args.pretrained,
                                num_classes = args.num_classes)
         print(global_model)
+
+
+        ## ==================================Build Clients==================================
+        if args.flalg == 'FedAvg':
+            clients = [ST_Client(train_dataset,user_groups[i],local_state_preserve=False,device=device) for i in range(args.num_users)]
+        elif args.flalg == 'FedBN':
+            clients = [ST_Client(train_dataset,user_groups[i],local_state_preserve=True,device=device) for i in range(args.num_users)]
+        # elif args.flalg == 'FAT':
+        #     clients = [AT_Client(train_dataset,user_groups[i],local_state_preserve=False,device=device) for i in range(args.num_users)]
+        # Todo: add other types of clients
+            
 
         ## ==================================Build Monitor==================================
         if args.adv_test:
@@ -100,8 +104,8 @@ if __name__ == '__main__':
 
         
         ##  ==================================Build Scheduler==================================
-        # To be done
-        scheduler = None
+        if args.flalg in ["FedAvg","FedBN","FedAvgAT","FedBNAT"]:
+            scheduler = base_scheduler(**args)
             
         ## ==================================Build Selector==================================
         if args.strategy == 'rand':
@@ -126,11 +130,12 @@ if __name__ == '__main__':
             raise NotImplementedError("Not a supported selection strategy: {}".format(args.strategy))
         
         ## ==================================Build Server==================================
-        server = Avg_Server(global_model=global_model,clients = clients,
-                            selector = selector,scheduler = scheduler,
-                            stat_monitor=stat_monitor,sys_monitor=sys_monitor,
-                            weights=weights,test_dataset=test_dataset,
-                            device=device,**args)
+        if args.flalg in ["FedAvg","FedBN","FedAvgAT","FedBNAT"]:
+            server = Avg_Server(global_model=global_model,clients = clients,
+                                selector = selector,scheduler = scheduler,
+                                stat_monitor=stat_monitor,sys_monitor=sys_monitor,
+                                weights=weights,test_dataset=test_dataset,
+                                device=device,test_every = args.test_every)
 
 
         ## ==================================Start Training==================================

@@ -40,7 +40,7 @@ class Avg_Server():
         self.stat_info = self.stat_monitor.collect(self.global_model)
         self.sys_info = self.sys_monitor.collect()
         self.selector.stat_update(stat_info=self.stat_info,sys_info=self.sys_info)
-        self.scheduler.stat_update(sys_info=self.sys_info)
+        self.scheduler.stat_update(epoch=0,stat_info=self.stat_info,sys_info=self.sys_info)
 
         
  
@@ -60,7 +60,7 @@ class Avg_Server():
             self.selector.stat_update(epoch=self.round,selected_clients=self.idxs_users,stat_info=self.stat_info,sys_info=self.sys_info,server=self)
         
         #update the scheduler's information
-        self.scheduler.stat_update(epoch =self.round,sys_info=self.sys_info)
+        self.scheduler.stat_update(epoch =self.round,stat_info = self.stat_info,sys_info=self.sys_info)
         
         # select clients
         if self.train_frac is None:
@@ -88,7 +88,7 @@ class Avg_Server():
     def train_idx(self,idxs_users):
         local_weights = np.array([None for _ in range(self.num_users)])
         for idx in idxs_users:
-            training_hyperparameters = self.scheduler.set(idx)
+            training_hyperparameters = self.scheduler.set(idx,self.round)
             local_model = self.clients[idx].train(self.global_model,**training_hyperparameters)
             local_model.to(self.device) # return the local model to the server's device
             local_weights[idx] = copy.deepcopy(local_model.state_dict())

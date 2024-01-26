@@ -37,6 +37,7 @@ class ST_Stat_Monitor():
                 os.makedirs(self.log_path)
             self.tsv_file = osp.join(self.log_path, 'stat.log.tsv')
             self.pkl_file = osp.join(self.log_path, 'stat.pkl')
+            self.pt_file = osp.join(self.log_path,'best_model.pt')
             with open(self.tsv_file, 'w') as wf:
                 columns = ['epoch', 'mode', 'loss', 'accuracy', 'best_accuracy']
                 wf.write('\t'.join(columns) + '\n')
@@ -96,6 +97,9 @@ class ST_Stat_Monitor():
             self.test_accs.append(test_acc)
             self.test_losses.append(test_loss)
             self.log()
+            # store the model if it attains the highest validation loss
+            if np.argmax(self.weighted_global_accs) == len(self.weighted_global_accs)-1:
+                torch.save([global_model,[c.local_states for c in self.clients]],self.pt_file)
         
         res = {"epoch":epoch,
             "train_acc": local_accs,
@@ -122,6 +126,8 @@ class ST_Stat_Monitor():
                         self.local_accs,self.local_losses,self.weighted_local_accs,self.weighted_local_losses,
                         self.global_accs,self.global_losses,self.weighted_global_accs,self.weighted_global_losses,
                         self.test_accs,self.test_losses], stat_f)
+        
+        
             
     def test_inference(self, model, test_dataset,device = torch.device('cpu')):
         """ Returns the test accuracy and loss.

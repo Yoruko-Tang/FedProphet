@@ -8,11 +8,11 @@ class ST_Client():
     """
     This is the standard fl client, who uses standard local SGD for training
     """
-    def __init__(self,dataset,data_idxs,FedBN=False,device = torch.device('cpu'),**kwargs):
+    def __init__(self,dataset,data_idxs,local_state_preserve=False,device = torch.device('cpu'),**kwargs):
         self.trainset, self.testset = self.train_test(dataset, list(data_idxs))
         self.device = device
         self.final_local_accuracy,self.final_local_loss = np.inf,np.inf
-        self.local_state_preserve = FedBN
+        self.local_state_preserve = local_state_preserve
         self.local_states = None
 
     def train_test(self, dataset, idxs):
@@ -29,6 +29,7 @@ class ST_Client():
         return trainset, testset
     
     def train(self,model,iteration,batchsize,lr,optimizer='sgd',
+              momentum=0.0,reg=0.0,
               criterion=torch.nn.CrossEntropyLoss,verbose=False,**kwargs):
         """train the model for one communication round."""
         model = copy.deepcopy(model) # avoid modifying global model
@@ -42,9 +43,9 @@ class ST_Client():
         # Set optimizer for the local updates
         np = model.parameters()
         if optimizer == 'sgd':
-            optimizer = torch.optim.SGD(np, lr=lr, momentum=kwargs['momentum'],weight_decay=kwargs['weight_decay'])
+            optimizer = torch.optim.SGD(np, lr=lr, momentum=momentum,weight_decay=reg)
         elif optimizer == 'adam':
-            optimizer = torch.optim.Adam(np, lr=lr, weight_decay=kwargs['weight_decay'])
+            optimizer = torch.optim.Adam(np, lr=lr, weight_decay=reg)
         
 
         iters = 0
