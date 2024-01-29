@@ -8,12 +8,13 @@ class ST_Client():
     """
     This is the standard fl client, who uses standard local SGD for training
     """
-    def __init__(self,dataset,data_idxs,local_state_preserve=False,device = torch.device('cpu'),**kwargs):
+    def __init__(self,dataset,data_idxs,local_state_preserve=False,device = torch.device('cpu'), client_device_name = 'tesla_v100', **kwargs):
         self.trainset, self.testset = self.train_test(dataset, list(data_idxs))
         self.device = device
         self.final_local_accuracy,self.final_local_loss = np.inf,np.inf
         self.local_state_preserve = local_state_preserve
         self.local_states = None
+        self.device_name = client_device_name
 
     def train_test(self, dataset, idxs):
         """
