@@ -14,7 +14,7 @@ class base_scheduler():
         self.reg = reg
         self.round = 0
 
-    def set(self,idx):
+    def set(self,**kwargs):
         if self.lr_decay is not None:
             if self.lr_schedule is None:
                 lr = self.lr*(self.lr_decay**self.round)
@@ -31,7 +31,7 @@ class base_scheduler():
         }
         return res
     
-    def stat_update(self,epoch,stat_info,sys_info,**kwargs):
+    def stat_update(self,epoch,**kwargs):
         self.round = epoch
 
         

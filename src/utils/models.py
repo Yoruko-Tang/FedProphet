@@ -19,7 +19,8 @@ def get_net(modelname, modeltype, pretrained=False, num_classes=1000):
     """
     # assert "vgg" in modelname or 'resnet' in modelname, "Only support VGG and ResNet for pretrained model currently"
     assert modeltype in ["imagenet","cifar"], "Only support imagenet-like or cifar-like datasets with pretrained model currently"
-    model = eval('torchvision.models.{}'.format(modelname))(pretrained=pretrained)
+ 
+    model = eval('torchvision.models.{}'.format(modelname))(weights="DEFAULT" if pretrained else None)
     if num_classes!=1000: # reinitialize the last layer
         if 'vgg' in modelname: # vgg
             if modeltype == 'imagenet': # for 224x224x3 inputs
@@ -27,9 +28,8 @@ def get_net(modelname, modeltype, pretrained=False, num_classes=1000):
                 model.classifier[-1] = nn.Linear(in_feat, num_classes)
             else: # for 32x32x3 inputs
                 model.avgpool = nn.AdaptiveAvgPool2d((1,1))
-                in_feat = model.features[-2].out_channels
                 model.classifier = nn.Sequential(
-                    nn.Linear(in_feat, 512),
+                    nn.Linear(512, 512),
                     nn.ReLU(True),
                     nn.Dropout(),
                     nn.Linear(512, 512),
@@ -42,26 +42,26 @@ def get_net(modelname, modeltype, pretrained=False, num_classes=1000):
         else:
             raise RuntimeError("Not supported pretrained model: {}".format(modelname))
 
-    return modify_pretrained_model(model)
+    return model
     
 
-def modify_pretrained_model(model): 
-    def Get_Local_State_Dict(self):
-        sd = self.state_dict()
-        for name in list(sd.keys()):
-            if 'weight' in name or 'bias' in name:
-                sd.pop(name)
-        return sd
+# def modify_pretrained_model(model): 
+#     def Get_Local_State_Dict(self):
+#         sd = self.state_dict()
+#         for name in list(sd.keys()):
+#             if 'weight' in name or 'bias' in name:
+#                 sd.pop(name)
+#         return sd
 
-    def Load_Local_State_Dict(self,local_dict):
-        # load local parameters saved by Get_Local_State_Dict()
-        sd = self.state_dict()
-        sd.update(local_dict)
-        self.load_state_dict(sd)
+#     def Load_Local_State_Dict(self,local_dict):
+#         # load local parameters saved by Get_Local_State_Dict()
+#         sd = self.state_dict()
+#         sd.update(local_dict)
+#         self.load_state_dict(sd)
 
-    model.Get_Local_State_Dict = types.MethodType(Get_Local_State_Dict,model)
-    model.Load_Local_State_Dict = types.MethodType(Load_Local_State_Dict,model)
-    return model
+#     model.Get_Local_State_Dict = types.MethodType(Get_Local_State_Dict,model)
+#     model.Load_Local_State_Dict = types.MethodType(Load_Local_State_Dict,model)
+#     return model
 
 
 class Normalize(nn.Module):

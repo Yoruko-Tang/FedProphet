@@ -34,6 +34,7 @@ class Avg_Server():
         self.global_model.to(self.device)
         
         self.round = 0
+        self.idxs_users = None
         self.test_every = test_every
         
         # initialize selector and scheduler
@@ -79,7 +80,12 @@ class Avg_Server():
 
         if (self.round+1)%self.test_every == 0:
             # collect each client's statistical information
-            self.stat_info = self.stat_monitor.collect(self.global_model,epoch=self.round,chosen_idxs=self.idxs_users,test_dataset=self.test_dataset,device=self.device,log=True)
+            self.stat_info = \
+                self.stat_monitor.collect(self.global_model,
+                                          epoch=self.round,
+                                          chosen_idxs=self.idxs_users,
+                                          test_dataset=self.test_dataset,
+                                          device=self.device,log=True)
         
 
         self.round += 1
@@ -88,7 +94,7 @@ class Avg_Server():
     def train_idx(self,idxs_users):
         local_weights = np.array([None for _ in range(self.num_users)])
         for idx in idxs_users:
-            training_hyperparameters = self.scheduler.set(idx,self.round)
+            training_hyperparameters = self.scheduler.set(idx=idx,round=self.round)
             local_model = self.clients[idx].train(self.global_model,**training_hyperparameters)
             local_model.to(self.device) # return the local model to the server's device
             local_weights[idx] = copy.deepcopy(local_model.state_dict())
