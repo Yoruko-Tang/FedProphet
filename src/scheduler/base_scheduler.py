@@ -33,4 +33,5 @@ class base_scheduler():
     
     def stat_update(self,epoch,**kwargs):
         self.round = epoch
+
         

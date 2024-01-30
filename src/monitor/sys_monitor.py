@@ -19,10 +19,19 @@ class Sys_Monitor:
         self.device_runtime_perf_list = self.get_runtime_value(self.device_perf_list, self.device_perf_degrade_factor_list)
         self.device_runtime_mem_list = self.get_runtime_value(self.device_mem_list, self.device_mem_avail_factor_list)
         
+        # self.model_stat 
 
         
     
+    def model_stat(model):
+
+        """
+        return module-required mem;  flops
+        """
+        
     def collect(self):
+        self.device_runtime_perf_list = self.get_runtime_value(self.device_perf_list, self.device_perf_degrade_factor_list)
+        self.device_runtime_mem_list = self.get_runtime_value(self.device_mem_list, self.device_mem_avail_factor_list)
         return None
     
     def profile(self,id,layer):
