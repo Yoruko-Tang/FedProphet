@@ -5,24 +5,24 @@ class Sys_Monitor:
     """
     collect the validation loss of each client
     """
-    def __init__(self,client_num,flsys_profile_info,device_random_seed,scaling_factor):
+    def __init__(self,num_users,flsys_profile_info,device_random_seed,sys_scaling_factor,**kwargs):
 
         self.unique_client_device_dic = self.read_client_device_info(flsys_profile_info)
         self.device_name_list, self.device_perf_list, self.device_mem_list \
-            = self.sample_devices(client_num,device_random_seed,self.unique_client_device_dic,scaling_factor)
+            = self.sample_devices(num_users,device_random_seed,self.unique_client_device_dic,sys_scaling_factor)
         self.unique_runtime_app_list = ['idle', '1080p', '4k', 'inference', 'detection', 'web']
         self.unique_perf_degrade_dic = {'idle': 1, '1080p': 0.735, '4k': 0.459, 'inference': 0.524, 'detection': 0.167 , 'web': 0.231}
         self.unique_mem_avail_dic = {'idle': 1, '1080p': 0.5, '4k': 0.25, 'inference': 0.75, 'detection': 0.0625, 'web': 0.125}
 
         self.device_perf_degrade_factor_list, self.device_mem_avail_factor_list, self.device_runtime_app_list \
-            = self.sample_runtime_app(client_num,self.unique_runtime_app_list,self.unique_perf_degrade_dic,self.unique_mem_avail_dic)
+            = self.sample_runtime_app(num_users,self.unique_runtime_app_list,self.unique_perf_degrade_dic,self.unique_mem_avail_dic)
         self.device_runtime_perf_list = self.get_runtime_value(self.device_perf_list, self.device_perf_degrade_factor_list)
         self.device_runtime_mem_list = self.get_runtime_value(self.device_mem_list, self.device_mem_avail_factor_list)
         
 
         
     
-    def collect(self,model):
+    def collect(self):
         return None
     
     def profile(self,id,layer):
@@ -61,7 +61,7 @@ class Sys_Monitor:
 
         return degrade_factor_for_each_client_list, mem_avail_factor_for_each_client_list, runtime_app_id_list
     
-    def sample_devices(self,client_num,random_seed,device_dic,scaling_factor):
+    def sample_devices(self,num_users,random_seed,device_dic,sys_scaling_factor):
         """
         sample the device with its theoretical performance (GFLOPS) and 
         maximal available memory (GB) for each client
@@ -80,7 +80,7 @@ class Sys_Monitor:
             unique_mem_list.append(device_dic[k][1])
             mul_perf_mem_list.append(float(device_dic[k][0])*float(device_dic[k][1]))
         
-        scaled_mul_perf_mem_list = [v ** scaling_factor for v in mul_perf_mem_list]
+        scaled_mul_perf_mem_list = [v ** sys_scaling_factor for v in mul_perf_mem_list]
         total = sum(scaled_mul_perf_mem_list)
         prob_list = [scaled_v / total for scaled_v in scaled_mul_perf_mem_list]
 
@@ -90,8 +90,8 @@ class Sys_Monitor:
         client_device_mem_list  = [] #GB
 
         random.seed(random_seed)
-        device_id_list = random.choices(unique_id_list, weights=prob_list, k=client_num)
-        # device_id_list = [random.randint(0,num_unique_device-1) for _ in range(client_num)]
+        device_id_list = random.choices(unique_id_list, weights=prob_list, k=num_users)
+        # device_id_list = [random.randint(0,num_unique_device-1) for _ in range(num_users)]
         for id in device_id_list:
             client_device_name_list.append(unique_name_list[id])
             client_device_perf_list.append(unique_perf_list[id])

@@ -65,7 +65,7 @@ class ST_Stat_Monitor():
         if test_dataset is not None:
             test_acc,test_loss = self.test_inference(global_model,test_dataset,device)
         else:
-            test_acc,test_loss = None
+            test_acc,test_loss = None,None
 
         # collect
         if local_accs is not None:
@@ -112,9 +112,9 @@ class ST_Stat_Monitor():
     
     def log(self):
         # log the latest result into the log files
-        train_column = [self.epochs[-1],'train',self.weighted_local_accs[-1],self.weighted_local_losses[-1],max(self.weighted_local_accs)]
-        val_column = [self.epochs[-1],'val',self.weighted_global_accs[-1],self.weighted_global_losses[-1],max(self.weighted_global_accs)]
-        test_column = [self.epochs[-1],'test',self.test_accs[-1],self.test_losses[-1],max(self.test_accs)]
+        train_column = [self.epochs[-1],'train',self.weighted_local_losses[-1],self.weighted_local_accs[-1],max(self.weighted_local_accs)]
+        val_column = [self.epochs[-1],'val',self.weighted_global_losses[-1],self.weighted_global_accs[-1],max(self.weighted_global_accs)]
+        test_column = [self.epochs[-1],'test',self.test_losses[-1],self.test_accs[-1],max(self.test_accs) if self.test_accs[-1] is not None else None]
         print(f"Round:{self.epochs[-1]}\t|Val Acc:{self.weighted_global_accs[-1]}\t|Test Acc:{self.test_accs[-1]}")
         with open(self.tsv_file, 'a') as af:
             af.write('\t'.join([str(c) for c in train_column]) + '\n')
@@ -202,7 +202,7 @@ class AT_Stat_Monitor(ST_Stat_Monitor):
         if test_dataset is not None:
             test_adv_acc,test_adv_loss = self.test_adv_inference(global_model,test_dataset,device)
         else:
-            test_adv_acc,test_adv_loss = None
+            test_adv_acc,test_adv_loss = None,None
 
         if log:
             self.epochs.append(epoch)
@@ -250,9 +250,9 @@ class AT_Stat_Monitor(ST_Stat_Monitor):
     
     def log(self):
         # log the latest result into the log files
-        train_column = [self.epochs[-1],'train',self.weighted_local_accs[-1],self.weighted_local_losses[-1],max(self.weighted_local_accs),"n/a","n/a","n/a"]
-        val_column = [self.epochs[-1],'val',self.weighted_global_accs[-1],self.weighted_global_losses[-1],max(self.weighted_global_accs),self.weighted_global_adv_accs[-1],self.weighted_global_adv_losses[-1],max(self.weighted_global_adv_accs)]
-        test_column = [self.epochs[-1],'test',self.test_accs[-1],self.test_losses[-1],max(self.test_accs),self.test_adv_accs[-1],self.test_adv_losses[-1],max(self.test_adv_accs)]
+        train_column = [self.epochs[-1],'train',self.weighted_local_losses[-1],self.weighted_local_accs[-1],max(self.weighted_local_accs),"n/a","n/a","n/a"]
+        val_column = [self.epochs[-1],'val',self.weighted_global_losses[-1],self.weighted_global_accs[-1],max(self.weighted_global_accs),self.weighted_global_adv_losses[-1],self.weighted_global_adv_accs[-1],max(self.weighted_global_adv_accs)]
+        test_column = [self.epochs[-1],'test',self.test_losses[-1],self.test_accs[-1],max(self.test_accs) if self.test_accs[-1] is not None else None,self.test_adv_losses[-1],self.test_adv_accs[-1],max(self.test_adv_accs) if self.test_adv_accs[-1] is not None else None]
         print(f"Round:{self.epochs[-1]}\t|Val Clean Acc:{self.weighted_global_accs[-1]}\t|Val Adv Acc:{self.weighted_global_adv_accs[-1]}\t|Test Clean Acc:{self.test_accs[-1]}\t|Test Adv Acc:{self.test_adv_accs[-1]}")
         with open(self.tsv_file, 'a') as af:
             af.write('\t'.join([str(c) for c in train_column]) + '\n')

@@ -44,20 +44,16 @@ def fl_options(parser):
                         help="use Dirichlet_noniid sampling, set the alpha of Dir here")
     
     # systematic option
-    parser.add_argument('--sys_efficiency_mode', type=str, default='bias', 
-                        help='system efficiency mode: bias or energy-efficiency')
-    parser.add_argument('--sys_gamma', type=float, default=1.0,
-                        help='The hyperprameter gamma for system efficiency -> latency')
-    parser.add_argument('--sys_theta', type=float, default=0,
-                        help='The hyperparameter theta for system efficiency -> energy')
-    parser.add_argument('--flsys_info', type=str, default='./flsys_profile_info',
+    parser.add_argument('--flsys_profile_info', type=str, default='./flsys_profile_info',
                         help='The path of FL system information file')
-    parser.add_argument('--random_device_seed', type=int, default=717,
-                        help='random seed used for generate devices')    
-    parser.add_argument('--rho',type=float,default=None,help="The hyperparameter rho for system efficiency")
+    parser.add_argument('--device_random_seed', type=int, default=717,
+                        help='random seed used for generate devices')
+    parser.add_argument('--sys_scaling_factor',type=float,default=0.0,
+                        help='the factor that controls the distribution of different devices')
+    
 
-    parser.add_argument('--verbose', type=int, default=1, 
-                        help='verbose')
+    parser.add_argument('--verbose', action='store_true', default=False, 
+                        help='whether to print the training procudure of each client')
     parser.add_argument('--seed', type=int, default=None, nargs='*', 
                         help='random seed')
     
@@ -66,7 +62,7 @@ def fl_options(parser):
 
 def opt_option(parser):
     ## fl optimizers
-    parser.add_argument('flalg',type=str,default='FedAvg',
+    parser.add_argument('--flalg',type=str,default='FedAvg',
                         help="The algorithm for FL optimizer")
     parser.add_argument('--epochs', type=int, default=10,
                         help="number of rounds of training")
@@ -94,7 +90,7 @@ def opt_option(parser):
     parser.add_argument('--reg', default=1e-4, type=float, 
                         help='weight decay for an optimizer')
     
-    
+    return parser
 
 
 def selector_option(parser):
@@ -187,6 +183,7 @@ def at_option(parser):
     parser.add_argument('--advt_alpha',type = float, default=0.01)
     parser.add_argument('--advt_T', type = int, default=15)
 
+    return parser
 
 if __name__ == '__main__':
     args = args_parser()

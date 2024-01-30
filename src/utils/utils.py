@@ -17,45 +17,19 @@ def setup_seed(seed):
 
 def get_log_path(args):
 
-    if args.sys_efficiency_mode == 'bias' and args.sys_gamma == 1.0 and args.sys_theta == 0:
-        child_folder = 'objects'
-    if args.sys_efficiency_mode == 'bias' and args.sys_gamma < 1 and args.sys_theta > 0:
-        child_folder = 'energy-bias'
-    if args.sys_efficiency_mode == 'energy-efficiency':
-        child_folder = 'energy-efficiency'
-
     if not args.iid:
-        base_file = './save/{}/{}_{}_{}_{}_N[{}]_C[{}]_iid[{}]_{}[{}]_E[{}]_B[{}]_mu[{}]_lr[{:.5f}]'.\
-                    format(child_folder, args.dataset,'FedProx[%.3f]'%args.mu if args.FedProx else 'FedAvg', args.model, args.epochs,args.num_users,args.frac, args.iid,
-                    'sp' if args.alpha is None else 'alpha',args.shards_per_client if args.alpha is None else args.alpha,
-                    args.local_ep, args.local_bs,args.mu,args.lr)
+        file_name = f"./save/{args.dataset}_{args.model}_{args.epochs}_N[{args.num_users}]_{'all' if args.frac == 1.0 else args.strategy}[{args.frac}]_{'sp' if args.alpha is None else 'alpha'}[{args.shards_per_client if args.alpha is None else args.alpha}]_sys[{args.sys_scaling_factor}]_E[{args.local_ep}]_B[{args.local_bs}]_lr[{args.lr}]"
     else:
-        base_file = './save/{}/{}_{}_{}_{}_N[{}]_C[{}]_iid[{}]_E[{}]_B[{}]_mu[{}]_lr[{:.5f}]'.\
-                    format(child_folder, args.dataset,'FedProx[%.3f]'%args.mu if args.FedProx else 'FedAvg', args.model, args.epochs,args.num_users,args.frac, args.iid,
-                    args.local_ep, args.local_bs,args.mu,args.lr)
+        file_name = f"./save/{args.dataset}_{args.model}_{args.epochs}_N[{args.num_users}]_{'all' if args.frac == 1.0 else args.strategy}[{args.frac}]_iid_sys[{args.sys_scaling_factor}]_E[{args.local_ep}]_B[{args.local_bs}]_lr[{args.lr}]"
     
+    file_name = os.path.join(file_name,args.flalg)
     
-    if args.frac == 1.0:
-        file_name = base_file + '/all'
-    elif 'fedcor' in args.strategy:
-        file_name = base_file + '/gpr[int{}_gam{}_norm{}_disc{}]'.\
-            format(args.GPR_interval,args.GPR_gamma,args.poly_norm,args.discount)
-        if args.strategy == 'cfedcor':
-            file_name += '_cluster[num{}_th{}_rho{}]'.format(args.num_cluster,args.clustering_th,args.rho)
-        elif args.rho is not None:
-            file_name += '_rho{}'.format(args.rho)
-    elif args.strategy == 'harmony':
-        file_name = base_file + '/harmony[omega{}]'.format(args.omega)
-    else:
-        file_name = base_file + '/' + args.strategy
     
     if not os.path.exists(file_name):
         os.makedirs(file_name)
     
-    sys_file_name = file_name + '/sys_mode_{}_sys_gamma{}_sys_theta{}_device_seed{}_rho{}'. \
-        format(args.sys_efficiency_mode, args.sys_gamma, args.sys_theta, args.random_device_seed, args.rho)
 
-    return file_name, sys_file_name
+    return file_name
 
 
 def exp_details(args):
@@ -69,14 +43,12 @@ def exp_details(args):
     if args.iid:
         print('    IID')
     else:
-        print('    Non-IID')
+        print(f"    Non-IID: {'sp' if args.alpha is None else 'alpha'}={args.shards_per_client if args.alpha is None else args.alpha}")
     print('    Fraction of users  : {}'.format(args.frac))
     print('    Local Batch size   : {}'.format(args.local_bs))
     print('    Local Epochs       : {}\n'.format(args.local_ep))
-    if args.FedProx:
-        print('    Algorithm    :    FedProx({})'.format(args.mu))
-    else:
-        print('    Algorithm    : FedAvg')
+    
+    print('    Algorithm    : {}'.format(args.flalg))
     print('    Selection Strategy    : {}'.format(args.strategy))
     return
 

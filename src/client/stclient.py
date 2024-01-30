@@ -7,13 +7,16 @@ import numpy as np
 class ST_Client():
     """
     This is the standard fl client, who uses standard local SGD for training
+    Typical use case: FedAvg, FedBN
     """
-    def __init__(self,dataset,data_idxs,local_state_preserve=False,device = torch.device('cpu'),  **kwargs):
+    def __init__(self,dataset,data_idxs,local_state_preserve=False,
+                 device = torch.device('cpu'), verbose=False, **kwargs):
         self.trainset, self.testset = self.train_test(dataset, list(data_idxs))
         self.device = device
         self.final_local_accuracy,self.final_local_loss = np.inf,np.inf
         self.local_state_preserve = local_state_preserve
         self.local_states = None
+        self.verbose = verbose
 
 
     def train_test(self, dataset, idxs):
@@ -31,12 +34,12 @@ class ST_Client():
     
     def train(self,model,iteration,batchsize,lr,optimizer='sgd',
               momentum=0.0,reg=0.0,
-              criterion=torch.nn.CrossEntropyLoss,verbose=False,**kwargs):
+              criterion=torch.nn.CrossEntropyLoss(),**kwargs):
         """train the model for one communication round."""
         model = copy.deepcopy(model) # avoid modifying global model
         model.to(self.device)
         if self.local_state_preserve and self.local_states is not None:
-            model.Load_Local_State_Dict(self.local_states)
+            model = self.load_local_state_dict(model,self.local_states)
         model.train()
         
         self.trainloader = DataLoader(self.trainset,batch_size=batchsize,shuffle=True)
@@ -65,20 +68,20 @@ class ST_Client():
                 if iters == iteration:
                     break
 
-            if verbose:
+            if self.verbose:
                 print('Local Epoch : {}/{} |\tLoss: {:.4f}'.format(iters, iteration, loss.item()))
         
-        self.local_states = model.Get_Local_State_Dict()
+        self.local_states = copy.deepcopy(self.get_local_state_dict(model))
         self.final_local_accuracy,self.final_local_loss = self.validate(model)
         
         return model
 
-    def validate(self,model,criterion=torch.nn.CrossEntropyLoss):
+    def validate(self,model,criterion=torch.nn.CrossEntropyLoss()):
         """ Returns the validation accuracy and loss."""
         model = copy.deepcopy(model) # avoid modifying global model
         model.to(self.device)
         if self.local_state_preserve and self.local_states is not None:
-            model.Load_Local_State_Dict(self.local_states)
+            model = self.load_local_state_dict(model,self.local_states)
         model.eval()
         loss, total, correct = 0.0, 0.0, 0.0
         self.testloader = DataLoader(self.testset,batch_size=32, shuffle=False)
@@ -86,7 +89,7 @@ class ST_Client():
         for batch_idx, (datas, labels) in enumerate(self.testloader):
             datas, labels = datas.to(self.device), labels.to(self.device)
             outputs = model(datas)
-            batch_loss,_ = criterion(outputs, labels)
+            batch_loss = criterion(outputs, labels)
             loss += batch_loss.item()
 
             # Prediction
@@ -97,4 +100,17 @@ class ST_Client():
 
         accuracy = correct/total
         return accuracy, loss/(batch_idx+1)
+    
+    def get_local_state_dict(self,model):
+        sd = model.state_dict()
+        for name in list(sd.keys()):
+            if 'weight' in name or 'bias' in name:
+                sd.pop(name)
+        return sd
+    
+    def load_local_state_dict(self,model,local_dict):
+        sd = model.state_dict()
+        sd.update(local_dict)
+        model.load_state_dict(sd)
+        return model
     
