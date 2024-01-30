@@ -1036,8 +1036,16 @@ class RNN(nn.Module):
         self.load_state_dict(sd)
 
 if __name__ == '__main__':
-    rnn = RNN(8, 256, 80)
-    sd = rnn.state_dict()
+    model = get_net('resnet50','cifar',True,10)
+    sd = model.state_dict()
+    for name in list(sd.keys()):
+        print(name)
+    for name in list(sd.keys()):
+        # pop out the parameters except for bn layers
+        if 'weight' in name and name.replace('weight','running_mean') not in sd.keys():
+            sd.pop(name)
+        elif 'bias' in name and name.replace('bias','running_mean') not in sd.keys():
+            sd.pop(name)
     for name in list(sd.keys()):
         print(name)
     

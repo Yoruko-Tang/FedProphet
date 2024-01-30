@@ -104,7 +104,10 @@ class ST_Client():
     def get_local_state_dict(self,model):
         sd = model.state_dict()
         for name in list(sd.keys()):
-            if 'weight' in name or 'bias' in name:
+            # pop out the parameters except for bn layers
+            if 'weight' in name and name.replace('weight','running_mean') not in sd.keys():
+                sd.pop(name)
+            elif 'bias' in name and name.replace('bias','running_mean') not in sd.keys():
                 sd.pop(name)
         return sd
     
