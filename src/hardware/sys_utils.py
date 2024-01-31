@@ -1,5 +1,7 @@
 import numpy as np
 from numpy.random import RandomState
+from fvcore.nn import FlopCountAnalysis, parameter_count
+import torch
 
 unique_runtime_app_list = ['idle', '1080p', '4k', 'inference', 'detection', 'web']
 unique_perf_degrade_dic = {'idle': 1, '1080p': 0.735, '4k': 0.459, 'inference': 0.524, 'detection': 0.167 , 'web': 0.231}
@@ -97,11 +99,45 @@ def sample_runtime_app(rs):
     runtime_app = rs.choices(unique_runtime_app_list)
     return runtime_app, unique_perf_degrade_dic[runtime_app],unique_mem_avail_dic[runtime_app]
 
-def profile_model(model,inputsize):
+
+def profile_model(model, inputsize):
     """
     get the flops and paramenters of each layer (block) in a model 
+
+    return: flops_per_module and params_per_module
+    *** note that the last item in the return is ('total', flops/params) ***
     """
-    pass
+    x = torch.rand(inputsize)
+    flops = FlopCountAnalysis(model,x)
+    _flops_per_module = flops.by_module()
+    _params_per_module = parameter_count(model)
+    flops_per_module = {}
+    params_per_module = {}
+    dot_count = 0
+    for key in _flops_per_module.keys():
+        for c in key:
+            if c == '.':
+                dot_count += 1
+        if (dot_count == 0 and 'layer' not in key and 'classifier' not in key and 'features' not in key) \
+            or (dot_count == 1 and 'weight' not in key and 'bias' not in key):
+            flops_per_module[key] = _flops_per_module[key]
+            params_per_module[key] = _params_per_module[key]
+        dot_count = 0
+
+    flops_per_module['total'] = flops_per_module.pop('')
+    params_per_module['total'] = params_per_module.pop('')
+
+    def validate(dic):
+        sum = 0
+        for key in dic:
+            if key != 'total':
+                sum += dic[key]
+        assert sum == dic['total'], "Wrong profiling data!"
+    
+    validate(flops_per_module)
+    validate(params_per_module)
+
+    return flops_per_module, params_per_module
 
 def training_latency(model,inputsizes,performance,memory):
     """
@@ -109,6 +145,7 @@ def training_latency(model,inputsizes,performance,memory):
     The inputsizes can be a list of sizes, one for each minibatch.
     The total training latency should be calculated as the sum of all minibatches.
     """
+    # [[10,3,32,32],[]]
     return 0
 
 def model_partition(model,max_flops,max_mem,num_classes):
