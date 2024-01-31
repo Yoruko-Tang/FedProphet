@@ -5,13 +5,14 @@ import torch
 from torch.utils.data import DataLoader
 import torch.nn.functional as F
 import pickle
-
+from utils.adversarial import Adv_Sample_Generator
 
 class ST_Stat_Monitor():
     """
     collect the training,validation and test accuracy and loss
     """
-    def __init__(self,clients,weights = None,log_path=None):
+    def __init__(self,clients,weights = None,log_path=None,
+                 criterion=F.cross_entropy):
         self.clients = clients
         self.weights = weights if weights is not None else np.ones(len(self.clients))/len(self.clients)
         self.chosen_clients = []
@@ -28,7 +29,7 @@ class ST_Stat_Monitor():
 
         self.epochs = []
         
-
+        self.criterion = criterion
 
         # create log files
         self.log_path = log_path
@@ -42,7 +43,7 @@ class ST_Stat_Monitor():
                 columns = ['epoch', 'mode', 'loss', 'accuracy', 'best_accuracy']
                 wf.write('\t'.join(columns) + '\n')
 
-    def collect(self,global_model,epoch=None,chosen_idxs=None,test_dataset=None,device=torch.device('cpu'),log=False):
+    def collect(self,global_model,epoch=None,chosen_idxs=None,test_dataset=None,device=torch.device('cpu'),log=False,**kwargs):
         local_accs, local_losses = [],[]
         global_accs, global_losses = [],[]
         
@@ -124,9 +125,15 @@ class ST_Stat_Monitor():
     
     def log(self):
         # log the latest result into the log files
-        train_column = [self.epochs[-1],'train',self.weighted_local_losses[-1],self.weighted_local_accs[-1],max(self.weighted_local_accs)]
-        val_column = [self.epochs[-1],'val',self.weighted_global_losses[-1],self.weighted_global_accs[-1],max(self.weighted_global_accs)]
-        test_column = [self.epochs[-1],'test',self.test_losses[-1],self.test_accs[-1],max(self.test_accs) if self.test_accs[-1] is not None else None]
+        train_column = [self.epochs[-1],'train',self.weighted_local_losses[-1],
+                        self.weighted_local_accs[-1],
+                        max(self.weighted_local_accs)]
+        val_column = [self.epochs[-1],'val',self.weighted_global_losses[-1],
+                      self.weighted_global_accs[-1],
+                      max(self.weighted_global_accs)]
+        test_column = [self.epochs[-1],'test',self.test_losses[-1],
+                       self.test_accs[-1],
+                       max(self.test_accs) if self.test_accs[-1] is not None else None]
         print(f"Round:{self.epochs[-1]}\t|Val Acc:{self.weighted_global_accs[-1]}\t|Test Acc:{self.test_accs[-1]}")
         with open(self.tsv_file, 'a') as af:
             af.write('\t'.join([str(c) for c in train_column]) + '\n')
@@ -139,7 +146,7 @@ class ST_Stat_Monitor():
                         self.global_accs,self.global_losses,self.weighted_global_accs,self.weighted_global_losses,
                         self.test_accs,self.test_losses], stat_f)
         
-        
+      
             
     def test_inference(self, model, test_dataset,device = torch.device('cpu')):
         """ Returns the test accuracy and loss.
@@ -149,7 +156,7 @@ class ST_Stat_Monitor():
         loss, total, correct = 0.0, 0.0, 0.0
 
         model.to(device)
-        criterion = F.cross_entropy
+        
         testloader = DataLoader(test_dataset, batch_size=128,
                                 shuffle=False)
 
@@ -158,7 +165,7 @@ class ST_Stat_Monitor():
 
             # Inference
             outputs = model(datas)
-            batch_loss = criterion(outputs, labels)
+            batch_loss = self.criterion(outputs, labels)
             loss += batch_loss.item()
 
             # Prediction
@@ -170,14 +177,42 @@ class ST_Stat_Monitor():
         accuracy = correct/total
         return accuracy, loss/(batch_idx+1)
 
+    def validation(self,model):
+        val_accs = []
+        val_losses = []
+        for n,c in enumerate(self.clients):
+            if isinstance(model,list):
+                acc,loss = c.validate(model[n])
+            else:
+                acc,loss = c.validate(model)
+            val_accs.append(acc)
+            val_losses.append(loss)
+        return val_accs, val_losses
         
 class AT_Stat_Monitor(ST_Stat_Monitor):
     """
     collect the training,validation and test accuracy and loss
     """
-    def __init__(self,clients,weights = None,log_path=None):
-        super().__init__(clients,weights,log_path)
-        
+    def __init__(self,clients,weights = None,log_path=None,
+                 criterion = F.cross_entropy,
+                 test_adv_method='PGD',test_adv_eps=8/255,
+                 test_adv_alpha=2/255,test_adv_T=10,test_adv_norm='inf',
+                 test_adv_bound=[0.0,1.0]):
+        super().__init__(clients,weights,log_path,criterion)
+        self.test_adv_criterion = lambda m,i,y:self.criterion(m(i),y)
+        self.test_adv_method=test_adv_method
+        self.test_adv_eps = test_adv_eps
+        self.test_adv_alpha = test_adv_alpha
+        self.test_adv_T = test_adv_T
+        self.test_adv_norm = test_adv_norm
+        self.test_adv_bound = test_adv_bound
+        self.adv_sample_gen = Adv_Sample_Generator(criterion=self.test_adv_criterion,
+                                                   attack_method=self.test_adv_method,
+                                                   epsilon=self.test_adv_eps,
+                                                   alpha=self.test_adv_alpha,
+                                                   T=self.test_adv_T,
+                                                   norm=self.test_adv_norm,
+                                                   bound=self.test_adv_bound)
         # validation
         self.global_adv_accs,self.global_adv_losses = [],[]
         self.weighted_global_adv_accs,self.weighted_global_adv_losses = [],[]
@@ -191,7 +226,7 @@ class AT_Stat_Monitor(ST_Stat_Monitor):
             columns = ['epoch', 'mode', 'clean_loss', 'clean_accuracy', 'best_clean_accuracy','adv_loss', 'adv_accuracy', 'best_adv_accuracy']
             wf.write('\t'.join(columns) + '\n')
 
-    def collect(self,global_model,epoch=None,chosen_idxs=None,test_dataset=None,device=torch.device('cpu'),log=False):
+    def collect(self,global_model,epoch=None,chosen_idxs=None,test_dataset=None,device=torch.device('cpu'),log=False,**kwargs):
         res = super().collect(global_model,epoch,chosen_idxs,test_dataset,device,log=False)
         
         # val acc and loss
@@ -280,4 +315,30 @@ class AT_Stat_Monitor(ST_Stat_Monitor):
             
 
     def test_adv_inference(self,model, test_dataset,device = torch.device('cpu')):
-        pass
+        """ Returns the adversarial test accuracy and loss.
+        """
+
+        model.eval()
+        loss, total, correct = 0.0, 0.0, 0.0
+
+        model.to(device)
+        
+        testloader = DataLoader(test_dataset, batch_size=128,
+                                shuffle=False)
+
+        for batch_idx, (datas, labels) in enumerate(testloader):
+            datas, labels = datas.to(device), labels.to(device)
+            adv_datas = self.adv_sample_gen.attack_data(model,datas,labels)
+            # Inference
+            outputs = model(adv_datas)
+            batch_loss = self.criterion(outputs, labels)
+            loss += batch_loss.item()
+
+            # Prediction
+            _, pred_labels = torch.max(outputs, 1)
+            pred_labels = pred_labels.view(-1)
+            correct += torch.sum(torch.eq(pred_labels, labels)).item()
+            total += len(labels)
+
+        accuracy = correct/total
+        return accuracy, loss/(batch_idx+1)

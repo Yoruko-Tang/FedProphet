@@ -103,9 +103,11 @@ def profile_model(model,inputsize):
     """
     pass
 
-def training_latency(model,iteration,performance,memory):
+def training_latency(model,inputsizes,performance,memory):
     """
-    Calculate the training latency given a model, device performance and device memory
+    Calculate the training latency given a model, device performance and device memory.
+    The inputsizes can be a list of sizes, one for each minibatch.
+    The total training latency should be calculated as the sum of all minibatches.
     """
     return 0
 

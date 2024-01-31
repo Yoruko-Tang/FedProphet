@@ -1,8 +1,10 @@
 import torch
+import torch.nn.functional as F
 import numpy as np
 
 class Adv_Sample_Generator():
-    def __init__(self, criterion, attack_method='PGD',
+    def __init__(self, criterion=lambda m,i,y:F.cross_entropy(m(i),y), 
+                 attack_method='PGD',
                  epsilon=8/255, alpha=2/255,T=10, 
                  norm='inf', bound=[0.0,1.0]):
         """

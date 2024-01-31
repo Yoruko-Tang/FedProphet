@@ -112,7 +112,7 @@ class Oort_Selector(Selector):
                         self.T = max(self.delta, self.T - self.delta)
 
         if sys_info is not None:
-            self.sys_utils[selected_clients] = np.array(sys_info)
+            self.sys_utils[selected_clients] = np.array(sys_info["train_times"][selected_clients])
     
         if len(self.explored_clients)==self.total_client_num:
             self.epsilon = 0.0
