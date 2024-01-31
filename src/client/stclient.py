@@ -10,8 +10,10 @@ class ST_Client():
     This is the standard fl client, who uses standard local SGD for training
     Typical use case: FedAvg, FedBN
     """
-    def __init__(self,dataset,data_idxs,sys_info=None,local_state_preserve=False,
-                 device = torch.device('cpu'), verbose=False, random_seed=None, **kwargs):
+    def __init__(self,dataset,data_idxs,sys_info=None,
+                 local_state_preserve=False,
+                 device = torch.device('cpu'), 
+                 verbose=False, random_seed=None, **kwargs):
         self.trainset, self.testset = self.train_test(dataset, list(data_idxs))
         self.dev_name,self.performance,self.memory=sys_info
         self.runtime_app,self.perf_degrade,self.mem_degrade = None,None,None
