@@ -15,8 +15,9 @@ class ST_Client():
         self.trainset, self.testset = self.train_test(dataset, list(data_idxs))
         self.dev_name,self.performance,self.memory=sys_info
         self.runtime_app,self.perf_degrade,self.mem_degrade = None,None,None
+        self.batches = None
         self.device = device
-        self.final_local_accuracy,self.final_local_loss = np.inf,np.inf
+        self.final_local_accuracy,self.final_local_loss = 100.0,100.0
         self.local_state_preserve = local_state_preserve
         self.local_states = None
         self.verbose = verbose
@@ -57,12 +58,12 @@ class ST_Client():
         
 
         iters = 0
+        self.batches = []
         while iters < iteration:
         #for iter in range(self.args.local_ep):
             for _, (datas, labels) in enumerate(self.trainloader):
-                
+                self.batches.append(list(datas.shape))
                 datas, labels = datas.to(self.device), labels.to(self.device)
-
                 model.zero_grad()
                 output = model(datas)
                 loss = criterion(output, labels)

@@ -1,7 +1,6 @@
 import numpy as np
 import copy
 import torch
-import selection
 
 class Avg_Server():
     def __init__(self,global_model,clients,selector,scheduler,
@@ -39,7 +38,7 @@ class Avg_Server():
         
         # initialize selector and scheduler
         self.stat_info = self.stat_monitor.collect(self.global_model)
-        self.sys_info = self.sys_monitor.collect()
+        self.sys_info = self.sys_monitor.collect(self.global_model)
         self.selector.stat_update(stat_info=self.stat_info,sys_info=self.sys_info)
         self.scheduler.stat_update(epoch=0,stat_info=self.stat_info,sys_info=self.sys_info)
 
@@ -53,12 +52,10 @@ class Avg_Server():
         
         print('\n | Global Training Round : {} |\n'.format(self.round))
         
-        # collect each client's systematic information
-        self.sys_info = self.sys_monitor.collect()
+        
         
         # update the selector's information before selection
-        if not isinstance(self.selector,selection.AFL_Selector):
-            self.selector.stat_update(epoch=self.round,selected_clients=self.idxs_users,stat_info=self.stat_info,sys_info=self.sys_info,server=self)
+        self.selector.stat_update(epoch=self.round,selected_clients=self.idxs_users,stat_info=self.stat_info,sys_info=self.sys_info,server=self)
         
         #update the scheduler's information
         self.scheduler.stat_update(epoch =self.round,stat_info = self.stat_info,sys_info=self.sys_info)
@@ -71,22 +68,22 @@ class Avg_Server():
             self.idxs_users = self.selector.select(m)
         print("Chosen Clients:",self.idxs_users)
         
-        # update the selector's information after selection for AFL
-        if isinstance(self.selector,selection.AFL_Selector):
-            self.selector.stat_update(selected_clients=self.idxs_users,stat_info=self.stat_info)
         
         # train selected clients
         self.global_model = self.train_idx(self.idxs_users)
 
         if (self.round+1)%self.test_every == 0:
             # collect each client's statistical information
-            self.stat_info = \
-                self.stat_monitor.collect(self.global_model,
-                                          epoch=self.round,
-                                          chosen_idxs=self.idxs_users,
-                                          test_dataset=self.test_dataset,
-                                          device=self.device,log=True)
-        
+            self.stat_info = self.stat_monitor.collect(self.global_model,
+                                                       epoch=self.round,
+                                                       chosen_idxs=self.idxs_users,
+                                                       test_dataset=self.test_dataset,
+                                                       device=self.device,log=True)
+        # collect each client's systematic information
+        self.sys_info = self.sys_monitor.collect(self.global_model,
+                                                 epoch=self.round,
+                                                 chosen_clients=self.idxs_users,
+                                                 log=True)
 
         self.round += 1
         return self.global_model
@@ -123,11 +120,3 @@ class Avg_Server():
                 w0[p] = w/weights_sum
         model.load_state_dict(w0)
         return model
-
-    def val(self,model):
-        return self.stat_monitor.collect(model)
-
-    def test(self,model):
-        return self.stat_monitor.collect(model,test_dataset=self.test_dataset,device=self.device)
-    
-    
