@@ -105,7 +105,7 @@ def profile_model(model, inputsize):
     get the flops and paramenters of each layer (block) in a model 
 
     return: flops_per_module and params_per_module
-    *** note that the last item in the return is ('total', flops/params) ***
+    *** note that the last item in the returned dictionaries is ('total', flops/params) ***
     """
     x = torch.rand(inputsize)
     flops = FlopCountAnalysis(model,x)
