@@ -97,8 +97,22 @@ def sample_runtime_app(rs):
     runtime_app = rs.choices(unique_runtime_app_list)
     return runtime_app, unique_perf_degrade_dic[runtime_app],unique_mem_avail_dic[runtime_app]
 
+def profile_model(model,inputsize):
+    """
+    get the flops and paramenters of each layer (block) in a model 
+    """
+    pass
+
 def training_latency(model,iteration,performance,memory):
     """
     Calculate the training latency given a model, device performance and device memory
     """
     return 0
+
+def model_partition(model,max_flops,max_mem,num_classes):
+    """
+    partition the model in a greedy manner, with each module in the 
+    max_flops and max_mem constraints
+    """
+    pass
+
