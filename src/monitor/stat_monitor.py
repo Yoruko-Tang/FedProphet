@@ -56,14 +56,26 @@ class ST_Stat_Monitor():
             local_losses = None
         
         # validation acc and loss
-        for c in self.clients:
-            acc,loss = c.validate(global_model)
+        for n,c in enumerate(self.clients):
+            if isinstance(global_model,list):
+                acc,loss = c.validate(global_model[n])
+            else:
+                acc,loss = c.validate(global_model)
             global_accs.append(acc)
             global_losses.append(loss)
         
         # test acc and loss
         if test_dataset is not None:
-            test_acc,test_loss = self.test_inference(global_model,test_dataset,device)
+            if not isinstance(global_model,list):
+                test_acc,test_loss = self.test_inference(global_model,test_dataset,device)
+            else:
+                test_accs,test_losses = [],[]
+                for n in range(len(global_model)):
+                    test_acc_n,test_loss_n = self.test_inference(global_model[n],test_dataset,device)
+                    test_accs.append(test_acc_n)
+                    test_losses.append(test_loss_n)
+                    test_acc,test_loss = np.mean(test_accs),np.mean(test_losses)
+        
         else:
             test_acc,test_loss = None,None
 

@@ -3,20 +3,24 @@ from torch.utils.data import DataLoader, Subset
 import torch.nn
 import copy
 import numpy as np
+from hardware.sys_utils import sample_runtime_app
 
 class ST_Client():
     """
     This is the standard fl client, who uses standard local SGD for training
     Typical use case: FedAvg, FedBN
     """
-    def __init__(self,dataset,data_idxs,local_state_preserve=False,
-                 device = torch.device('cpu'), verbose=False, **kwargs):
+    def __init__(self,dataset,data_idxs,sys_info=None,local_state_preserve=False,
+                 device = torch.device('cpu'), verbose=False, random_seed=None, **kwargs):
         self.trainset, self.testset = self.train_test(dataset, list(data_idxs))
+        self.dev_name,self.performance,self.memory=sys_info
+        self.runtime_app,self.perf_degrade,self.mem_degrade = None,None,None
         self.device = device
         self.final_local_accuracy,self.final_local_loss = np.inf,np.inf
         self.local_state_preserve = local_state_preserve
         self.local_states = None
         self.verbose = verbose
+        self.rs = np.random.RandomState(random_seed)
 
 
     def train_test(self, dataset, idxs):
@@ -100,6 +104,13 @@ class ST_Client():
 
         accuracy = correct/total
         return accuracy, loss/(batch_idx+1)
+    
+    def get_runtime_sys_stat(self):
+        self.runtime_app,self.perf_degrade,self.mem_degrade=sample_runtime_app(self.rs)
+        self.avail_perf = self.performance*self.perf_degrade
+        self.avail_mem = self.memory*self.mem_degrade
+        return self.runtime_app, self.avail_perf,self.avail_mem
+
     
     def get_local_state_dict(self,model):
         sd = model.state_dict()

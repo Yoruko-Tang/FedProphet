@@ -19,6 +19,8 @@ from utils.utils import setup_seed, get_log_path, exp_details
 from datasets.dataset_utils import get_dataset, get_data_matrix
 from datasets import dataset_to_modelfamily
 
+from hardware.sys_utils import get_devices
+
 
 
 
@@ -50,6 +52,7 @@ if __name__ == '__main__':
         ## ==================================Load Dataset==================================
         train_dataset, test_dataset, user_groups, user_groups_test, weights = get_dataset(args,seed)
         data_matrix = get_data_matrix(train_dataset, user_groups, args.num_classes)
+        user_devices = get_devices(args,seed)
         if seed is not None:
             setup_seed(seed)
 
@@ -64,13 +67,17 @@ if __name__ == '__main__':
 
         ## ==================================Build Clients==================================
         if args.flalg == 'FedAvg':
-            clients = [ST_Client(train_dataset,user_groups[i],
+            clients = [ST_Client(train_dataset,user_groups[i],sys_info=user_devices[i],
                                  local_state_preserve=False,device=device,
-                                 verbose=args.verbose) for i in range(args.num_users)]
+                                 verbose=args.verbose,
+                                 random_seed=i+args.device_random_seed
+                                 ) for i in range(args.num_users)]
         elif args.flalg == 'FedBN':
-            clients = [ST_Client(train_dataset,user_groups[i],
+            clients = [ST_Client(train_dataset,user_groups[i],sys_info=user_devices[i],
                                  local_state_preserve=True,device=device,
-                                 verbose=args.verbose) for i in range(args.num_users)]
+                                 verbose=args.verbose,
+                                 random_seed=i+args.device_random_seed
+                                 ) for i in range(args.num_users)]
         # elif args.flalg == 'FAT':
         #     clients = [AT_Client(train_dataset,user_groups[i],local_state_preserve=False,device=device) for i in range(args.num_users)]
         # Todo: add other types of clients

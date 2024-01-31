@@ -1,0 +1,104 @@
+import numpy as np
+from numpy.random import RandomState
+
+unique_runtime_app_list = ['idle', '1080p', '4k', 'inference', 'detection', 'web']
+unique_perf_degrade_dic = {'idle': 1, '1080p': 0.735, '4k': 0.459, 'inference': 0.524, 'detection': 0.167 , 'web': 0.231}
+unique_mem_avail_dic = {'idle': 1, '1080p': 0.5, '4k': 0.25, 'inference': 0.75, 'detection': 0.0625, 'web': 0.125}
+
+def get_devices(args,seed=None):
+    """
+    Returns the devices of each client, which is a dict: idx -> (device_name,perf,mem)
+    The available device list is defined in args.flsys_profile_info, and the 
+    sampling probability is determined by args.sys_scaling_factor.
+    """
+    rs = RandomState(seed)
+    unique_client_device_dic = read_client_device_info(args.flsys_profile_info)
+    device_name_list, device_perf_list, device_mem_list \
+        = sample_devices(args.num_users,rs,unique_client_device_dic,
+                         args.sys_scaling_factor)
+    
+    user_devices = {i:(device_name_list[i],device_perf_list[i],device_mem_list[i]) for i in range(args.num_users)}
+    return user_devices
+    
+
+
+def read_client_device_info(flsys_profile_info):
+
+    """
+    arg: flsys_profile_info
+
+    return: unique_client_device_dic - {'client_device_name': GFLOPS, GB}
+    """
+
+    unique_client_device_dic = {}
+    file = open(flsys_profile_info, 'r')
+
+    while True:
+        line = file.readline()
+        if not line: break
+        line = line.replace('\n', ' ').replace('\t', ' ')
+        splitline = line.split(" ")
+        splitline = splitline[:-1]
+        compact_line =[]
+        for item in splitline:
+            if item != '':
+                compact_line.append(item)
+
+        client_device_name = compact_line[0]
+        if client_device_name != 'Client':
+            if client_device_name not in unique_client_device_dic.keys():
+                unique_client_device_dic[client_device_name] = [compact_line[1]] #GFLOPS
+                unique_client_device_dic[client_device_name].append(compact_line[2]) #GB
+    
+    return unique_client_device_dic
+
+def sample_devices(num_users,rs,device_dic,sys_scaling_factor):
+    """
+    sample the device with its theoretical performance (GFLOPS) and 
+    maximal available memory (GB) for each client
+    """
+    num_unique_device = len(device_dic)
+    unique_id_list = [id for id in range(num_unique_device)]
+    unique_name_list = []
+    unique_perf_list = []
+    unique_mem_list  = []
+    mul_perf_mem_list = []
+    
+
+    for k in device_dic.keys():
+        unique_name_list.append(k)
+        unique_perf_list.append(device_dic[k][0])
+        unique_mem_list.append(device_dic[k][1])
+        mul_perf_mem_list.append(float(device_dic[k][0])*float(device_dic[k][1]))
+    
+    scaled_mul_perf_mem_list = np.array([v ** sys_scaling_factor for v in mul_perf_mem_list])
+    prob_list = scaled_mul_perf_mem_list/np.sum(scaled_mul_perf_mem_list)
+
+
+    client_device_name_list = []
+    client_device_perf_list = [] #GFLOPS
+    client_device_mem_list  = [] #GB
+
+
+    device_id_list = rs.choices(unique_id_list, p=prob_list, size=num_users)
+    # device_id_list = [random.randint(0,num_unique_device-1) for _ in range(num_users)]
+    for id in device_id_list:
+        client_device_name_list.append(unique_name_list[id])
+        client_device_perf_list.append(unique_perf_list[id])
+        client_device_mem_list.append(unique_mem_list[id])
+    
+    return client_device_name_list, client_device_perf_list, client_device_mem_list
+
+
+def sample_runtime_app(rs):
+    # generate the specific runtime applications for each client
+    # runtime application for each client is dynamic - different random seed per epoch
+
+    runtime_app = rs.choices(unique_runtime_app_list)
+    return runtime_app, unique_perf_degrade_dic[runtime_app],unique_mem_avail_dic[runtime_app]
+
+def training_latency(model,iteration,performance,memory):
+    """
+    Calculate the training latency given a model, device performance and device memory
+    """
+    return 0
