@@ -71,10 +71,8 @@ def opt_option(parser):
     parser.add_argument('--target_accuracy',type=float,default=None,
                         help='stop at a specified test accuracy')
     
-    # local optimizer
-    parser.add_argument('--optimizer', type=str, default='sgd', 
-                        choices=['sgd','adam'],
-                        help="type of optimizer")
+    # local optimizer args
+    
     parser.add_argument('--local_ep', type=int, default=10,
                         help="the number of local epochs: E")
     parser.add_argument('--local_bs', type=int, default=10,
@@ -85,6 +83,9 @@ def opt_option(parser):
                         help = 'Learning rate decay at specified rounds')
     parser.add_argument('--lr_schedule', type=int, nargs='*', default=None,
                         help='Decrease learning rate at these rounds.')
+    parser.add_argument('--optimizer', type=str, default='sgd', 
+                        choices=['sgd','adam'],
+                        help="type of optimizer")
     parser.add_argument('--momentum', type=float, default=0.0,
                         help='SGD momentum (default: 0.0)')
     parser.add_argument('--reg', default=1e-4, type=float, 
@@ -167,12 +168,14 @@ def at_option(parser):
     parser.add_argument('--adv_warmup',type = int,default = 0,help='length of warm up phase')
     parser.add_argument('--adv_train', action = 'store_true',
                         help = 'Use adversarial samples for training')
-    parser.add_argument('--adv_attack',type = str, choices=['PGD','BIM','FGSM','FGSM_RS'],default='PGD',
+    parser.add_argument('--adv_method',type = str, choices=['PGD','BIM','FGSM','FGSM_RS'],default='PGD',
                         help = 'Kind of adversarial attack')
-    parser.add_argument('--adv_epsilon',type = float,nargs="*", default=[0.15,])
-    parser.add_argument('--adv_alpha',type = float,nargs="*", default=[0.01,])
-    parser.add_argument('--adv_T', type = int, default=15)
-    parser.add_argument('--adv_sample_ratio', type = float,default=1.0,
+    parser.add_argument('--adv_epsilon',type = float, default=8/255)
+    parser.add_argument('--adv_alpha',type = float, default=2/255)
+    parser.add_argument('--adv_T', type = int, default=10)
+    parser.add_argument('--adv_norm', type = str, default='inf')
+    parser.add_argument('--adv_bound',type = float,nargs=2, default=[0.0,1.0])
+    parser.add_argument('--adv_ratio', type = float,default=1.0,
                         help = 'Ratio of adversarial training samples')
     
     parser.add_argument('--adv_test', action = 'store_true',

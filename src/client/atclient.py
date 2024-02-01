@@ -31,9 +31,9 @@ class AT_Client(ST_Client):
         self.test_adv_norm = test_adv_norm
         self.test_adv_bound = test_adv_bound
         
-    def train(self,model,iteration,batchsize,lr,optimizer='sgd',
+    def train(self,model,local_ep,local_bs,lr,optimizer='sgd',
               momentum=0.0,reg=0.0, criterion=torch.nn.CrossEntropyLoss(),
-              adv_method='pgd',adv_eps=0.0,adv_alpha=0.0,adv_T=0,
+              adv_method='pgd',adv_epsilon=0.0,adv_alpha=0.0,adv_T=0,
               adv_norm='inf',adv_bound=[0.0,1.0],adv_ratio=1.0,**kwargs):
         """train the model for one communication round."""
         model = copy.deepcopy(model) # avoid modifying global model
@@ -42,7 +42,7 @@ class AT_Client(ST_Client):
             model = self.load_local_state_dict(model,self.local_states)
         
 
-        self.trainloader = DataLoader(self.trainset,batch_size=batchsize,shuffle=True)
+        self.trainloader = DataLoader(self.trainset,batch_size=local_bs,shuffle=True)
 
         # Set optimizer for the local updates
         np = model.parameters()
@@ -52,13 +52,13 @@ class AT_Client(ST_Client):
             optimizer = torch.optim.Adam(np, lr=lr, weight_decay=reg)
         
         adv_criterion = lambda m,i,y:criterion(m(i),y)
-        adv_data_gen = Adv_Sample_Generator(adv_criterion,adv_method,adv_eps,
+        adv_data_gen = Adv_Sample_Generator(adv_criterion,adv_method,adv_epsilon,
                                             adv_alpha,adv_T,adv_norm,adv_bound)
         
 
         iters = 0
         self.batches = []
-        while iters < iteration:
+        while iters < local_ep:
         #for iter in range(self.args.local_ep):
             for _, (datas, labels) in enumerate(self.trainloader):
                 adv_bs = int(adv_ratio*len(datas))
@@ -77,11 +77,11 @@ class AT_Client(ST_Client):
                 loss.backward()
                 optimizer.step()
                 iters += 1
-                if iters == iteration:
+                if iters == local_ep:
                     break
 
             if self.verbose:
-                print('Local Epoch : {}/{} |\tLoss: {:.4f}'.format(iters, iteration, loss.item()))
+                print('Local Epoch : {}/{} |\tLoss: {:.4f}'.format(iters, local_ep, loss.item()))
         
         self.local_states = copy.deepcopy(self.get_local_state_dict(model))
         self.final_local_accuracy,self.final_local_loss = self.validate(model)

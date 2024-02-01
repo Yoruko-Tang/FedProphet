@@ -39,7 +39,7 @@ class ST_Client():
                                 
         return trainset, testset
     
-    def train(self,model,iteration,batchsize,lr,optimizer='sgd',
+    def train(self,model,local_ep,local_bs,lr,optimizer='sgd',
               momentum=0.0,reg=0.0,
               criterion=torch.nn.CrossEntropyLoss(),**kwargs):
         """train the model for one communication round."""
@@ -49,7 +49,7 @@ class ST_Client():
             model = self.load_local_state_dict(model,self.local_states)
         model.train()
         
-        self.trainloader = DataLoader(self.trainset,batch_size=batchsize,shuffle=True)
+        self.trainloader = DataLoader(self.trainset,batch_size=local_bs,shuffle=True)
 
         # Set optimizer for the local updates
         np = model.parameters()
@@ -61,7 +61,7 @@ class ST_Client():
 
         iters = 0
         self.batches = []
-        while iters < iteration:
+        while iters < local_ep:
         #for iter in range(self.args.local_ep):
             for _, (datas, labels) in enumerate(self.trainloader):
                 self.batches.append(list(datas.shape))
@@ -72,11 +72,11 @@ class ST_Client():
                 loss.backward()
                 optimizer.step()
                 iters += 1
-                if iters == iteration:
+                if iters == local_ep:
                     break
 
             if self.verbose:
-                print('Local Epoch : {}/{} |\tLoss: {:.4f}'.format(iters, iteration, loss.item()))
+                print('Local Epoch : {}/{} |\tLoss: {:.4f}'.format(iters, local_ep, loss.item()))
         
         self.local_states = copy.deepcopy(self.get_local_state_dict(model))
         self.final_local_accuracy,self.final_local_loss = self.validate(model)
