@@ -55,7 +55,7 @@ class Sys_Monitor():
                     train_times.append(training_latency(model,c.batches,cavail_perf,cavail_mem))
 
             else:
-                train_times.append(0)
+                train_times.append(1.0)
         
         
         round_time = np.max(np.array(train_times)[chosen_idxs])
