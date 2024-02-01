@@ -60,6 +60,7 @@ def profile_model(model, inputsize):
 
     flops = FlopCountAnalysis(model,x)
     _flops_per_module = flops.by_module()
+    #print(_flops_per_module)
     _params_per_module = parameter_count(model)
     flops_per_module = {}
     params_per_module = {}
@@ -96,8 +97,20 @@ def profile_model(model, inputsize):
 
 
 model = get_net('vgg16','cifar',num_classes=10)
+print(model)
+layer_shapes = {}
+
 inputsize = [10,3,32,32]
 profile_model(model,inputsize)
+
+for name,para in model.named_parameters():
+    if 'bias' not in name:
+        layer_shapes[name] = para.shape
+
+print(layer_shapes)
+print(len(layer_shapes))
+
+
 
 
     

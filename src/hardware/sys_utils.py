@@ -139,7 +139,7 @@ def profile_model(model, inputsize):
 
     return flops_per_module, params_per_module
 
-def training_latency(model,inputsizes,performance,memory):
+def training_latency(module_dic,inputsizes,performance,memory):
     """
     Calculate the training latency given a model, device performance and device memory.
     The inputsizes can be a list of sizes, one for each minibatch.
@@ -148,10 +148,53 @@ def training_latency(model,inputsizes,performance,memory):
     # [[10,3,32,32],[]]
     return 0
 
-def model_partition(model,max_flops,max_mem,num_classes):
+def model_partition(model,inputsize,max_flops,max_mem,num_classes):
     """
     partition the model in a greedy manner, with each module in the 
     max_flops and max_mem constraints
     """
-    pass
+
+    def greedy_partition(flops_per_module,params_per_module,inputsize,max_flops,max_mem):
+        """
+        max_flops: flops
+        max_mem: bytes
+        memory consumption relates to input size...
+        """
+        module_id_list = [i for i in range(len(flops_per_module))]
+        partition_module_id_list =[]
+        current_partition_module_id_list = []
+
+        partition_module_list = []
+        current_partition_module_list = []
+        current_sum_flops = 0
+        current_sum_mem = 0
+
+        # assert max(flops) or max(params) > constraints 
+
+
+        pos = 0
+        for key in flops_per_module.keys():
+            # get the intermidiate features
+            # intmd_feature = get_feature_size(current_partition)
+            if current_sum_flops + flops_per_module[key] <= max_flops and \
+            current_sum_mem + (params_per_module[key]+intmd_feature) * 3 * 4 <= max_mem:
+                current_sum_flops += flops_per_module[key]
+                current_sum_mem += (params_per_module[key]+intmd_feature) * 3 * 4
+                current_partition_module_list.append(key)
+                current_partition_module_id_list.append(pos)
+            
+            else:
+                partition_module_list.append(current_partition_module_list)
+                partition_module_id_list.append(current_partition_module_id_list)
+                
+                
+            
+            
+            
+
+            
+
+        
+    
+
 
