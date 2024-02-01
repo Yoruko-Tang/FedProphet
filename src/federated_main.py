@@ -13,7 +13,7 @@ from scheduler import *
 
 
 from utils.options import args_parser
-from utils.models import get_net
+from models.model_utils import get_net
 from utils.utils import setup_seed, get_log_path, exp_details
 
 from datasets.dataset_utils import get_dataset, get_data_matrix
@@ -59,9 +59,11 @@ if __name__ == '__main__':
         ## ==================================Build Model==================================
         # try to get the model from torchvision.models with pretraining
         global_model = get_net(modelname = args.model,
-                               modeltype=dataset_to_modelfamily[args.dataset],
+                               modeltype = dataset_to_modelfamily[args.dataset],
+                               num_classes = args.num_classes,
                                pretrained = args.pretrained,
-                               num_classes = args.num_classes)
+                               adv_norm = (args.adv_train or args.adv_test),
+                               modularization = (args.flalg == "FedProphet"))
         print(global_model)
 
 

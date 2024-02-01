@@ -7,73 +7,54 @@ from torch import nn
 import torch.nn.functional as F
 import numpy as np
 import math
-import os.path as osp
-import os
-import torchvision.models
-import types
 
-def get_net(modelname, modeltype, pretrained=False, num_classes=1000):
+import models
+import models.vgg
+import models.resnet
+from models import modelname_to_modelfamily
+from datasets import modelfamily_to_normalize
+
+
+def get_net(modelname, modeltype, num_classes=1000, 
+            pretrained=False, adv_norm=False, modularization=False):
     """
     modelname: must be exactly the same as the classes in torchvision.models
     e.g., vgg11, vgg16
     """
     # assert "vgg" in modelname or 'resnet' in modelname, "Only support VGG and ResNet for pretrained model currently"
-    assert modeltype in ["imagenet","cifar"], "Only support imagenet-like or cifar-like datasets with pretrained model currently"
- 
-    model = eval('torchvision.models.{}'.format(modelname))(weights="DEFAULT" if pretrained else None)
-    if num_classes!=1000: # reinitialize the last layer
-        if 'vgg' in modelname: # vgg
-            if modeltype == 'imagenet': # for 224x224x3 inputs
-                in_feat = model.classifier[-1].in_features
-                model.classifier[-1] = nn.Linear(in_feat, num_classes)
-            else: # for 32x32x3 inputs
-                model.avgpool = nn.AdaptiveAvgPool2d((1,1))
-                model.classifier = nn.Sequential(
-                    nn.Linear(512, 512),
-                    nn.ReLU(True),
-                    nn.Dropout(),
-                    nn.Linear(512, 512),
-                    nn.ReLU(True),
-                    nn.Dropout(),
-                    nn.Linear(512, num_classes))# use less neurons for a small input
-        elif 'resnet' in modelname: #resnet
-            in_feat = model.fc.in_features
-            model.fc = nn.Linear(in_feat, num_classes)
-        else:
-            raise RuntimeError("Not supported pretrained model: {}".format(modelname))
+    if pretrained:
+        assert modeltype in ["imagenet","cifar"], "Only support imagenet-like or cifar-like datasets with pretrained model currently"
+    
+    # get pretrained model
+    model = eval('models.{}'.format(modelname))(weights="DEFAULT" if pretrained else None)
+    # adapt to the specified num_classes
+    model = eval('models.{}.adapt'.format(modelname_to_modelfamily(modelname)))(model,modeltype,num_classes)
 
+
+    # add normalization layer to the adversarial training model
+    if adv_norm:
+        norm_info = modelfamily_to_normalize[modeltype]
+        mean,std = norm_info["mean"],norm_info["std"]
+        normalization_layer = Normalize(mean,std)
+        model = eval('models.{}.add_normalization'.format(modelname_to_modelfamily(modelname)))(model,normalization_layer)
+    
+    # modularize the model such that the model can enter and exit at any layers
+    if modularization:
+        model = eval('models.{}.modularization'.format(modelname_to_modelfamily(modelname)))(model)
     return model
     
 
-# def modify_pretrained_model(model): 
-#     def Get_Local_State_Dict(self):
-#         sd = self.state_dict()
-#         for name in list(sd.keys()):
-#             if 'weight' in name or 'bias' in name:
-#                 sd.pop(name)
-#         return sd
-
-#     def Load_Local_State_Dict(self,local_dict):
-#         # load local parameters saved by Get_Local_State_Dict()
-#         sd = self.state_dict()
-#         sd.update(local_dict)
-#         self.load_state_dict(sd)
-
-#     model.Get_Local_State_Dict = types.MethodType(Get_Local_State_Dict,model)
-#     model.Load_Local_State_Dict = types.MethodType(Load_Local_State_Dict,model)
-#     return model
-
 
 class Normalize(nn.Module):
-    def __init__(self,mean,var):
+    def __init__(self,mean,std):
         super(Normalize, self).__init__()
         self.mean = torch.tensor(mean).reshape([1,-1,1,1])
-        self.var = torch.tensor(var).reshape([1,-1,1,1])
+        self.std = torch.tensor(std).reshape([1,-1,1,1])
     
     def forward(self,x):
         self.mean = self.mean.to(x)
-        self.var = self.var.to(x)
-        return (x-self.mean)/self.var
+        self.std = self.std.to(x)
+        return (x-self.mean)/self.std
 
 class DualBatchNorm2d(nn.BatchNorm2d):
     def __init__(self, num_features, eps=0.00001, momentum=0.1, affine=True, track_running_stats=True):

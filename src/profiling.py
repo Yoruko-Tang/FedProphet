@@ -1,4 +1,4 @@
-from models import get_net
+from models.model_utils import get_net
 from fvcore.nn import FlopCountAnalysis,flop_count_table, parameter_count
 import torch
 
@@ -95,9 +95,12 @@ def profile_model(model, inputsize):
     
 
 
-model = get_net('vgg16','cifar',num_classes=10)
+model = get_net('vgg16_bn','cifar',num_classes=10,adv_norm=True,modularization=True)
 inputsize = [10,3,32,32]
 profile_model(model,inputsize)
+for n,m in model.named_modules():
+    print(n)
+
 
 
     

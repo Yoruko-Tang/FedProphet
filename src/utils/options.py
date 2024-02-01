@@ -165,8 +165,8 @@ def selector_option(parser):
 def at_option(parser):
     # Adversarial Training
     parser.add_argument('--adv_warmup',type = int,default = 0,help='length of warm up phase')
-    parser.add_argument('--adv_train', type = float, default = 0.0,
-                        help = 'The fraction of clients that use adversarial samples for training')
+    parser.add_argument('--adv_train', action = 'store_true',
+                        help = 'Use adversarial samples for training')
     parser.add_argument('--adv_attack',type = str, choices=['PGD','BIM','FGSM','FGSM_RS'],default='PGD',
                         help = 'Kind of adversarial attack')
     parser.add_argument('--adv_epsilon',type = float,nargs="*", default=[0.15,])
