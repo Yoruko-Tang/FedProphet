@@ -9,7 +9,7 @@ from datasets.language import shakespeare, sent140
 # Create a mapping of dataset -> dataset_type
 # This is helpful to determine which (a) family of model needs to be loaded e.g., imagenet and
 # (b) input transform to apply
-dataset_to_modelfamily = {
+dataset_to_datafamily = {
     # MNIST
     'MNIST': 'mnist',
     'KMNIST': 'mnist',
@@ -32,7 +32,7 @@ dataset_to_modelfamily = {
     'sent140': 'nlp'
 }
 
-modelfamily_to_normalize = {
+datafamily_to_normalize = {
     'mnist': {
         'mean':(0.1307,),
         'std':(0.3081,)
@@ -48,7 +48,7 @@ modelfamily_to_normalize = {
 }
 
 # Transforms
-modelfamily_to_transforms = {
+datafamily_to_transforms = {
     'mnist': {
         'train': transforms.Compose([
             transforms.ToTensor(),

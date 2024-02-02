@@ -6,6 +6,7 @@ from torch.utils.data import DataLoader
 import torch.nn.functional as F
 import pickle
 from utils.adversarial import Adv_Sample_Generator
+import json
 
 class ST_Stat_Monitor():
     """
@@ -17,8 +18,8 @@ class ST_Stat_Monitor():
         self.weights = weights if weights is not None else np.ones(len(self.clients))/len(self.clients)
         self.chosen_clients = []
         # training
-        self.local_accs,self.local_losses = [],[]
-        self.weighted_local_accs,self.weighted_local_losses = [],[]
+        self.local_losses = []
+        self.weighted_local_losses = []
 
         # validation
         self.global_accs,self.global_losses = [],[]
@@ -43,17 +44,15 @@ class ST_Stat_Monitor():
                 columns = ['epoch', 'mode', 'loss', 'accuracy', 'best_accuracy']
                 wf.write('\t'.join(columns) + '\n')
 
-    def collect(self,global_model,epoch=None,chosen_idxs=None,test_dataset=None,device=torch.device('cpu'),log=False,**kwargs):
-        local_accs, local_losses = [],[]
+    def collect(self,global_model,epoch=None,chosen_idxs=None,test_dataset=None,device=torch.device('cpu'),log=False,save=True,**kwargs):
+        local_losses = []
         global_accs, global_losses = [],[]
         
         # training acc and loss
         if chosen_idxs is not None:
             for idx in chosen_idxs:
-                local_accs.append(self.clients[idx].final_local_accuracy)
                 local_losses.append(self.clients[idx].final_local_loss)
         else: # do not collect training data
-            local_accs = None
             local_losses = None
         
         # validation acc and loss
@@ -78,44 +77,64 @@ class ST_Stat_Monitor():
                     test_acc,test_loss = np.mean(test_accs),np.mean(test_losses)
         
         else:
-            test_acc,test_loss = None,None
+            test_acc,test_loss = 0,None
 
         # collect
-        if local_accs is not None:
-            local_accs, local_losses = np.array(local_accs),np.array(local_losses)
+        if local_losses is not None:
+            local_losses = np.array(local_losses)
+            weighted_local_loss = np.sum(local_losses*self.weights[chosen_idxs])/np.sum(self.weights[chosen_idxs])
+        else:
+            weighted_local_loss = None
         
 
         global_accs, global_losses  = np.array(global_accs),np.array(global_losses)
+        weighted_global_acc,weighted_global_loss = np.sum(global_accs*self.weights),np.sum(global_losses*self.weights)
         
         
         if log:
             self.epochs.append(epoch)
             self.chosen_clients.append(chosen_idxs)
+
+            self.local_losses.append(local_losses)
             self.global_accs.append(global_accs)
             self.global_losses.append(global_losses)
-            self.local_accs.append(local_accs)
-            self.local_losses.append(local_losses)
-
-            weighted_global_acc,weighted_global_loss = np.sum(global_accs*self.weights),np.sum(global_losses*self.weights)
-            self.weighted_global_accs.append(weighted_global_acc)
-            self.weighted_global_losses.append(weighted_global_loss)
-            
-            if local_accs is not None:
-                weighted_local_acc,weighted_local_loss = np.sum(local_accs*self.weights[chosen_idxs]),np.sum(local_losses*self.weights[chosen_idxs])
-            else:
-                weighted_local_acc,weighted_local_loss = None, None
-            self.weighted_local_accs.append(weighted_local_acc)
-            self.weighted_local_losses.append(weighted_local_loss)
-            
             self.test_accs.append(test_acc)
             self.test_losses.append(test_loss)
-            self.log()
-            # store the model if it attains the highest validation loss
-            if np.argmax(self.weighted_global_accs) == len(self.weighted_global_accs)-1:
-                torch.save([global_model,[c.local_states for c in self.clients]],self.pt_file)
+
+            self.weighted_local_losses.append(weighted_local_loss)
+            self.weighted_global_accs.append(weighted_global_acc)
+            self.weighted_global_losses.append(weighted_global_loss)
+
+            print(f"Round:{epoch}\t|Validation Accuracy:{weighted_global_acc*100:.2f}%\t|Test Accuracy:{test_acc*100:.2f}%")
+            # log the latest result into the log files
+            if save:
+                train_column = [epoch,'train',weighted_local_loss,'n/a','n/a']
+                val_column = [epoch,'val',weighted_global_loss,weighted_global_acc,
+                            max(self.weighted_global_accs)]
+                test_column = [epoch,'test',test_loss,test_acc,max(self.test_accs)]
+                with open(self.tsv_file, 'a') as af:
+                    if chosen_idxs is not None:
+                        af.write('\t'.join([str(c) for c in train_column]) + '\n')
+                    af.write('\t'.join([str(c) for c in val_column]) + '\n')
+                    if test_dataset is not None:
+                        af.write('\t'.join([str(c) for c in test_column]) + '\n')
+                
+                with open(self.pkl_file,'wb') as stat_f:
+                    pickle.dump([self.weights,self.epochs,self.chosen_clients, 
+                                self.local_losses,self.weighted_local_losses,
+                                self.global_accs,self.global_losses,
+                                self.weighted_global_accs,self.weighted_global_losses,
+                                self.test_accs,self.test_losses], stat_f)
+                # store the model if it attains the highest validation loss
+                if np.argmax(self.weighted_global_accs) == len(self.weighted_global_accs)-1:
+                    torch.save([global_model,[c.local_states for c in self.clients]],self.pt_file)
+                    model_info = {"round":epoch,
+                                  "validation clean accuracy":weighted_global_acc,
+                                  "test clean accuracy":test_acc}
+                    with open(self.pt_file.replace('best_model.pt','modelinfo.json'),'w') as pf:
+                        json.dump(model_info,pf,indent=True)
         
         res = {"epoch":epoch,
-            "train_acc": local_accs,
             "train_loss": local_losses,
             "val_acc": global_accs,
             "val_loss": global_losses,
@@ -123,29 +142,6 @@ class ST_Stat_Monitor():
             "test_loss": test_loss}
         return res
     
-    def log(self):
-        # log the latest result into the log files
-        train_column = [self.epochs[-1],'train',self.weighted_local_losses[-1],
-                        self.weighted_local_accs[-1],
-                        max(self.weighted_local_accs)]
-        val_column = [self.epochs[-1],'val',self.weighted_global_losses[-1],
-                      self.weighted_global_accs[-1],
-                      max(self.weighted_global_accs)]
-        test_column = [self.epochs[-1],'test',self.test_losses[-1],
-                       self.test_accs[-1],
-                       max(self.test_accs) if self.test_accs[-1] is not None else None]
-        print(f"Round:{self.epochs[-1]}\t|Val Acc:{self.weighted_global_accs[-1]}\t|Test Acc:{self.test_accs[-1]}")
-        with open(self.tsv_file, 'a') as af:
-            af.write('\t'.join([str(c) for c in train_column]) + '\n')
-            af.write('\t'.join([str(c) for c in val_column]) + '\n')
-            af.write('\t'.join([str(c) for c in test_column]) + '\n')
-        
-        with open(self.pkl_file,'wb') as stat_f:
-            pickle.dump([self.weights,self.epochs,self.chosen_clients, 
-                        self.local_accs,self.local_losses,self.weighted_local_accs,self.weighted_local_losses,
-                        self.global_accs,self.global_losses,self.weighted_global_accs,self.weighted_global_losses,
-                        self.test_accs,self.test_losses], stat_f)
-        
       
             
     def test_inference(self, model, test_dataset,device = torch.device('cpu')):
@@ -197,7 +193,7 @@ class AT_Stat_Monitor(ST_Stat_Monitor):
                  criterion = F.cross_entropy,
                  test_adv_method='PGD',test_adv_eps=8/255,
                  test_adv_alpha=2/255,test_adv_T=10,test_adv_norm='inf',
-                 test_adv_bound=[0.0,1.0]):
+                 test_adv_bound=[0.0,1.0],adv_warmup=0):
         super().__init__(clients,weights,log_path,criterion)
         self.test_adv_criterion = lambda m,i,y:self.criterion(m(i),y)
         self.test_adv_method=test_adv_method
@@ -206,6 +202,7 @@ class AT_Stat_Monitor(ST_Stat_Monitor):
         self.test_adv_T = test_adv_T
         self.test_adv_norm = test_adv_norm
         self.test_adv_bound = test_adv_bound
+        self.adv_warmup = adv_warmup
         self.adv_sample_gen = Adv_Sample_Generator(criterion=self.test_adv_criterion,
                                                    attack_method=self.test_adv_method,
                                                    epsilon=self.test_adv_eps,
@@ -214,11 +211,11 @@ class AT_Stat_Monitor(ST_Stat_Monitor):
                                                    norm=self.test_adv_norm,
                                                    bound=self.test_adv_bound)
         # validation
-        self.global_adv_accs,self.global_adv_losses = [],[]
-        self.weighted_global_adv_accs,self.weighted_global_adv_losses = [],[]
+        self.global_adv_accs,self.global_adv_losses = [np.zeros(len(self.clients))]*self.adv_warmup,[np.zeros(len(self.clients))]*self.adv_warmup
+        self.weighted_global_adv_accs,self.weighted_global_adv_losses = [0]*self.adv_warmup,[0]*self.adv_warmup
         
         # test
-        self.test_adv_accs,self.test_adv_losses = [],[]
+        self.test_adv_accs,self.test_adv_losses = [0]*self.adv_warmup,[None]*self.adv_warmup
 
 
         # create log files
@@ -226,13 +223,15 @@ class AT_Stat_Monitor(ST_Stat_Monitor):
             columns = ['epoch', 'mode', 'clean_loss', 'clean_accuracy', 'best_clean_accuracy','adv_loss', 'adv_accuracy', 'best_adv_accuracy']
             wf.write('\t'.join(columns) + '\n')
 
-    def collect(self,global_model,epoch=None,chosen_idxs=None,test_dataset=None,device=torch.device('cpu'),log=False,**kwargs):
-        res = super().collect(global_model,epoch,chosen_idxs,test_dataset,device,log=False)
+    def collect(self,global_model,epoch=None,chosen_idxs=None,test_dataset=None,device=torch.device('cpu'),log=False,save=True,**kwargs):
+        if epoch is not None and epoch<self.adv_warmup:
+            return super().collect(global_model,epoch,chosen_idxs,test_dataset,device,log,save)
+
+        res = super().collect(global_model,epoch,chosen_idxs,test_dataset,device,log,save=False)
+
+
         
         # val acc and loss
-        global_clean_accs = res["val_acc"]
-        global_clean_losses = res["val_loss"]
-
         global_adv_accs, global_adv_losses = [],[]
         for c in self.clients:
             adv_acc,adv_loss = c.adv_validate(global_model)
@@ -241,77 +240,67 @@ class AT_Stat_Monitor(ST_Stat_Monitor):
         global_adv_accs = np.array(global_adv_accs)
         global_adv_losses = np.array(global_adv_losses)
 
-        # test acc and loss
-        test_clean_acc = res["test_acc"]
-        test_clean_loss = res["test_loss"]
-
-
         if test_dataset is not None:
             test_adv_acc,test_adv_loss = self.test_adv_inference(global_model,test_dataset,device)
         else:
-            test_adv_acc,test_adv_loss = None,None
+            test_adv_acc,test_adv_loss = 0,None
+
+        # collect
+        weighted_global_adv_acc,weighted_global_adv_loss = np.sum(global_adv_accs*self.weights),np.sum(global_adv_losses*self.weights)
+
+        res["val_adv_acc"] = global_adv_accs
+        res["val_adv_loss"] = global_adv_losses
+        res["test_adv_acc"] = test_adv_acc
+        res["test_adv_loss"] = test_adv_loss
 
         if log:
-            self.epochs.append(epoch)
-            self.chosen_clients.append(chosen_idxs)
-            self.global_accs.append(global_clean_accs)
-            self.global_losses.append(global_clean_losses)
             self.global_adv_accs.append(global_adv_accs)
             self.global_adv_losses.append(global_adv_losses)
-            self.local_accs.append(res["train_acc"])
-            self.local_losses.append(res["train_loss"])
             
-            weighted_global_clean_acc,weighted_global_clean_loss = np.sum(global_clean_accs*self.weights),np.sum(global_clean_losses*self.weights)
-            self.weighted_global_accs.append(weighted_global_clean_acc)
-            self.weighted_global_losses.append(weighted_global_clean_loss)
-            
-            weighted_global_adv_acc,weighted_global_adv_loss = np.sum(global_adv_accs*self.weights),np.sum(global_adv_losses*self.weights)
             self.weighted_global_adv_accs.append(weighted_global_adv_acc)
             self.weighted_global_adv_losses.append(weighted_global_adv_loss)
 
-            if res["train_acc"] is not None:
-                weighted_local_acc,weighted_local_loss = np.sum(res["train_acc"]*self.weights[chosen_idxs]),np.sum(res["train_loss"]*self.weights[chosen_idxs])
-            else:
-                weighted_local_acc,weighted_local_loss = None, None
-            self.weighted_local_accs.append(weighted_local_acc)
-            self.weighted_local_losses.append(weighted_local_loss)
-            
-            self.test_accs.append(test_clean_acc)
-            self.test_losses.append(test_clean_loss)
             self.test_adv_accs.append(test_adv_acc)
             self.test_adv_losses.append(test_adv_loss)
-            self.log()
+
+            print(f"Round:{epoch}\t|Validation Adversarial Accuracy:{weighted_global_adv_acc*100:.2f}%\t|Test Adversarial Accuracy:{test_adv_acc*100:.2f}%")
+            
+            if save:
+                # log the latest result into the log files
+                train_column = [epoch,'train',self.weighted_local_losses[-1],"n/a","n/a","n/a","n/a","n/a"]
+                val_column = [epoch,'val',self.weighted_global_losses[-1],self.weighted_global_accs[-1],max(self.weighted_global_accs),weighted_global_adv_loss,weighted_global_adv_acc,max(self.weighted_global_adv_accs)]
+                test_column = [epoch,'test',self.test_losses[-1],self.test_accs[-1],max(self.test_accs),test_adv_loss,test_adv_acc,max(self.test_adv_accs)]
+                with open(self.tsv_file, 'a') as af:
+                    if chosen_idxs is not None:
+                        af.write('\t'.join([str(c) for c in train_column]) + '\n')
+                    af.write('\t'.join([str(c) for c in val_column]) + '\n')
+                    if test_dataset is not None:
+                        af.write('\t'.join([str(c) for c in test_column]) + '\n')
+                
+                with open(self.pkl_file,'wb') as stat_f:
+                    pickle.dump([self.weights,self.epochs,self.chosen_clients, 
+                                self.local_losses,self.weighted_local_losses,
+                                self.global_accs,self.global_losses,
+                                self.weighted_global_accs,self.weighted_global_losses,
+                                self.global_adv_accs,self.global_adv_losses,
+                                self.weighted_global_adv_accs,self.weighted_global_adv_losses,
+                                self.test_accs,self.test_losses,self.test_adv_accs,self.test_adv_losses], stat_f)
+                # store the model if it attains the highest validation loss
+                weighted_global_clean_adv_accs = self.weighted_global_accs + self.weighted_global_adv_accs
+                if np.argmax(weighted_global_clean_adv_accs) == len(weighted_global_clean_adv_accs)-1:
+                    torch.save([global_model,[c.local_states for c in self.clients]],self.pt_file)
+                    model_info = {"round":epoch,
+                                  "validation clean accuracy":self.weighted_global_accs[-1],
+                                  "validation adversarial accuracy":weighted_global_adv_acc,
+                                  "test clean accuracy":self.test_accs[-1],
+                                  "test adversarial accuracy":test_adv_acc}
+                    with open(self.pt_file.replace('best_model.pt','modelinfo.json'),'w') as pf:
+                        json.dump(model_info,pf,indent=True)
         
-        adv_res = {"epoch":epoch,
-            "train_acc": res["train_acc"],
-            "train_loss": res["train_loss"],
-            "val_acc": global_clean_accs,
-            "val_loss": global_clean_losses,
-            "val_adv_acc": global_adv_accs,
-            "val_adv_loss": global_adv_losses,
-            "test_acc": test_clean_acc,
-            "test_loss": test_clean_loss,
-            "test_adv_acc": test_adv_acc,
-            "test_adv_loss": test_adv_loss}
-        return adv_res
+        
+        return res
     
-    def log(self):
-        # log the latest result into the log files
-        train_column = [self.epochs[-1],'train',self.weighted_local_losses[-1],self.weighted_local_accs[-1],max(self.weighted_local_accs),"n/a","n/a","n/a"]
-        val_column = [self.epochs[-1],'val',self.weighted_global_losses[-1],self.weighted_global_accs[-1],max(self.weighted_global_accs),self.weighted_global_adv_losses[-1],self.weighted_global_adv_accs[-1],max(self.weighted_global_adv_accs)]
-        test_column = [self.epochs[-1],'test',self.test_losses[-1],self.test_accs[-1],max(self.test_accs) if self.test_accs[-1] is not None else None,self.test_adv_losses[-1],self.test_adv_accs[-1],max(self.test_adv_accs) if self.test_adv_accs[-1] is not None else None]
-        print(f"Round:{self.epochs[-1]}\t|Val Clean Acc:{self.weighted_global_accs[-1]}\t|Val Adv Acc:{self.weighted_global_adv_accs[-1]}\t|Test Clean Acc:{self.test_accs[-1]}\t|Test Adv Acc:{self.test_adv_accs[-1]}")
-        with open(self.tsv_file, 'a') as af:
-            af.write('\t'.join([str(c) for c in train_column]) + '\n')
-            af.write('\t'.join([str(c) for c in val_column]) + '\n')
-            af.write('\t'.join([str(c) for c in test_column]) + '\n')
         
-        with open(self.pkl_file,'wb') as stat_f:
-            pickle.dump([self.weights,self.epochs,self.chosen_clients, 
-                        self.local_accs,self.local_losses,self.weighted_local_accs,self.weighted_local_losses,
-                        self.global_accs,self.global_losses,self.weighted_global_accs,self.weighted_global_losses,
-                        self.global_adv_accs,self.global_adv_losses,self.weighted_global_adv_accs,self.weighted_global_adv_losses,
-                        self.test_accs,self.test_losses,self.test_adv_accs,self.test_adv_losses], stat_f)
             
 
     def test_adv_inference(self,model, test_dataset,device = torch.device('cpu')):

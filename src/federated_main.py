@@ -17,7 +17,7 @@ from models.model_utils import get_net
 from utils.utils import setup_seed, get_log_path, exp_details
 
 from datasets.dataset_utils import get_dataset, get_data_matrix
-from datasets import dataset_to_modelfamily
+from datasets import dataset_to_datafamily
 
 from hardware.sys_utils import get_devices
 
@@ -59,7 +59,7 @@ if __name__ == '__main__':
         ## ==================================Build Model==================================
         # try to get the model from torchvision.models with pretraining
         global_model = get_net(modelname = args.model,
-                               modeltype = dataset_to_modelfamily[args.dataset],
+                               modeltype = dataset_to_datafamily[args.dataset],
                                num_classes = args.num_classes,
                                pretrained = args.pretrained,
                                adv_norm = (args.adv_train or args.adv_test),
@@ -83,7 +83,7 @@ if __name__ == '__main__':
         elif args.flalg == 'FedAvgAT':
             clients = [AT_Client(train_dataset,user_groups[i],sys_info=user_devices[i],
                                  local_state_preserve=False,
-                                 test_adv_method=args.advt_attack,
+                                 test_adv_method=args.advt_method,
                                  test_adv_epsilon=args.advt_epsilon,
                                  test_adv_alpha=args.advt_alpha,
                                  test_adv_T=args.advt_T,
@@ -93,7 +93,7 @@ if __name__ == '__main__':
         elif args.flalg == 'FedBNAT':
             clients = [AT_Client(train_dataset,user_groups[i],sys_info=user_devices[i],
                                  local_state_preserve=True,
-                                 test_adv_method=args.advt_attack,
+                                 test_adv_method=args.advt_method,
                                  test_adv_epsilon=args.advt_epsilon,
                                  test_adv_alpha=args.advt_alpha,
                                  test_adv_T=args.advt_T,
@@ -109,10 +109,13 @@ if __name__ == '__main__':
         if args.adv_test:
             stat_monitor = AT_Stat_Monitor(clients=clients,weights=weights,
                                            log_path = file_name,
-                                           test_adv_method=args.advt_attack,
+                                           test_adv_method=args.advt_method,
                                            test_adv_eps=args.advt_epsilon,
                                            test_adv_alpha=args.advt_alpha,
-                                           test_adv_T=args.advt_T)
+                                           test_adv_T=args.advt_T,
+                                           test_adv_norm=args.advt_norm,
+                                           test_adv_bound=args.advt_bound,
+                                           adv_warmup=args.adv_warmup)
         else:
             stat_monitor = ST_Stat_Monitor(clients=clients,weights=weights,
                                            log_path = file_name)
@@ -122,7 +125,7 @@ if __name__ == '__main__':
         
         ##  ==================================Build Scheduler==================================
         if args.flalg in ["FedAvg","FedBN","FedAvgAT","FedBNAT"]:
-            scheduler = base_scheduler(**params)
+            scheduler = base_scheduler(vars(args))
         # Todo: Add schedulers for other baselines
         else:
             raise RuntimeError("FL optimizer {} has no registered scheduler!".format(args.flalg)) 

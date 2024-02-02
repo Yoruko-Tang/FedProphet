@@ -1,6 +1,6 @@
 import datasets
 
-from datasets.sampling import iid, SPC_noniid,Dirichlet_noniid
+from datasets.sampling import iid, SPC_noniid,SPC_skew_noniid,Dirichlet_noniid
 
 from torch.utils.data import Subset
 import numpy as np
@@ -15,11 +15,11 @@ def get_dataset(args,seed=None):
     rs = RandomState(seed)
     assert args.dataset in datasets.__dict__.keys(), "The dataset {} is not supported!".format(args.dataset)
     
-    if datasets.dataset_to_modelfamily[args.dataset] in ['mnist','cifar','imagenet']: # CV datasets
+    if datasets.dataset_to_datafamily[args.dataset] in ['mnist','cifar','imagenet']: # CV datasets
         dataset = datasets.__dict__[args.dataset]
-        modelfamily = datasets.dataset_to_modelfamily[args.dataset]
-        train_transform = datasets.modelfamily_to_transforms[modelfamily]['adv_train' if args.adv_train else 'train']
-        test_transform = datasets.modelfamily_to_transforms[modelfamily]['adv_test' if args.adv_test else 'test']
+        modelfamily = datasets.dataset_to_datafamily[args.dataset]
+        train_transform = datasets.datafamily_to_transforms[modelfamily]['adv_train' if args.adv_train else 'train']
+        test_transform = datasets.datafamily_to_transforms[modelfamily]['adv_test' if args.adv_test else 'test']
         train_dataset = dataset(train=True, transform=train_transform,download=True)
         test_dataset = dataset(train=False, transform=test_transform,download=True)
         args.num_classes = len(train_dataset.classes)
@@ -36,10 +36,15 @@ def get_dataset(args,seed=None):
                 user_groups_test,_ = Dirichlet_noniid(test_dataset, args.num_users,args.alpha,rs)
             else:
                 # Chose euqal splits for every user
-                user_groups = SPC_noniid(train_dataset, args.num_users,args.shards_per_client,rs)
-                user_groups_test = SPC_noniid(test_dataset, args.num_users,args.shards_per_client,rs)
+                if args.skew is None:
+                    user_groups = SPC_noniid(train_dataset, args.num_users,args.shards_per_client,rs)
+                    user_groups_test = SPC_noniid(test_dataset, args.num_users,args.shards_per_client,rs)
+                else:
+                    user_groups = SPC_skew_noniid(train_dataset, args.num_users,args.shards_per_client,args.skew,rs)
+                    user_groups_test = SPC_skew_noniid(test_dataset, args.num_users,args.shards_per_client,args.skew,rs)
 
-    elif datasets.dataset_to_modelfamily[args.dataset] == 'nlp':
+
+    elif datasets.dataset_to_datafamily[args.dataset] == 'nlp':
         if args.dataset == 'shakespeare':
             args.num_classes = 80
             

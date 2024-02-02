@@ -56,7 +56,7 @@ class Adv_Sample_Generator():
         model.eval()
         for _ in range(self.T):
             
-            loss = self.criterion(model,data,label)
+            loss = self.criterion(model,data+delta,label)
             grad = torch.autograd.grad(loss,delta)[0].detach()
             if self.norm == 'inf':
                 step = self.alpha*torch.sign(grad)
