@@ -137,7 +137,12 @@ def profile_model(model, inputsize):
     validate(flops_per_module)
     validate(params_per_module)
 
-    return flops_per_module, params_per_module
+    layer_name_list = []
+    for k in flops_per_module.keys():
+        if k != 'normalize' and k != 'total':
+            layer_name_list.append(k)
+
+    return layer_name_list, flops_per_module, params_per_module
 
 def training_latency(module_dic,inputsizes,performance,memory):
     """
@@ -153,41 +158,62 @@ def model_partition(model,inputsize,max_flops,max_mem,num_classes):
     partition the model in a greedy manner, with each module in the 
     max_flops and max_mem constraints
     """
+    layer_name_list, flops_per_module, params_per_module = profile_model(model,inputsize)
 
-    def greedy_partition(flops_per_module,params_per_module,inputsize,max_flops,max_mem):
-        """
-        max_flops: flops
-        max_mem: bytes
-        memory consumption relates to input size...
-        """
-        module_id_list = [i for i in range(len(flops_per_module))]
-        partition_module_id_list =[]
-        current_partition_module_id_list = []
+    feature_summary.register_feature_hook(model,layer_name_list)
+    vanilla_input = torch.rand(inputsize)
+    model(vanilla_input)
+    intmd_feature_dic = feature_summary.in_feature_list
+    
 
-        partition_module_list = []
-        current_partition_module_list = []
-        current_sum_flops = 0
-        current_sum_mem = 0
+    params_per_intmd = {}
+    for key in intmd_feature_dic.keys():
+        current_size = list(intmd_feature_dic[key])
+        param_size = 1
 
-        # assert max(flops) or max(params) > constraints 
+        for i in range(len(current_size)):
+            param_size = param_size * current_size[i]
+        
+        params_per_intmd[key] = param_size
 
+    # module_id_list = [i for i in range(len(layer_name_list))]
+    partition_module_id_list =[]
+    partition_module_list = []
 
-        pos = 0
-        for key in flops_per_module.keys():
-            # get the intermidiate features
-            # intmd_feature = get_feature_size(current_partition)
-            if current_sum_flops + flops_per_module[key] <= max_flops and \
-            current_sum_mem + (params_per_module[key]+intmd_feature) * 3 * 4 <= max_mem:
-                current_sum_flops += flops_per_module[key]
-                current_sum_mem += (params_per_module[key]+intmd_feature) * 3 * 4
-                current_partition_module_list.append(key)
-                current_partition_module_id_list.append(pos)
-            
-            else:
-                partition_module_list.append(current_partition_module_list)
-                partition_module_id_list.append(current_partition_module_id_list)
-                
-                
+    current_partition_module_id_list = []
+    current_partition_module_list = []
+
+    current_sum_flops = 0
+    current_sum_mem = 0
+
+    pos = 0
+    while pos < len(layer_name_list):
+        l = layer_name_list[pos]
+        # get the intermidiate features
+        # intmd_feature = get_feature_size(current_partition)
+        if current_sum_flops + int(flops_per_module[l]) <= max_flops and \
+        current_sum_mem + (int(params_per_module[l]) + int(params_per_intmd[l])) * 3 * 4 <= max_mem:
+            current_sum_flops += int(flops_per_module[l])
+            current_sum_mem += (int(params_per_module[l]) + int(params_per_intmd[l])) * 3 * 4
+            current_partition_module_list.append(l)
+            current_partition_module_id_list.append(pos)
+        
+        else:
+            assert current_partition_module_list != [], "max_flops/mem is too small!"
+            partition_module_list.append(current_partition_module_list)
+            partition_module_id_list.append(current_partition_module_id_list)
+
+            current_partition_module_id_list = []
+            current_partition_module_list = []
+            current_sum_flops = 0
+            current_sum_mem = 0
+
+            pos -= 1
+
+        pos += 1
+    
+    # not including 'normalize' and 'total'
+    return partition_module_id_list, partition_module_list
             
             
             
@@ -224,7 +250,7 @@ class feature_summary():
             for s in fs:
                 volumn*=s
             total += volumn
-        return total.item()
+        return total
     
 
     

@@ -86,23 +86,97 @@ def profile_model(model, inputsize):
     
     validate(flops_per_module)
     validate(params_per_module)
+    layer_name_list = []
+    for k in flops_per_module.keys():
+        if k != 'normalize' and k != 'total':
+            layer_name_list.append(k)
+            
 
-    print(flops_per_module)
-    print(params_per_module)
+    # print(flops_per_module)
+    # print(params_per_module)
 
-    print(len(flops_per_module))
-    print(len(params_per_module))
+    # print(len(flops_per_module))
+    # print(len(params_per_module))
+    return layer_name_list, flops_per_module, params_per_module
     
 
 
-model = get_net('vgg16_bn','cifar',num_classes=10,adv_norm=True,modularization=True)
+model = get_net('resnet50','cifar',num_classes=10,adv_norm=True,modularization=True)
+print(model)
 inputsize = [10,3,32,32]
 i = torch.rand(inputsize)
-feature_summary.register_feature_hook(model,["features.7","features.8","features.10","features.11"])
-profile_model(model,inputsize)
-for n,m in model.named_modules():
-    print(n)
+layer_name_list, flops_per_module, params_per_module = profile_model(model,inputsize)
 
-print(feature_summary.in_feature_list)
-print(feature_summary.get_total_feature_num())
+feature_summary.register_feature_hook(model,layer_name_list)
+model(i)
+intmd_feature_dic = feature_summary.in_feature_list
+#print(intmd_feature_dic)
+params_per_intmd = {}
+
+for key in layer_name_list:
+    current_size = list(intmd_feature_dic[key])
+    param_size = 1
+
+    for i in range(len(current_size)):
+        param_size = param_size * current_size[i]
+    
+    params_per_intmd[key] = param_size
+
+print(flops_per_module)
+print(params_per_module)
+print(params_per_intmd)
+
+l1 = []
+l2 = []
+l3 = []
+
+for key in layer_name_list:
+    l1.append(int(flops_per_module[key]))
+    l2.append(int(params_per_module[key]))
+    l3.append(int(params_per_intmd[key]))
+
+max_flops = max(l1)
+max_mem = max(l2) * 12 + max(l3) * 4
+print(max_flops,max_mem)
+# module_id_list = [i for i in range(len(layer_name_list))]
+partition_module_id_list =[]
+partition_module_list = []
+
+current_partition_module_id_list = []
+current_partition_module_list = []
+
+current_sum_flops = 0
+current_sum_mem = 0
+
+# assert max(flops) or max(params) > constraints 
+
+
+pos = 0
+while pos < len(layer_name_list):
+    l = layer_name_list[pos]
+    # get the intermidiate features
+    # intmd_feature = get_feature_size(current_partition)
+    if current_sum_flops + int(flops_per_module[l]) <= max_flops and \
+    current_sum_mem + (int(params_per_module[l]) + int(params_per_intmd[l])) * 3 * 4 <= max_mem:
+        current_sum_flops += int(flops_per_module[l])
+        current_sum_mem += (int(params_per_module[l]) + int(params_per_intmd[l])) * 3 * 4
+        current_partition_module_list.append(l)
+        current_partition_module_id_list.append(pos)
+    
+    else:
+        assert current_partition_module_list != [], "max_flops/mem is too small!"
+        partition_module_list.append(current_partition_module_list)
+        partition_module_id_list.append(current_partition_module_id_list)
+
+        current_partition_module_id_list = []
+        current_partition_module_list = []
+        current_sum_flops = 0
+        current_sum_mem = 0
+
+        pos -= 1
+
+    pos += 1
+
+print(partition_module_list)
+print(partition_module_id_list)
 
