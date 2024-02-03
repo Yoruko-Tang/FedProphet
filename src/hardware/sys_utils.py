@@ -69,8 +69,8 @@ def sample_devices(num_users,rs,device_dic,sys_scaling_factor):
 
     for k in device_dic.keys():
         unique_name_list.append(k)
-        unique_perf_list.append(device_dic[k][0])
-        unique_mem_list.append(device_dic[k][1])
+        unique_perf_list.append(float(device_dic[k][0]))
+        unique_mem_list.append(float(device_dic[k][1]))
         mul_perf_mem_list.append(float(device_dic[k][0])*float(device_dic[k][1]))
     
     scaled_mul_perf_mem_list = np.array([v ** sys_scaling_factor for v in mul_perf_mem_list])
@@ -82,7 +82,7 @@ def sample_devices(num_users,rs,device_dic,sys_scaling_factor):
     client_device_mem_list  = [] #GB
 
 
-    device_id_list = rs.choices(unique_id_list, p=prob_list, size=num_users)
+    device_id_list = rs.choice(unique_id_list, p=prob_list, size=num_users)
     # device_id_list = [random.randint(0,num_unique_device-1) for _ in range(num_users)]
     for id in device_id_list:
         client_device_name_list.append(unique_name_list[id])
@@ -96,7 +96,7 @@ def sample_runtime_app(rs):
     # generate the specific runtime applications for each client
     # runtime application for each client is dynamic - different random seed per epoch
 
-    runtime_app = rs.choices(unique_runtime_app_list)
+    runtime_app = rs.choice(unique_runtime_app_list)
     return runtime_app, unique_perf_degrade_dic[runtime_app],unique_mem_avail_dic[runtime_app]
 
 
@@ -198,3 +198,33 @@ def model_partition(model,inputsize,max_flops,max_mem,num_classes):
     
 
 
+class feature_summary():
+
+    in_feature_list = {}
+
+
+    @staticmethod
+    def register_feature_hook(model,layer_list):
+        for n,m in model.named_modules():
+            if n in layer_list:
+                m.called_name = n
+                m.register_forward_hook(feature_summary.in_feature_hook)
+                
+    
+    @staticmethod
+    def in_feature_hook(module,fea_in,fea_out):
+        feature_summary.in_feature_list[module.called_name] = fea_in[0].size()
+        return None
+    
+    @staticmethod
+    def get_total_feature_num():
+        total = 0
+        for fs in feature_summary.in_feature_list.values():
+            volumn = 1
+            for s in fs:
+                volumn*=s
+            total += volumn
+        return total.item()
+    
+
+    

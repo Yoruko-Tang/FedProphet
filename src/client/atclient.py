@@ -1,4 +1,4 @@
-from stclient import ST_Client
+from client.stclient import ST_Client
 
 import torch
 from torch.utils.data import DataLoader
@@ -30,13 +30,18 @@ class AT_Client(ST_Client):
         self.test_adv_T = test_adv_T
         self.test_adv_norm = test_adv_norm
         self.test_adv_bound = test_adv_bound
+
         
-    def train(self,model,local_ep,local_bs,lr,optimizer='sgd',
+    def train(self,init_model,local_ep,local_bs,lr,optimizer='sgd',
               momentum=0.0,reg=0.0, criterion=torch.nn.CrossEntropyLoss(),
-              adv_method='pgd',adv_epsilon=0.0,adv_alpha=0.0,adv_T=0,
+              adv_train=True,adv_method='pgd',adv_epsilon=0.0,adv_alpha=0.0,adv_T=0,
               adv_norm='inf',adv_bound=[0.0,1.0],adv_ratio=1.0,**kwargs):
         """train the model for one communication round."""
-        model = copy.deepcopy(model) # avoid modifying global model
+        if not adv_train: # conduct normal training if not adversarial training
+            model = super().train(init_model,local_ep,local_bs,lr,optimizer,
+                                  momentum,reg,criterion)
+            return model
+        model = copy.deepcopy(init_model) # avoid modifying global model
         model.to(self.device)
         if self.local_state_preserve and self.local_states is not None:
             model = self.load_local_state_dict(model,self.local_states)
@@ -84,7 +89,7 @@ class AT_Client(ST_Client):
                 print('Local Epoch : {}/{} |\tLoss: {:.4f}'.format(iters, local_ep, loss.item()))
         
         self.local_states = copy.deepcopy(self.get_local_state_dict(model))
-        self.final_local_accuracy,self.final_local_loss = self.validate(model)
+        self.final_local_loss = loss.item()
         
         return model
         
@@ -96,7 +101,7 @@ class AT_Client(ST_Client):
             model = self.load_local_state_dict(model,self.local_states)
         model.eval()
         loss, total, correct = 0.0, 0.0, 0.0
-        self.testloader = DataLoader(self.testset,batch_size=32, shuffle=False)
+        self.testloader = DataLoader(self.testset,batch_size=128, shuffle=False)
 
         adv_data_gen = Adv_Sample_Generator(lambda m,i,y:criterion(m(i),y),
                                             self.test_adv_method,

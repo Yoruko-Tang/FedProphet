@@ -37,8 +37,8 @@ class Avg_Server():
         self.test_every = test_every
         
         # collect the initial information 
-        self.stat_info = self.stat_monitor.collect(self.global_model)
-        self.sys_info = self.sys_monitor.collect(self.global_model)
+        self.stat_info = self.stat_monitor.collect(self.global_model,epoch=0)
+        self.sys_info = self.sys_monitor.collect(self.global_model,epoch=0)
 
 
 
@@ -59,7 +59,7 @@ class Avg_Server():
         #update the scheduler's information
         self.scheduler.stat_update(epoch =self.round,
                                    stat_info = self.stat_info,
-                                   sys_info=self.sys_info)
+                                   sys_info = self.sys_info)
         
         # select clients
         if self.train_frac is None:

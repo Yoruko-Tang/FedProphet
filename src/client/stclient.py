@@ -19,7 +19,7 @@ class ST_Client():
         self.runtime_app,self.perf_degrade,self.mem_degrade = None,None,None
         self.batches = None
         self.device = device
-        self.final_local_accuracy,self.final_local_loss = 100.0,100.0
+        self.final_local_loss = 100.0
         self.local_state_preserve = local_state_preserve
         self.local_states = None
         self.verbose = verbose
@@ -39,11 +39,11 @@ class ST_Client():
                                 
         return trainset, testset
     
-    def train(self,model,local_ep,local_bs,lr,optimizer='sgd',
+    def train(self,init_model,local_ep,local_bs,lr,optimizer='sgd',
               momentum=0.0,reg=0.0,
               criterion=torch.nn.CrossEntropyLoss(),**kwargs):
         """train the model for one communication round."""
-        model = copy.deepcopy(model) # avoid modifying global model
+        model = copy.deepcopy(init_model) # avoid modifying global model
         model.to(self.device)
         if self.local_state_preserve and self.local_states is not None:
             model = self.load_local_state_dict(model,self.local_states)
@@ -79,7 +79,7 @@ class ST_Client():
                 print('Local Epoch : {}/{} |\tLoss: {:.4f}'.format(iters, local_ep, loss.item()))
         
         self.local_states = copy.deepcopy(self.get_local_state_dict(model))
-        self.final_local_accuracy,self.final_local_loss = self.validate(model)
+        self.final_local_loss = loss.item()
         
         return model
 
@@ -91,7 +91,7 @@ class ST_Client():
             model = self.load_local_state_dict(model,self.local_states)
         model.eval()
         loss, total, correct = 0.0, 0.0, 0.0
-        self.testloader = DataLoader(self.testset,batch_size=32, shuffle=False)
+        self.testloader = DataLoader(self.testset,batch_size=128, shuffle=False)
 
         for batch_idx, (datas, labels) in enumerate(self.testloader):
             datas, labels = datas.to(self.device), labels.to(self.device)

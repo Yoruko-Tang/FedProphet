@@ -38,13 +38,13 @@ def fl_options(parser):
                         help='Default set to IID. Set to 0 for non-IID.')
     parser.add_argument('--shards_per_client',type = int,default=1,
                         help='number of shards for each client')
-    parser.add_argument('--unequal', type=int, default=0,
-                        help='whether to use unbalanced data splits for non-i.i.d setting (use 0 for equal splits)')
+    parser.add_argument('--skew', type=float, default=None,
+                        help='the proportion of iid data in addition to SPC partition')
     parser.add_argument('--alpha',type=float,default=None,
                         help="use Dirichlet_noniid sampling, set the alpha of Dir here")
     
     # systematic option
-    parser.add_argument('--flsys_profile_info', type=str, default='./flsys_profile_info',
+    parser.add_argument('--flsys_profile_info', type=str, default='./src/hardware/flsys_profile_info',
                         help='The path of FL system information file')
     parser.add_argument('--device_random_seed', type=int, default=717,
                         help='random seed used for generate devices')
@@ -180,11 +180,13 @@ def at_option(parser):
     
     parser.add_argument('--adv_test', action = 'store_true',
                         help = 'Use adversarial samples for test')
-    parser.add_argument('--advt_attack',type = str, choices=['PGD','BIM','FGSM','FGSM_RS'],default='PGD',
+    parser.add_argument('--advt_method',type = str, choices=['PGD','BIM','FGSM','FGSM_RS'],default='PGD',
                         help = 'Kind of adversarial attack in test time')
-    parser.add_argument('--advt_epsilon',type = float, default=0.15)
-    parser.add_argument('--advt_alpha',type = float, default=0.01)
-    parser.add_argument('--advt_T', type = int, default=15)
+    parser.add_argument('--advt_epsilon',type = float, default=8/255)
+    parser.add_argument('--advt_alpha',type = float, default=2/255)
+    parser.add_argument('--advt_norm', type = str, default='inf')
+    parser.add_argument('--advt_bound',type = float,nargs=2, default=[0.0,1.0])
+    parser.add_argument('--advt_T', type = int, default=10)
 
     return parser
 

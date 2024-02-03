@@ -46,6 +46,48 @@ def SPC_noniid(dataset, num_users,shards_per_client,rs):
         rs.shuffle(dict_users[i])
     return dict_users
 
+def SPC_skew_noniid(dataset,num_users,shards_per_client,skew,rs):
+    """
+    sampling non-iid data distribution with (1-skew) data from shards_noniid and (skew) data from iid
+    """
+   
+    non_iid_idx = rs.choice(np.arange(len(dataset)),int((1-skew)*len(dataset)),replace=False)
+    iid_idx = list(set(range(len(dataset)))-set(non_iid_idx))
+    num_iid_imgs = len(iid_idx)//num_users
+
+    # build non-iid data distribution
+    num_shards = shards_per_client*num_users
+    num_non_iid_imgs = len(non_iid_idx)//num_shards
+    idx_shard = [i for i in range(num_shards)]
+    dict_users = {i: np.array([],dtype=np.int64) for i in range(num_users)}
+    # idxs = np.arange(num_shards*num_imgs)
+    try:
+        labels = np.array(dataset.targets)[non_iid_idx]
+    except:
+        labels = np.array(dataset.labels)[non_iid_idx]
+
+
+    # sort labels
+    idxs_labels = np.vstack((non_iid_idx, labels))
+    idxs_labels = idxs_labels[:, idxs_labels[1, :].argsort()]
+    idxs = idxs_labels[0, :]
+
+    # divide and assign
+    for i in range(num_users):
+        rand_set = set(rs.choice(idx_shard, shards_per_client, replace=False))
+        idx_shard = list(set(idx_shard) - rand_set)
+        for rand in rand_set:
+            dict_users[i] = np.concatenate(
+                (dict_users[i], idxs[rand*num_non_iid_imgs:(rand+1)*num_non_iid_imgs]), axis=0)
+        # append iid part
+        iid_set = rs.choice(iid_idx, num_iid_imgs, replace=False)
+        iid_idx = list(set(iid_idx)-set(iid_set))
+        dict_users[i] = np.concatenate((dict_users[i], iid_set), axis=0)
+        rs.shuffle(dict_users[i])
+        
+    
+    return dict_users
+
 def Dirichlet_noniid(dataset,num_users,alpha,rs):
     """
     Sample dataset with dirichlet distribution and concentration parameter alpha

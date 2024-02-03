@@ -59,7 +59,7 @@ class Sys_Monitor():
         
         
         round_time = np.max(np.array(train_times)[chosen_idxs])
-        total_time = self.total_times[-1]+round_time
+        total_time = (self.total_times[-1] if len(self.total_times)>0 else 0)+round_time
         
         
         if log:

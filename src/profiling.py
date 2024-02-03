@@ -1,9 +1,7 @@
 from models.model_utils import get_net
 from fvcore.nn import FlopCountAnalysis,flop_count_table, parameter_count
-# from torchvision.models.feature_extraction import create_feature_extractor
-# from torchvision.models.feature_extraction import get_graph_node_names
 import torch
-
+from hardware.sys_utils import feature_summary
 
 # model = get_net('vgg11','cifar',num_classes=10)
 # print("model-----------------------------------------")
@@ -92,37 +90,19 @@ def profile_model(model, inputsize):
     print(flops_per_module)
     print(params_per_module)
 
-    return_nodes = {}
-    for key in flops_per_module.keys():
-        if key != 'normalize' and key != 'total':
-            return_nodes[key] = key
-    
-    return return_nodes
-
-
-    # print(len(flops_per_module))
-    # print(len(params_per_module))
+    print(len(flops_per_module))
+    print(len(params_per_module))
     
 
 
-model = get_net('resnet50','cifar',num_classes=10,adv_norm=True,modularization=True)
+model = get_net('vgg16_bn','cifar',num_classes=10,adv_norm=True,modularization=True)
 inputsize = [10,3,32,32]
+i = torch.rand(inputsize)
+feature_summary.register_feature_hook(model,["features.7","features.8","features.10","features.11"])
+profile_model(model,inputsize)
+for n,m in model.named_modules():
+    print(n)
 
+print(feature_summary.in_feature_list)
+print(feature_summary.get_total_feature_num())
 
-code_string = 'model.'+'conv1'+'(torch.rand(inputsize))'
-output = exec(code_string)
-print(output.shape)
-#print(model)
-# return_nodes = profile_model(model,inputsize)
-# train_nodes, eval_nodes = get_graph_node_names(model)
-#print(train_nodes)
-
-# print(create_feature_extractor(model, return_nodes=return_nodes))
-# for n,m in model.named_modules():
-#     print(n)
-
-
-
-    
-
-    

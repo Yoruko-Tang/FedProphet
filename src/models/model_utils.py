@@ -12,7 +12,7 @@ import models
 import models.vgg
 import models.resnet
 from models import modelname_to_modelfamily
-from datasets import modelfamily_to_normalize
+from datasets import datafamily_to_normalize
 
 
 def get_net(modelname, modeltype, num_classes=1000, 
@@ -33,7 +33,7 @@ def get_net(modelname, modeltype, num_classes=1000,
 
     # add normalization layer to the adversarial training model
     if adv_norm:
-        norm_info = modelfamily_to_normalize[modeltype]
+        norm_info = datafamily_to_normalize[modeltype]
         mean,std = norm_info["mean"],norm_info["std"]
         normalization_layer = Normalize(mean,std)
         model = eval('models.{}.add_normalization'.format(modelname_to_modelfamily(modelname)))(model,normalization_layer)

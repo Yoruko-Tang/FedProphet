@@ -18,7 +18,7 @@ def setup_seed(seed):
 def get_log_path(args):
 
     if not args.iid:
-        file_name = f"./save/{args.dataset}_{args.model}_{args.epochs}_N[{args.num_users}]_{'all' if args.frac == 1.0 else args.strategy}[{args.frac}]_{'sp' if args.alpha is None else 'alpha'}[{args.shards_per_client if args.alpha is None else args.alpha}]_sys[{args.sys_scaling_factor}]_E[{args.local_ep}]_B[{args.local_bs}]_lr[{args.lr}]"
+        file_name = f"./save/{args.dataset}_{args.model}_{args.epochs}_N[{args.num_users}]_{'all' if args.frac == 1.0 else args.strategy}[{args.frac}]_{'sp' if args.alpha is None else 'alpha'}[{args.shards_per_client+args.skew if args.alpha is None else args.alpha}]_sys[{args.sys_scaling_factor}]_E[{args.local_ep}]_B[{args.local_bs}]_lr[{args.lr}]"
     else:
         file_name = f"./save/{args.dataset}_{args.model}_{args.epochs}_N[{args.num_users}]_{'all' if args.frac == 1.0 else args.strategy}[{args.frac}]_iid_sys[{args.sys_scaling_factor}]_E[{args.local_ep}]_B[{args.local_bs}]_lr[{args.lr}]"
     
@@ -43,7 +43,7 @@ def exp_details(args):
     if args.iid:
         print('    IID')
     else:
-        print(f"    Non-IID: {'sp' if args.alpha is None else 'alpha'}={args.shards_per_client if args.alpha is None else args.alpha}")
+        print(f"    Non-IID: {'sp' if args.alpha is None else 'alpha'}={args.shards_per_client+args.skew if args.alpha is None else args.alpha}")
     print('    Fraction of users  : {}'.format(args.frac))
     print('    Local Batch size   : {}'.format(args.local_bs))
     print('    Local Epochs       : {}\n'.format(args.local_ep))
