@@ -36,14 +36,10 @@ class Avg_Server():
         self.idxs_users = None
         self.test_every = test_every
         
-        # initialize selector and scheduler
+        # collect the initial information 
         self.stat_info = self.stat_monitor.collect(self.global_model)
         self.sys_info = self.sys_monitor.collect(self.global_model)
-        self.selector.stat_update(stat_info=self.stat_info,sys_info=self.sys_info)
-        self.scheduler.stat_update(epoch=0,stat_info=self.stat_info,sys_info=self.sys_info)
 
-        
- 
 
 
 
@@ -55,10 +51,15 @@ class Avg_Server():
         
         
         # update the selector's information before selection
-        self.selector.stat_update(epoch=self.round,selected_clients=self.idxs_users,stat_info=self.stat_info,sys_info=self.sys_info,server=self)
+        self.selector.stat_update(epoch=self.round,
+                                  selected_clients=self.idxs_users,
+                                  stat_info=self.stat_info,
+                                  sys_info=self.sys_info,server=self)
         
         #update the scheduler's information
-        self.scheduler.stat_update(epoch =self.round,stat_info = self.stat_info,sys_info=self.sys_info)
+        self.scheduler.stat_update(epoch =self.round,
+                                   stat_info = self.stat_info,
+                                   sys_info=self.sys_info)
         
         # select clients
         if self.train_frac is None:

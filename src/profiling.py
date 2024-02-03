@@ -1,5 +1,7 @@
-from models import get_net
+from models.model_utils import get_net
 from fvcore.nn import FlopCountAnalysis,flop_count_table, parameter_count
+# from torchvision.models.feature_extraction import create_feature_extractor
+# from torchvision.models.feature_extraction import get_graph_node_names
 import torch
 
 
@@ -60,7 +62,6 @@ def profile_model(model, inputsize):
 
     flops = FlopCountAnalysis(model,x)
     _flops_per_module = flops.by_module()
-    #print(_flops_per_module)
     _params_per_module = parameter_count(model)
     flops_per_module = {}
     params_per_module = {}
@@ -91,25 +92,34 @@ def profile_model(model, inputsize):
     print(flops_per_module)
     print(params_per_module)
 
-    print(len(flops_per_module))
-    print(len(params_per_module))
+    return_nodes = {}
+    for key in flops_per_module.keys():
+        if key != 'normalize' and key != 'total':
+            return_nodes[key] = key
+    
+    return return_nodes
+
+
+    # print(len(flops_per_module))
+    # print(len(params_per_module))
     
 
 
-model = get_net('vgg16','cifar',num_classes=10)
-print(model)
-layer_shapes = {}
-
+model = get_net('resnet50','cifar',num_classes=10,adv_norm=True,modularization=True)
 inputsize = [10,3,32,32]
-profile_model(model,inputsize)
 
-for name,para in model.named_parameters():
-    if 'bias' not in name:
-        layer_shapes[name] = para.shape
 
-print(layer_shapes)
-print(len(layer_shapes))
+code_string = 'model.'+'conv1'+'(torch.rand(inputsize))'
+output = exec(code_string)
+print(output.shape)
+#print(model)
+# return_nodes = profile_model(model,inputsize)
+# train_nodes, eval_nodes = get_graph_node_names(model)
+#print(train_nodes)
 
+# print(create_feature_extractor(model, return_nodes=return_nodes))
+# for n,m in model.named_modules():
+#     print(n)
 
 
 

@@ -13,7 +13,7 @@ from scheduler import *
 
 
 from utils.options import args_parser
-from utils.models import get_net
+from models.model_utils import get_net
 from utils.utils import setup_seed, get_log_path, exp_details
 
 from datasets.dataset_utils import get_dataset, get_data_matrix
@@ -59,43 +59,73 @@ if __name__ == '__main__':
         ## ==================================Build Model==================================
         # try to get the model from torchvision.models with pretraining
         global_model = get_net(modelname = args.model,
-                               modeltype=dataset_to_modelfamily[args.dataset],
+                               modeltype = dataset_to_modelfamily[args.dataset],
+                               num_classes = args.num_classes,
                                pretrained = args.pretrained,
-                               num_classes = args.num_classes)
+                               adv_norm = (args.adv_train or args.adv_test),
+                               modularization = (args.flalg == "FedProphet"))
         print(global_model)
 
 
         ## ==================================Build Clients==================================
         if args.flalg == 'FedAvg':
             clients = [ST_Client(train_dataset,user_groups[i],sys_info=user_devices[i],
-                                 local_state_preserve=False,device=device,
-                                 verbose=args.verbose,
+                                 local_state_preserve=False,
+                                 device=device,verbose=args.verbose,
                                  random_seed=i+args.device_random_seed
                                  ) for i in range(args.num_users)]
         elif args.flalg == 'FedBN':
             clients = [ST_Client(train_dataset,user_groups[i],sys_info=user_devices[i],
-                                 local_state_preserve=True,device=device,
-                                 verbose=args.verbose,
+                                 local_state_preserve=True,
+                                 device=device,verbose=args.verbose,
                                  random_seed=i+args.device_random_seed
                                  ) for i in range(args.num_users)]
-        # elif args.flalg == 'FAT':
-        #     clients = [AT_Client(train_dataset,user_groups[i],local_state_preserve=False,device=device) for i in range(args.num_users)]
+        elif args.flalg == 'FedAvgAT':
+            clients = [AT_Client(train_dataset,user_groups[i],sys_info=user_devices[i],
+                                 local_state_preserve=False,
+                                 test_adv_method=args.advt_attack,
+                                 test_adv_epsilon=args.advt_epsilon,
+                                 test_adv_alpha=args.advt_alpha,
+                                 test_adv_T=args.advt_T,
+                                 device=device,verbose=args.verbose,
+                                 random_seed=i+args.device_random_seed
+                                 ) for i in range(args.num_users)]
+        elif args.flalg == 'FedBNAT':
+            clients = [AT_Client(train_dataset,user_groups[i],sys_info=user_devices[i],
+                                 local_state_preserve=True,
+                                 test_adv_method=args.advt_attack,
+                                 test_adv_epsilon=args.advt_epsilon,
+                                 test_adv_alpha=args.advt_alpha,
+                                 test_adv_T=args.advt_T,
+                                 device=device,verbose=args.verbose,
+                                 random_seed=i+args.device_random_seed
+                                 ) for i in range(args.num_users)]
         # Todo: add other types of clients
         else:
-            raise RuntimeError("Not supported FL Optimizer: "+args.flalg) 
+            raise RuntimeError("Not supported FL optimizer: "+args.flalg) 
 
         ## ==================================Build Monitor==================================
+        # statistical monitor
         if args.adv_test:
-            stat_monitor = AT_Stat_Monitor(clients=clients,weights=weights,log_path = file_name)
+            stat_monitor = AT_Stat_Monitor(clients=clients,weights=weights,
+                                           log_path = file_name,
+                                           test_adv_method=args.advt_attack,
+                                           test_adv_eps=args.advt_epsilon,
+                                           test_adv_alpha=args.advt_alpha,
+                                           test_adv_T=args.advt_T)
         else:
-            stat_monitor = ST_Stat_Monitor(clients=clients,weights=weights,log_path = file_name)
+            stat_monitor = ST_Stat_Monitor(clients=clients,weights=weights,
+                                           log_path = file_name)
 
-        # Todo: Replace with sys monitor
-        sys_monitor = Sys_Monitor(**params)
+        # systematic monitor
+        sys_monitor = Sys_Monitor(clients=clients,log_path=file_name)
         
         ##  ==================================Build Scheduler==================================
         if args.flalg in ["FedAvg","FedBN","FedAvgAT","FedBNAT"]:
             scheduler = base_scheduler(**params)
+        # Todo: Add schedulers for other baselines
+        else:
+            raise RuntimeError("FL optimizer {} has no registered scheduler!".format(args.flalg)) 
             
         ## ==================================Build Selector==================================
         if args.strategy == 'rand':
