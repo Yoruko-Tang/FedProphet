@@ -155,3 +155,28 @@ def model_partition(model,max_flops,max_mem,num_classes):
     """
     pass
 
+class feature_summary():
+
+    in_feature_list = []
+
+    @staticmethod
+    def register_feature_hook(model,layer_list):
+        for n,m in model.named_modules():
+            if n in layer_list:
+                m.register_forward_hook(feature_summary.in_feature_hook)
+    
+    @staticmethod
+    def in_feature_hook(module,fea_in,fea_out):
+        feature_summary.in_feature_list.append(fea_in[0].shape)
+        return None
+    
+    @staticmethod
+    def get_total_feature_num():
+        total = 0
+        for fs in feature_summary.in_feature_list:
+            volumn = 1
+            for s in fs:
+                volumn*=s
+            total += volumn
+        return total.item()
+

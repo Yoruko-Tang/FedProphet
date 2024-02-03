@@ -1,7 +1,7 @@
 from models.model_utils import get_net
 from fvcore.nn import FlopCountAnalysis,flop_count_table, parameter_count
 import torch
-
+from hardware.sys_utils import feature_summary
 
 # model = get_net('vgg11','cifar',num_classes=10)
 # print("model-----------------------------------------")
@@ -97,10 +97,14 @@ def profile_model(model, inputsize):
 
 model = get_net('vgg16_bn','cifar',num_classes=10,adv_norm=True,modularization=True)
 inputsize = [10,3,32,32]
+i = torch.rand(inputsize)
+feature_summary.register_feature_hook(model,["features.7","features.8","features.10","features.11"])
 profile_model(model,inputsize)
 for n,m in model.named_modules():
     print(n)
 
+print(feature_summary.in_feature_list)
+print(feature_summary.get_total_feature_num())
 
 
     
