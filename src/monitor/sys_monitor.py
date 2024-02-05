@@ -30,12 +30,12 @@ class Sys_Monitor():
             self.tsv_file = osp.join(self.log_path, 'sys.log.tsv')
             self.pkl_file = osp.join(self.log_path, 'sys.pkl')
             with open(self.tsv_file, 'w') as wf:
-                columns = ['epoch', 'min_avail_perf', 'max_avail_perf', 
-                           'min_avail_mem', 'max_avail_mem', 
-                           'round_time', 'total_time']
+                columns = ['epoch', 'min_avail_perf (GFLOPS)', 'max_avail_perf (GFLOPS)', 
+                           'min_avail_mem (GB)', 'max_avail_mem (GB)', 
+                           'round_time (s)', 'total_time (s)']
                 wf.write('\t'.join(columns) + '\n')
         
-    def collect(self,model,epoch=None,chosen_idxs=None,log=False,**kwargs):
+    def collect(self,model,epoch=None,chosen_idxs=None,log=False,save=True,**kwargs):
         runtime_app = [] # running apps of all clients
         avail_perf = [] # available performance of all clients
         avail_mem = []  # available memory of all clients
@@ -78,6 +78,23 @@ class Sys_Monitor():
             self.round_times.append(round_time)
             self.total_times.append(total_time)
 
+            print(f"Round: {epoch}\t|Round Time: {round_time}s\t|Total Time: {total_time}s")
+
+            if save:
+                sys_column = [epoch,
+                              np.min(avail_perf),np.max(avail_perf),
+                              np.min(avail_mem),np.max(avail_mem),
+                              round_time,total_time]
+            
+                
+                with open(self.tsv_file,'a') as af:
+                    af.write('\t'.join([str(c) for c in sys_column]) + '\n')
+
+                with open(self.pkl_file,'wb') as sys_f:
+                    pickle.dump([self.epochs,self.chosen_clients,self.chosen_devices,
+                                self.runtime_apps,self.avail_perfs,self.avail_mems,
+                                self.train_times,self.round_times,self.total_times], sys_f)
+
         res = {"epoch":epoch,
                "runtime_apps":runtime_app,
                "available_perfs":avail_perf,
@@ -88,20 +105,8 @@ class Sys_Monitor():
         
         return res
     
-    def log(self):
-        sys_column = [self.epochs[-1],
-                      np.min(self.avail_perfs[-1]),np.max(self.avail_perfs[-1]),
-                      np.min(self.avail_mems[-1]),np.max(self.avail_mems[-1]),
-                      self.round_times[-1],self.total_times[-1]]
-        
-        print(f"Round:{self.epochs[-1]}\t|Round Time:{self.round_times[-1]}\t|Total Time:{self.total_times[-1]}")
-        with open(self.tsv_file,'a') as af:
-            af.write('\t'.join([str(c) for c in sys_column]) + '\n')
 
-        with open(self.pkl_file,'wb') as sys_f:
-            pickle.dump([self.epochs,self.chosen_clients,self.chosen_devices,
-                        self.runtime_apps,self.avail_perfs,self.avail_mems,
-                        self.train_times,self.round_times,self.total_times], sys_f)
+        
 
 
 

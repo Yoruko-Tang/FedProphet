@@ -83,7 +83,7 @@ class Avg_Server():
         # collect each client's systematic information
         self.sys_info = self.sys_monitor.collect(self.global_model,
                                                  epoch=self.round,
-                                                 chosen_clients=self.idxs_users,
+                                                 chosen_idxs=self.idxs_users,
                                                  log=True)
 
         self.round += 1

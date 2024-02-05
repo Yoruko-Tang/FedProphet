@@ -105,7 +105,7 @@ class ST_Stat_Monitor():
             self.weighted_global_accs.append(weighted_global_acc)
             self.weighted_global_losses.append(weighted_global_loss)
 
-            print(f"Round:{epoch}\t|Validation Accuracy:{weighted_global_acc*100:.2f}%\t|Test Accuracy:{test_acc*100:.2f}%")
+            print(f"Round: {epoch}\t|Validation Accuracy: {weighted_global_acc*100:.2f}%\t|Test Accuracy: {test_acc*100:.2f}%")
             # log the latest result into the log files
             if save:
                 train_column = [epoch,'train',weighted_local_loss,'n/a','n/a']
@@ -211,11 +211,11 @@ class AT_Stat_Monitor(ST_Stat_Monitor):
                                                    norm=self.test_adv_norm,
                                                    bound=self.test_adv_bound)
         # validation
-        self.global_adv_accs,self.global_adv_losses = [np.zeros(len(self.clients))]*self.adv_warmup,[np.zeros(len(self.clients))]*self.adv_warmup
-        self.weighted_global_adv_accs,self.weighted_global_adv_losses = [0]*self.adv_warmup,[0]*self.adv_warmup
+        self.global_adv_accs,self.global_adv_losses = [],[]
+        self.weighted_global_adv_accs,self.weighted_global_adv_losses = [],[]
         
         # test
-        self.test_adv_accs,self.test_adv_losses = [0]*self.adv_warmup,[None]*self.adv_warmup
+        self.test_adv_accs,self.test_adv_losses = [],[]
 
 
         # create log files
@@ -225,6 +225,15 @@ class AT_Stat_Monitor(ST_Stat_Monitor):
 
     def collect(self,global_model,epoch=None,chosen_idxs=None,test_dataset=None,device=torch.device('cpu'),log=False,save=True,**kwargs):
         if epoch is not None and epoch<self.adv_warmup:
+            if log:
+                self.global_adv_accs.append(np.zeros(len(self.clients)))
+                self.global_adv_losses.append(np.zeros(len(self.clients)))
+
+                self.weighted_global_adv_accs.append(0)
+                self.weighted_global_adv_losses.append(0)
+
+                self.test_adv_accs.append(0)
+                self.test_adv_losses.append(None)
             return super().collect(global_model,epoch,chosen_idxs,test_dataset,device,log,save)
 
         res = super().collect(global_model,epoch,chosen_idxs,test_dataset,device,log,save=False)
@@ -263,7 +272,7 @@ class AT_Stat_Monitor(ST_Stat_Monitor):
             self.test_adv_accs.append(test_adv_acc)
             self.test_adv_losses.append(test_adv_loss)
 
-            print(f"Round:{epoch}\t|Validation Adversarial Accuracy:{weighted_global_adv_acc*100:.2f}%\t|Test Adversarial Accuracy:{test_adv_acc*100:.2f}%")
+            print(f"Round: {epoch}\t|Validation Adversarial Accuracy: {weighted_global_adv_acc*100:.2f}%\t|Test Adversarial Accuracy: {test_adv_acc*100:.2f}%")
             
             if save:
                 # log the latest result into the log files
@@ -286,7 +295,7 @@ class AT_Stat_Monitor(ST_Stat_Monitor):
                                 self.weighted_global_adv_accs,self.weighted_global_adv_losses,
                                 self.test_accs,self.test_losses,self.test_adv_accs,self.test_adv_losses], stat_f)
                 # store the model if it attains the highest validation loss
-                weighted_global_clean_adv_accs = self.weighted_global_accs + self.weighted_global_adv_accs
+                weighted_global_clean_adv_accs = np.array(self.weighted_global_accs) + np.array(self.weighted_global_adv_accs)
                 if np.argmax(weighted_global_clean_adv_accs) == len(weighted_global_clean_adv_accs)-1:
                     torch.save([global_model,[c.local_states for c in self.clients]],self.pt_file)
                     model_info = {"round":epoch,

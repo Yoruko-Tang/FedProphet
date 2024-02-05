@@ -139,6 +139,7 @@ def Dirichlet_noniid(dataset,num_users,alpha,rs,minimal_datasize=1):
             labels_idxs[label] = list(set(labels_idxs[label])-set(data_idx))
         rest = rest+labels_idxs[label]
 
+    # randomly allocate the rest of the dataset
     rest_clients = rs.choice(range(num_users),len(rest),replace = True)
     
     for n,user in enumerate(rest_clients):
