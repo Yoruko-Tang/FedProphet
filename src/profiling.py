@@ -109,8 +109,10 @@ layer_name_list, flops_per_module, params_per_module = profile_model(model,input
 
 feature_summary.register_feature_hook(model,layer_name_list)
 model(i)
-intmd_feature_dic = feature_summary.in_feature_list
-#print(intmd_feature_dic)
+intmd_feature_dic = feature_summary.in_feature_dict
+print(intmd_feature_dic)
+print(feature_summary.out_feature_dict)
+input()
 params_per_intmd = {}
 
 for key in layer_name_list:

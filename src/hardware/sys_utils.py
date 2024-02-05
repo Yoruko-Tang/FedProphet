@@ -163,7 +163,7 @@ def model_partition(model,inputsize,max_flops,max_mem,num_classes):
     feature_summary.register_feature_hook(model,layer_name_list)
     vanilla_input = torch.rand(inputsize)
     model(vanilla_input)
-    intmd_feature_dic = feature_summary.in_feature_list
+    intmd_feature_dic = feature_summary.in_feature_dict
     
 
     params_per_intmd = {}
@@ -226,7 +226,8 @@ def model_partition(model,inputsize,max_flops,max_mem,num_classes):
 
 class feature_summary():
 
-    in_feature_list = {}
+    in_feature_dict = {}
+    out_feature_dict = {}
 
 
     @staticmethod
@@ -239,13 +240,14 @@ class feature_summary():
     
     @staticmethod
     def in_feature_hook(module,fea_in,fea_out):
-        feature_summary.in_feature_list[module.called_name] = fea_in[0].size()
+        feature_summary.in_feature_dict[module.called_name] = fea_in[0].size()
+        feature_summary.out_feature_dict[module.called_name] = fea_out.size()
         return None
     
     @staticmethod
     def get_total_feature_num():
         total = 0
-        for fs in feature_summary.in_feature_list.values():
+        for fs in feature_summary.in_feature_dict.values():
             volumn = 1
             for s in fs:
                 volumn*=s
