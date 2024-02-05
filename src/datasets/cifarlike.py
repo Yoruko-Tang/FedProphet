@@ -84,8 +84,8 @@ class TinyImageNet200(ImageFolder):
                          target_transform=target_transform)
         self.root = root
 
-        print('=> done loading {} ({}) with {} examples'.format(self.__class__.__name__, 'train' if train else 'test',
-                                                                len(self.samples)))
+        # print('=> done loading {} ({}) with {} examples'.format(self.__class__.__name__, 'train' if train else 'test',
+        #                                                         len(self.samples)))
 
         self._load_meta()
 

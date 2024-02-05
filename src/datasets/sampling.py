@@ -88,7 +88,7 @@ def SPC_skew_noniid(dataset,num_users,shards_per_client,skew,rs):
     
     return dict_users
 
-def Dirichlet_noniid(dataset,num_users,alpha,rs):
+def Dirichlet_noniid(dataset,num_users,alpha,rs,minimal_datasize=1):
     """
     Sample dataset with dirichlet distribution and concentration parameter alpha
     """
@@ -100,11 +100,11 @@ def Dirichlet_noniid(dataset,num_users,alpha,rs):
     num_classes = len(dataset.classes)
     labels_idxs = []
     prior_class_distribution = np.zeros(num_classes)
-    b = np.zeros(num_classes)
+    d = np.zeros(num_classes)
     for i in range(num_classes):
         labels_idxs.append(idxs[labels==i])
         prior_class_distribution[i] = len(labels_idxs[i])/len(dataset)
-        b[i]=len(labels_idxs[i])
+        d[i]=len(labels_idxs[i])
     
     data_ratio = np.zeros([num_classes,num_users])
     if isinstance(alpha,list):
@@ -115,14 +115,21 @@ def Dirichlet_noniid(dataset,num_users,alpha,rs):
     # data_ratio = data_ratio/np.sum(data_ratio,axis=1,keepdims=True)
     # Client_DataSize = len(dataset)//num_users*np.ones([num_users,1],dtype=np.int64)
     A = matrix(data_ratio)
-    b = matrix(b)
+    b = matrix(d)
     G = matrix(-np.eye(num_users))
-    h = matrix(np.zeros([num_users,1]))
+    h = matrix(-minimal_datasize*np.ones([num_users,1]))
     P = matrix(np.eye(num_users))
     q = matrix(np.zeros([num_users,1]))
     results = solvers.qp(P,q,G,h,A,b)
+    if results['status'] == 'unknown':# the original optimization is not feasible
+        # we relax the equation constraint and try to find the solution that 
+        # is the closest to the feasible area
+        P = matrix(np.transpose(data_ratio)@data_ratio)
+        q = matrix(-np.transpose(data_ratio)@np.reshape(d,[-1,1]))
+        G = matrix(np.vstack([data_ratio,-np.eye(num_users)]))
+        h = matrix(np.vstack([np.reshape(d,[-1,1]),-minimal_datasize*np.ones([num_users,1])]))
+        results = solvers.qp(P,q,G,h)
     Client_DataSize = np.array(results['x'])
-    # print(Client_DataSize)
     Data_Division = data_ratio*np.transpose(Client_DataSize)
     rest = []
     for label in range(num_classes):
@@ -140,7 +147,7 @@ def Dirichlet_noniid(dataset,num_users,alpha,rs):
     for user in range(num_users):
         rs.shuffle(dict_users[user])
 
-    return dict_users,data_ratio
+    return dict_users
 
 
     

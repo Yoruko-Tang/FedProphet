@@ -1,7 +1,7 @@
 from torchvision import transforms
 
 from datasets.cifarlike import CIFAR10, CIFAR100, SVHN, TinyImageNet200
-from datasets.imagenetlike import ImageNet1k,CUBS200,Caltech256
+from datasets.imagenetlike import ImageNet1k,CUBS200,Caltech101,Caltech256
 from datasets.mnistlike import MNIST, KMNIST, FashionMNIST
 from datasets.language import shakespeare, sent140
 
@@ -24,6 +24,7 @@ dataset_to_datafamily = {
 
     # Imagenet
     'CUBS200': 'imagenet',
+    'Caltech101': 'imagenet',
     'Caltech256': 'imagenet',
     'ImageNet1k': 'imagenet',
 

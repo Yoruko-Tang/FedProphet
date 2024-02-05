@@ -50,7 +50,7 @@ if __name__ == '__main__':
         print("Start with Random Seed: {}".format(seed))
         
         ## ==================================Load Dataset==================================
-        train_dataset, test_dataset, user_groups, user_groups_test, weights = get_dataset(args,seed)
+        train_dataset, test_dataset, user_groups, weights = get_dataset(args,seed)
         data_matrix = get_data_matrix(train_dataset, user_groups, args.num_classes)
         user_devices = get_devices(args,seed)
         if seed is not None:

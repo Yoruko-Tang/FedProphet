@@ -28,20 +28,20 @@ def get_dataset(args,seed=None):
         if args.iid:
             # Sample IID user data from Mnist
             user_groups = iid(train_dataset, args.num_users,rs)
-            user_groups_test = iid(test_dataset,args.num_users,rs)
+            #user_groups_test = iid(test_dataset,args.num_users,rs)
         else:
             # Sample Non-IID user data from Mnist
             if args.alpha is not None:
-                user_groups,_ = Dirichlet_noniid(train_dataset, args.num_users,args.alpha,rs)
-                user_groups_test,_ = Dirichlet_noniid(test_dataset, args.num_users,args.alpha,rs)
+                user_groups = Dirichlet_noniid(train_dataset, args.num_users,args.alpha,rs,minimal_datasize=len(train_dataset)//(args.num_users*10))
+                #user_groups_test = Dirichlet_noniid(test_dataset, args.num_users,args.alpha,rs,minimal_datasize=len(test_dataset)//(args.num_users*10))
             else:
                 # Chose euqal splits for every user
                 if args.skew is None:
                     user_groups = SPC_noniid(train_dataset, args.num_users,args.shards_per_client,rs)
-                    user_groups_test = SPC_noniid(test_dataset, args.num_users,args.shards_per_client,rs)
+                    #user_groups_test = SPC_noniid(test_dataset, args.num_users,args.shards_per_client,rs)
                 else:
                     user_groups = SPC_skew_noniid(train_dataset, args.num_users,args.shards_per_client,args.skew,rs)
-                    user_groups_test = SPC_skew_noniid(test_dataset, args.num_users,args.shards_per_client,args.skew,rs)
+                    #user_groups_test = SPC_skew_noniid(test_dataset, args.num_users,args.shards_per_client,args.skew,rs)
 
 
     elif datasets.dataset_to_datafamily[args.dataset] == 'nlp':
@@ -53,7 +53,7 @@ def get_dataset(args,seed=None):
         else:
             raise RuntimeError("Not registered NLP dataset!")  
         data_dir = './data/{}/'.format(args.dataset)
-        user_groups_test={}
+        #user_groups_test={}
         train_dataset,test_dataset,user_groups=datasets.__dict__[args.dataset](data_dir,args.shards_per_client,rs)
         
     else:
@@ -61,11 +61,18 @@ def get_dataset(args,seed=None):
     
     args.num_users=len(user_groups.keys())
     weights = []
+    sizes = []
     for i in range(args.num_users):
         weights.append(len(user_groups[i])/len(train_dataset))
+        sizes.append(len(user_groups[i]))
     
+    print("====> Complete dataset partitioning!")
+    print("====> Minimum local datasize: {}, maximum local datasize: {}".format(np.min(sizes),
+                                                                                np.max(sizes)))
+    print("====> Total training datasize: {}, Total test datasize: {}".format(np.sum(sizes),
+                                                                              len(test_dataset)))
     
-    return train_dataset, test_dataset, user_groups, user_groups_test,np.array(weights)
+    return train_dataset, test_dataset, user_groups, np.array(weights)
 
 def get_data_matrix(dataset,user_groups,num_classes):
     num_users = len(user_groups.keys())
