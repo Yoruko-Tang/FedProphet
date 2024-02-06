@@ -3,7 +3,7 @@ from torch.utils.data import DataLoader, Subset
 import torch.nn
 import copy
 import numpy as np
-from hardware.sys_utils import sample_runtime_app
+from hardware.sys_utils import sample_runtime_app,training_latency
 
 class ST_Client():
     """
@@ -18,6 +18,7 @@ class ST_Client():
         self.dev_name,self.performance,self.memory=sys_info
         self.runtime_app,self.perf_degrade,self.mem_degrade = None,None,None
         self.batches = None
+        self.latency = None
         self.device = device
         self.final_local_loss = 100.0
         self.local_state_preserve = local_state_preserve
@@ -108,11 +109,14 @@ class ST_Client():
         accuracy = correct/total
         return accuracy, loss/(batch_idx+1)
     
-    def get_runtime_sys_stat(self):
+    def get_runtime_sys_stat(self,model_dict=None):
         self.runtime_app,self.perf_degrade,self.mem_degrade=sample_runtime_app(self.rs)
         self.avail_perf = self.performance*self.perf_degrade
         self.avail_mem = self.memory*self.mem_degrade
-        return self.runtime_app, self.avail_perf,self.avail_mem
+        
+        self.latency = training_latency(model_dict,self.batches,self.avail_perf,self.avail_mem)
+
+        return self.runtime_app, self.avail_perf,self.avail_mem,self.latency
 
     
     def get_local_state_dict(self,model):

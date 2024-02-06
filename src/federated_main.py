@@ -124,8 +124,10 @@ if __name__ == '__main__':
         sys_monitor = Sys_Monitor(clients=clients,log_path=file_name)
         
         ##  ==================================Build Scheduler==================================
-        if args.flalg in ["FedAvg","FedBN","FedAvgAT","FedBNAT"]:
+        if args.flalg in ["FedAvg","FedBN"]:
             scheduler = base_scheduler(vars(args))
+        elif args.flalg in ["FedAvgAT","FedBNAT"]:
+            scheduler = base_AT_scheduler(vars(args))
         # Todo: Add schedulers for other baselines
         else:
             raise RuntimeError("FL optimizer {} has no registered scheduler!".format(args.flalg)) 

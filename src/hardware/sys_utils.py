@@ -100,49 +100,49 @@ def sample_runtime_app(rs):
     return runtime_app, unique_perf_degrade_dic[runtime_app],unique_mem_avail_dic[runtime_app]
 
 
-def profile_model(model, inputsize):
-    """
-    get the flops and paramenters of each layer (block) in a model 
+# def profile_model(model, inputsize):
+#     """
+#     get the flops and paramenters of each layer (block) in a model 
 
-    return: flops_per_module and params_per_module
-    *** note that the last item in the returned dictionaries is ('total', flops/params) ***
-    """
-    x = torch.rand(inputsize)
-    flops = FlopCountAnalysis(model,x)
-    _flops_per_module = flops.by_module()
-    _params_per_module = parameter_count(model)
-    flops_per_module = {}
-    params_per_module = {}
-    dot_count = 0
-    for key in _flops_per_module.keys():
-        for c in key:
-            if c == '.':
-                dot_count += 1
-        if (dot_count == 0 and 'layer' not in key and 'classifier' not in key and 'features' not in key) \
-            or (dot_count == 1 and 'weight' not in key and 'bias' not in key):
-            flops_per_module[key] = _flops_per_module[key]
-            params_per_module[key] = _params_per_module[key]
-        dot_count = 0
+#     return: flops_per_module and params_per_module
+#     *** note that the last item in the returned dictionaries is ('total', flops/params) ***
+#     """
+#     x = torch.rand(inputsize)
+#     flops = FlopCountAnalysis(model,x)
+#     _flops_per_module = flops.by_module()
+#     _params_per_module = parameter_count(model)
+#     flops_per_module = {}
+#     params_per_module = {}
+#     dot_count = 0
+#     for key in _flops_per_module.keys():
+#         for c in key:
+#             if c == '.':
+#                 dot_count += 1
+#         if (dot_count == 0 and 'layer' not in key and 'classifier' not in key and 'features' not in key) \
+#             or (dot_count == 1 and 'weight' not in key and 'bias' not in key):
+#             flops_per_module[key] = _flops_per_module[key]
+#             params_per_module[key] = _params_per_module[key]
+#         dot_count = 0
 
-    flops_per_module['total'] = flops_per_module.pop('')
-    params_per_module['total'] = params_per_module.pop('')
+#     flops_per_module['total'] = flops_per_module.pop('')
+#     params_per_module['total'] = params_per_module.pop('')
 
-    def validate(dic):
-        sum = 0
-        for key in dic:
-            if key != 'total':
-                sum += dic[key]
-        assert sum == dic['total'], "Wrong profiling data!"
+#     def validate(dic):
+#         sum = 0
+#         for key in dic:
+#             if key != 'total':
+#                 sum += dic[key]
+#         assert sum == dic['total'], "Wrong profiling data!"
     
-    validate(flops_per_module)
-    validate(params_per_module)
+#     validate(flops_per_module)
+#     validate(params_per_module)
 
-    layer_name_list = []
-    for k in flops_per_module.keys():
-        if k != 'normalize' and k != 'total':
-            layer_name_list.append(k)
+#     layer_name_list = []
+#     for k in flops_per_module.keys():
+#         if k != 'normalize' and k != 'total':
+#             layer_name_list.append(k)
 
-    return layer_name_list, flops_per_module, params_per_module
+#     return layer_name_list, flops_per_module, params_per_module
 
 def training_latency(module_dic,inputsizes,performance,memory):
     """
@@ -224,35 +224,107 @@ def model_partition(model,inputsize,max_flops,max_mem,num_classes):
     
 
 
-class feature_summary():
+class model_summary():
+    """
+    This class will profile a given model and get its number of parameters,
+    flops of each layer, and sizes of intermediate features. 
+    The granulty of the model is defined by the model itself.
+    """
+    def __init__(self,model,inputsize):
+        self.in_feature_dict = {}
+        self.out_feature_dict = {}
+        self.register_feature_hook(model)
+        self.module_list, self.flops_dict, self.num_parameter_dict, self.mem_dict = self.profile_model(model,inputsize) 
 
-    in_feature_dict = {}
-    out_feature_dict = {}
 
-
-    @staticmethod
-    def register_feature_hook(model,layer_list):
+    def register_feature_hook(self,model):
+        # out_feature_layer_list = []
+        # for module in model.module_list:
+        #     if isinstance(module,list):
+        #         out_feature_layer_list.append(module[-1])
+        #     elif isinstance(module,str):
+        #         out_feature_layer_list.append(module)
         for n,m in model.named_modules():
-            if n in layer_list:
-                m.called_name = n
-                m.register_forward_hook(feature_summary.in_feature_hook)
-                
-    
-    @staticmethod
-    def in_feature_hook(module,fea_in,fea_out):
-        feature_summary.in_feature_dict[module.called_name] = fea_in[0].size()
-        feature_summary.out_feature_dict[module.called_name] = fea_out.size()
+            m.called_name = n
+            if n in model.feature_layer_list:
+                m.register_forward_hook(self.in_feature_hook)
+            # elif n in out_feature_layer_list:
+                # m.regisiter_forward_hook(self.out_feature_hook)
+        
+
+    def in_feature_hook(self,module,fea_in,fea_out):
+        self.in_feature_dict[module.called_name] = fea_in[0].size()
+        self.out_feature_dict[module.called_name] = fea_out.size()
         return None
     
-    @staticmethod
-    def get_total_feature_num():
-        total = 0
-        for fs in feature_summary.in_feature_dict.values():
-            volumn = 1
-            for s in fs:
-                volumn*=s
-            total += volumn
-        return total
+    # def out_feature_hook(self,module,fea_in,fea_out):
+    #     self.out_feature_dict[module.called_name] = fea_out.size()
+    #     return None
     
 
+    
+    def profile_model(self, model, inputsize):
+        """
+        get the flops and paramenters of each layer (block) in a model 
+
+        return: flops_per_module, params_per_module and mem_per_module
+        *** note that the last item in the returned dictionaries is ('total', flops/params) ***
+        """
+        x = torch.rand(inputsize)
+        flops = FlopCountAnalysis(model,x)
+        _flops_per_module = flops.by_module()
+        _params_per_module = parameter_count(model)
+        flops_per_module = {}
+        params_per_module = {}
+        mem_per_module = {}
+
+        for key in model.module_list:
+            if isinstance(key,str):
+                flops_per_module[key] = _flops_per_module[key]
+                params_per_module[key] = _params_per_module[key]
+                mem_per_module[key] = 3*4*params_per_module[key]
+                for layer in self.in_feature_dict.keys(): # input feature size of every layer
+                    if key in layer:
+                        mem_per_module[key] += 4*self.mul(self.in_feature_dict[layer])
+                # # output feature size of the last layer
+                # mem_per_module[key] += 4*self.out_feature_dict[key]
+            else:
+                name = "+".join(key)
+                flops_per_module[name] = 0
+                params_per_module[name] = 0
+                for l in key:
+                    flops_per_module[name] += _flops_per_module[l]
+                    params_per_module[name] += _params_per_module[l]
+                mem_per_module[name] = 3*4*params_per_module[name]
+                for layer in self.in_feature_dict.keys(): # input feature size of every layer
+                    for l in key:
+                        if l in layer:
+                            mem_per_module[name] += 4*self.mul(self.in_feature_dict[layer])
+                # # output feature size of the last layer
+                # mem_per_module[name] += 4*self.out_feature_dict[key[-1]]
+
+        module_name_list = list(flops_per_module.keys())
+        flops_per_module['total'] = _flops_per_module['']
+        params_per_module['total'] = _params_per_module['']
+        mem_per_module['total'] = sum(mem_per_module.values())
+
+        def validate(dic):
+            sum = 0
+            for key in dic:
+                if key != 'total':
+                    sum += dic[key]
+            assert sum == dic['total'], "Wrong profiling data!"
+        
+        validate(flops_per_module)
+        validate(params_per_module)
+
+
+        return module_name_list, flops_per_module, params_per_module, mem_per_module
+    
+    @staticmethod
+    def mul(list):
+        res = 1
+        for i in list:
+            res *= i
+        return res
     

@@ -38,7 +38,7 @@ class Avg_Server():
         
         # collect the initial information 
         self.stat_info = self.stat_monitor.collect(self.global_model,epoch=0)
-        self.sys_info = self.sys_monitor.collect(self.global_model,epoch=0)
+        self.sys_info = self.sys_monitor.collect(self.global_model.state_dict(),epoch=0)
 
 
 
@@ -81,7 +81,7 @@ class Avg_Server():
                                                        test_dataset=self.test_dataset,
                                                        device=self.device,log=True)
         # collect each client's systematic information
-        self.sys_info = self.sys_monitor.collect(self.global_model,
+        self.sys_info = self.sys_monitor.collect(self.global_model.state_dict(),
                                                  epoch=self.round,
                                                  chosen_idxs=self.idxs_users,
                                                  log=True)

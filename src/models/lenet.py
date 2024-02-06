@@ -74,6 +74,8 @@ def modularization(model):
     such that the forward only go through layers in a given list.
     If the given list does not contain contious layers, there may be an error.
     [Warning]: There is no check on the continuity of the list!
+
+    This function will also set the granulity of the model, which is the atom in modularization
     """
 
     def module_forward(self, x: torch.Tensor, layer_list: List[str]) -> torch.Tensor:
@@ -90,13 +92,40 @@ def modularization(model):
         if len(valid_features)>0:
             for f in valid_features:
                 x = f(x)
-            if 'features.5' in layer_list:
-                x = torch.flatten(x, 1)
+            
         if len(valid_classifier)>0:
+            if x.dim()>2:
+                x = torch.flatten(x, 1)
             for f in valid_classifier:
                 x = f(x)
 
         return x
     
     model.module_forward = types.MethodType(module_forward,model)
+
+    module_list = []
+    continue_layer = []
+    for n,m in model.named_modules():
+        if n.count('.') == 1:
+            if isinstance(m,nn.Conv2d) or isinstance(m,nn.Linear):
+                if len(continue_layer)>0:
+                    module_list.append(continue_layer)
+                continue_layer = [n]
+            else:
+                continue_layer += [n]
+    if len(continue_layer) > 0: # the last continue layer has not been appended
+        module_list.append(continue_layer)
+
+    model.module_list = module_list
+    return model
+
+def set_feature_layer(model):
+    """
+    Set the layers whose input must be preserved in the memory for backpropagation 
+    """
+    feature_layer_list = []
+    for n in model.state_dict().keys():
+        if '.weight' in n:
+            feature_layer_list.append(n.replace('.weight',''))
+    model.feature_layer_list = feature_layer_list
     return model

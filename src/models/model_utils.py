@@ -1,6 +1,9 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 # Python version: 3.6
+# import os
+# import sys
+# sys.path.append(os.path.join(os.getcwd(),"src"))
 
 import torch
 from torch import nn
@@ -9,10 +12,9 @@ import numpy as np
 import math
 
 import models
-import models.vgg
-import models.resnet
-from models import modelname_to_modelfamily
 from datasets import datafamily_to_normalize
+
+
 
 
 def get_net(modelname, modeltype, num_classes=1000, 
@@ -28,7 +30,9 @@ def get_net(modelname, modeltype, num_classes=1000,
     # get pretrained model
     model = eval('models.{}'.format(modelname))(weights="DEFAULT" if pretrained else None)
     # adapt to the specified num_classes
-    model = eval('models.{}.adapt'.format(modelname_to_modelfamily(modelname)))(model,modeltype,num_classes)
+    model = eval('models.{}.adapt'.format(models.modelname_to_modelfamily(modelname)))(model,modeltype,num_classes)
+    # add list of feature layers for memory tracking
+    model = eval('models.{}.set_feature_layer'.format(models.modelname_to_modelfamily(modelname)))(model)
 
 
     # add normalization layer to the adversarial training model
@@ -36,11 +40,11 @@ def get_net(modelname, modeltype, num_classes=1000,
         norm_info = datafamily_to_normalize[modeltype]
         mean,std = norm_info["mean"],norm_info["std"]
         normalization_layer = Normalize(mean,std)
-        model = eval('models.{}.add_normalization'.format(modelname_to_modelfamily(modelname)))(model,normalization_layer)
+        model = eval('models.{}.add_normalization'.format(models.modelname_to_modelfamily(modelname)))(model,normalization_layer)
     
     # modularize the model such that the model can enter and exit at any layers
     if modularization:
-        model = eval('models.{}.modularization'.format(modelname_to_modelfamily(modelname)))(model)
+        model = eval('models.{}.modularization'.format(models.modelname_to_modelfamily(modelname)))(model)
     return model
     
 
@@ -1016,17 +1020,10 @@ class RNN(nn.Module):
         sd.update(local_dict)
         self.load_state_dict(sd)
 
-if __name__ == '__main__':
-    model = get_net('resnet50','cifar',True,10)
-    sd = model.state_dict()
-    for name in list(sd.keys()):
-        print(name)
-    for name in list(sd.keys()):
-        # pop out the parameters except for bn layers
-        if 'weight' in name and name.replace('weight','running_mean') not in sd.keys():
-            sd.pop(name)
-        elif 'bias' in name and name.replace('bias','running_mean') not in sd.keys():
-            sd.pop(name)
-    for name in list(sd.keys()):
-        print(name)
+# if __name__ == '__main__':
+#     model = get_net('lenet5','mnist',10,modularization=True,adv_norm=True)
+#     for name,_ in model.named_modules():
+#         print(name)
+#     print(model.feature_layer_list)
+#     print(model.module_list)
     
