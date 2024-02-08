@@ -38,13 +38,13 @@ class module_scheduler(base_AT_scheduler):
 
         # use the largest atom layer as the lower bound
         if max_module_flops is None:
-            max_module_flops = sorted(self.atom_flops_dict.values())[-2]
+            max_module_flops = np.inf
         else:
-            assert sorted(self.atom_flops_dict.values())[-2] <= max_module_flops, "Max allowed flops is too small to partition!"
+            assert sorted(self.atom_flops_dict.values())[-2] < max_module_flops, "Max allowed flops is too small to partition!"
         if max_module_mem is None: 
-            max_module_mem = sorted(self.atom_mem_dict.values())[-2]
+            max_module_mem = np.inf
         else:
-            assert sorted(self.atom_mem_dict.values())[-2] <= max_module_mem, "Max allowed memory is too small to partition!"
+            assert sorted(self.atom_mem_dict.values())[-2] < max_module_mem, "Max allowed memory is too small to partition!"
 
         
         
