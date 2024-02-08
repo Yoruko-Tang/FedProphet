@@ -10,6 +10,7 @@ def adapt(model,modeltype,num_classes):
     #if num_classes!=1000: # reinitialize the last layer
     in_feat = model.fc.in_features
     model.fc = nn.Linear(in_feat, num_classes)
+    model.output_size = num_classes
     return model
 
 def add_normalization(model,normalization_layer):

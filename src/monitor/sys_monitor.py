@@ -34,31 +34,21 @@ class Sys_Monitor():
                            'round_time (s)', 'total_time (s)']
                 wf.write('\t'.join(columns) + '\n')
         
-    def collect(self,model_dict,epoch=None,chosen_idxs=None,log=False,save=True,**kwargs):
+    def collect(self,epoch=None,chosen_idxs=None,log=False,save=True,**kwargs):
         runtime_app = [] # running apps of all clients
         avail_perf = [] # available performance of all clients
         avail_mem = []  # available memory of all clients
         train_times = [] # trainning latency of all clients
-        for n,c in enumerate(self.clients):
+        for c in self.clients:
             # collect performance, memory and training latency
+            cruntime_app,cavail_perf,cavail_mem,clatency = c.get_runtime_sys_stat()
             
-            if isinstance(model_dict,list):
-                cruntime_app,cavail_perf,cavail_mem,clatency = c.get_runtime_sys_stat(model_dict[n])
-            else:
-                cruntime_app,cavail_perf,cavail_mem,clatency = c.get_runtime_sys_stat(model_dict)
-
             runtime_app.append(cruntime_app)
             avail_perf.append(cavail_perf)
             avail_mem.append(cavail_mem)
             train_times.append(clatency)
 
         train_times = np.array(train_times)
-        # assign the clients without participation as the largest latency of all clients
-        if len(train_times[train_times!=None])>0:
-            train_times[train_times==None] = np.max(train_times[train_times!=None])
-        else:
-            train_times = np.ones(len(self.clients))
-        
         round_time = np.max(train_times[chosen_idxs])
         total_time = (self.total_times[-1] if len(self.total_times)>0 else 0)+round_time
         

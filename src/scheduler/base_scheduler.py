@@ -18,10 +18,14 @@ class base_scheduler():
                 loc = self.args["lr_schedule"].index(self.round)
                 lr = lr*(self.args["lr_decay"]**(loc+1))
         
-        
+        if "BN" in args["flalg"]:
+            local_state_preserve = True
+        else:
+            local_state_preserve = False
                 
         args = copy.deepcopy(self.args)
         args["lr"] = lr
+        args["local_state_preserve"] = local_state_preserve
 
         return args
     

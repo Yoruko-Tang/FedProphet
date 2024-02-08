@@ -14,16 +14,15 @@ class AT_Client(ST_Client):
     """
     This is a client that conducts adversarial training
     """
-    def __init__(self, dataset, data_idxs, sys_info=None, 
-                 local_state_preserve=False, 
+    def __init__(self, dataset, data_idxs, model_profile, sys_info=None, 
                  test_adv_method='pgd',test_adv_epsilon=0.0,test_adv_alpha=0.0,
                  test_adv_T=0,test_adv_norm='inf',test_adv_bound=[0.0,1.0],
                  device=torch.device('cpu'), 
                  verbose=False, random_seed=None, 
                  reserved_performance = 0, reserved_memory = 0, **kwargs):
-        super().__init__(dataset, data_idxs, sys_info, 
-                         local_state_preserve, device, verbose, 
-                         random_seed, reserved_performance, reserved_memory, **kwargs)
+        super().__init__(dataset, data_idxs, model_profile, sys_info, 
+                         device, verbose, random_seed, reserved_performance, 
+                         reserved_memory, **kwargs)
         
         self.test_adv_method = test_adv_method
         self.test_adv_epsilon = test_adv_epsilon
@@ -35,6 +34,7 @@ class AT_Client(ST_Client):
         
     def train(self,init_model,local_ep,local_bs,lr,optimizer='sgd',
               momentum=0.0,reg=0.0, criterion=torch.nn.CrossEntropyLoss(),
+              local_state_preserve = False,
               adv_train=True,adv_method='pgd',adv_epsilon=0.0,adv_alpha=0.0,adv_T=0,
               adv_norm='inf',adv_bound=[0.0,1.0],adv_ratio=1.0,**kwargs):
         """train the model for one communication round."""
@@ -44,7 +44,7 @@ class AT_Client(ST_Client):
             return model
         model = copy.deepcopy(init_model) # avoid modifying global model
         model.to(self.device)
-        if self.local_state_preserve and self.local_states is not None:
+        if self.local_states is not None:
             model = self.load_local_state_dict(model,self.local_states)
         
 
@@ -89,7 +89,8 @@ class AT_Client(ST_Client):
             if self.verbose:
                 print('Local Epoch : {}/{} |\tLoss: {:.4f}'.format(iters, local_ep, loss.item()))
         
-        self.local_states = copy.deepcopy(self.get_local_state_dict(model))
+        if local_state_preserve:
+            self.local_states = copy.deepcopy(self.get_local_state_dict(model))
         self.final_local_loss = loss.item()
         
         return model
@@ -98,7 +99,7 @@ class AT_Client(ST_Client):
         """ Returns the validation adversarial accuracy and adversarial loss."""
         model = copy.deepcopy(model) # avoid modifying global model
         model.to(self.device)
-        if self.local_state_preserve and self.local_states is not None:
+        if self.local_states is not None:
             model = self.load_local_state_dict(model,self.local_states)
         model.eval()
         loss, total, correct = 0.0, 0.0, 0.0

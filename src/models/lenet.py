@@ -48,6 +48,7 @@ def adapt(model,modeltype,num_classes):
     assert modeltype == 'mnist', "LeNet5 can only be applied on MNIST-like datasets!"
     in_feat = model.classifier[-1].in_features
     model.classifier[-1] = nn.Linear(in_feat, num_classes)
+    model.output_size = num_classes
     return model
 
 def add_normalization(model,normalization_layer):

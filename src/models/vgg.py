@@ -21,6 +21,7 @@ def adapt(model,modeltype,num_classes):
             nn.ReLU(True),
             nn.Dropout(),
             nn.Linear(512, num_classes))# use less neurons for a small input
+    model.output_size = num_classes
     return model
 
 def add_normalization(model,normalization_layer):

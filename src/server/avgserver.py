@@ -35,10 +35,12 @@ class Avg_Server():
         self.round = 0
         self.idxs_users = None
         self.test_every = test_every
+
+        # collect the init loss and training latency
+        self.train_idx(list(range(self.num_users)))
         
-        # collect the initial information 
         self.stat_info = self.stat_monitor.collect(self.global_model,epoch=0)
-        self.sys_info = self.sys_monitor.collect(self.global_model.state_dict(),epoch=0)
+        self.sys_info = self.sys_monitor.collect(epoch=0)
 
 
 
@@ -81,8 +83,7 @@ class Avg_Server():
                                                        test_dataset=self.test_dataset,
                                                        device=self.device,log=True)
         # collect each client's systematic information
-        self.sys_info = self.sys_monitor.collect(self.global_model.state_dict(),
-                                                 epoch=self.round,
+        self.sys_info = self.sys_monitor.collect(epoch=self.round,
                                                  chosen_idxs=self.idxs_users,
                                                  log=True)
 

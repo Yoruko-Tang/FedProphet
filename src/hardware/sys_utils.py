@@ -2,7 +2,7 @@ import numpy as np
 from numpy.random import RandomState
 from fvcore.nn import FlopCountAnalysis, parameter_count
 import torch
-from copy import deepcopy
+
 
 unique_runtime_app_list = ['idle', '1080p', '4k', 'inference', 'detection', 'web']
 unique_perf_degrade_dic = {'idle': 1, '1080p': 0.735, '4k': 0.459, 'inference': 0.524, 'detection': 0.167 , 'web': 0.231}
@@ -101,16 +101,6 @@ def sample_runtime_app(rs):
     return runtime_app, unique_perf_degrade_dic[runtime_app],unique_mem_avail_dic[runtime_app]
 
 
-def training_latency(module_dic,inputsizes,performance,memory):
-    """
-    Calculate the training latency given a model, device performance and device memory.
-    The inputsizes can be a list of sizes, one for each minibatch.
-    The total training latency should be calculated as the sum of all minibatches.
-    """
-    # [[10,3,32,32],[]]
-    return 0
-
-       
     
 class model_summary():
     """
@@ -119,34 +109,22 @@ class model_summary():
     The granulty of the model is defined by the model itself.
     """
     def __init__(self,model,inputsize):
-        self.in_feature_dict = {}
-        self.out_feature_dict = {}
-        self.module_list, self.flops_dict, self.num_parameter_dict, self.mem_dict = self.profile_model(model,inputsize) 
+        self.model = model
+        self.inputsize = inputsize
+        self.module_list, self.flops_dict, self.num_parameter_dict, self.mem_dict = self.profile_model(self.model,inputsize) 
 
 
     def register_feature_hook(self,model):
-        # out_feature_layer_list = []
-        # for module in model.module_list:
-        #     if isinstance(module,list):
-        #         out_feature_layer_list.append(module[-1])
-        #     elif isinstance(module,str):
-        #         out_feature_layer_list.append(module)
         for n,m in model.named_modules():
             m.called_name = n
             if n in model.feature_layer_list:
                 m.register_forward_hook(self.in_feature_hook)
-            # elif n in out_feature_layer_list:
-                # m.regisiter_forward_hook(self.out_feature_hook)
+
         
 
     def in_feature_hook(self,module,fea_in,fea_out):
         self.in_feature_dict[module.called_name] = fea_in[0].size()
-        # self.out_feature_dict[module.called_name] = fea_out.size()
         return None
-    
-    # def out_feature_hook(self,module,fea_in,fea_out):
-    #     self.out_feature_dict[module.called_name] = fea_out.size()
-    #     return None
     
 
     
@@ -157,6 +135,18 @@ class model_summary():
         return: flops_per_module, params_per_module and mem_per_module
         *** note that the last item in the returned dictionaries is ('total', flops/params) ***
         """
+        def validate(dic):
+            sum = 0
+            for key in dic:
+                if key != 'total':
+                    sum += dic[key]
+            assert sum == dic['total'], "Wrong profiling data!"
+
+        # initialize the dicts
+        self.in_feature_dict = {}
+        self.out_feature_dict = {}
+        self.num_classes = model.output_size
+
         self.register_feature_hook(model)
         x = torch.rand(inputsize)
         flops = FlopCountAnalysis(model,x)
@@ -165,130 +155,78 @@ class model_summary():
         flops_per_module = {}
         params_per_module = {}
         mem_per_module = {}
+        module_name_list = []
 
-        for key in model.module_list:
-            if isinstance(key,str):
-                flops_per_module[key] = _flops_per_module[key]
-                params_per_module[key] = _params_per_module[key]
-                mem_per_module[key] = 3*4*params_per_module[key] # memory for parameter
-                if key in self.in_feature_dict.keys():# this module is a layer
-                    mem_per_module[key] += 4*self.mul(self.in_feature_dict[key])
-
-                else: # this module is a block
-                    for layer in self.in_feature_dict.keys(): # calculate every layer in this block
-                        if (key+'.') in layer:
-                            mem_per_module[key] += 4*self.mul(self.in_feature_dict[layer])
-                            
-            else: # this module is a combination of multiple sub-modules
-                name = "+".join(key)
-                flops_per_module[name] = 0
-                params_per_module[name] = 0
-                mem_per_module[name] = 0
-                for l in key:# calculate the flops and parameters in every sub-module
-                    flops_per_module[name] += _flops_per_module[l]
-                    params_per_module[name] += _params_per_module[l]                  
-                    if l in self.in_feature_dict.keys(): # this sub-module is a layer
-                        mem_per_module[name] += 4*self.mul(self.in_feature_dict[l])
-                    
-                    else: # this sub-module is a block
-                        for layer in self.in_feature_dict.keys(): # calculate every layer in this block
-                            if (l+'.') in layer:
-                                mem_per_module[name] += 4*self.mul(self.in_feature_dict[layer])
-                    
-                mem_per_module[name] += 3*4*params_per_module[name] # memory for parameter
-                
-
-        module_name_list = list(flops_per_module.keys())
         flops_per_module['total'] = _flops_per_module['']
         params_per_module['total'] = _params_per_module['']
-        mem_per_module['total'] = sum(mem_per_module.values())
-
-        # calculate the output size of each module
-        for n in range(len(module_name_list)-1):
-            self.out_feature_dict[module_name_list[n]] = None
-            nidx = n+1
-            while self.out_feature_dict[module_name_list[n]] == None and nidx < len(module_name_list):
-                # find the first layer in the next module
-                for nl in module_name_list[nidx].split('+'):
-                    if nl in self.in_feature_dict.keys():
-                        self.out_feature_dict[module_name_list[n]] = self.in_feature_dict[nl]
-                        break
-                    else:
-                        for layer in self.in_feature_dict.keys():
-                            if (nl+'.') in layer:
-                                self.out_feature_dict[module_name_list[n]] = self.in_feature_dict[layer]
-                                break
-                        if self.out_feature_dict[module_name_list[n]] is not None:
-                            break
-                nidx += 1
-            if self.out_feature_dict[module_name_list[n]] == None:
-                raise RuntimeWarning("Cannot fetch the output size of the module: "+ module_name_list[n])
-        self.out_feature_dict[module_name_list[-1]]=[inputsize[0],]
-
-        def validate(dic):
-            sum = 0
-            for key in dic:
-                if key != 'total':
-                    sum += dic[key]
-            assert sum == dic['total'], "Wrong profiling data!"
+        mem_per_module['total'] = 3*4*params_per_module['total']
+        for k in self.in_feature_dict.keys():
+            mem_per_module['total'] += 4*np.prod(self.in_feature_dict[k])
         
-        validate(flops_per_module)
-        validate(params_per_module)
+        if hasattr(model,"module_list"): # if this model is modularized
+            for key in model.module_list:
+                if isinstance(key,str):
+                    flops_per_module[key] = _flops_per_module[key]
+                    params_per_module[key] = _params_per_module[key]
+                    mem_per_module[key] = 3*4*params_per_module[key] # memory for parameter
+                    if key in self.in_feature_dict.keys():# this module is a layer
+                        mem_per_module[key] += 4*np.prod(self.in_feature_dict[key])
+
+                    else: # this module is a block
+                        for layer in self.in_feature_dict.keys(): # calculate every layer in this block
+                            if (key+'.') in layer:
+                                mem_per_module[key] += 4*np.prod(self.in_feature_dict[layer])
+                                
+                else: # this module is a combination of multiple sub-modules
+                    name = "+".join(key)
+                    flops_per_module[name] = 0
+                    params_per_module[name] = 0
+                    mem_per_module[name] = 0
+                    for l in key:# calculate the flops and parameters in every sub-module
+                        flops_per_module[name] += _flops_per_module[l]
+                        params_per_module[name] += _params_per_module[l]                  
+                        if l in self.in_feature_dict.keys(): # this sub-module is a layer
+                            mem_per_module[name] += 4*np.prod(self.in_feature_dict[l])
+                        
+                        else: # this sub-module is a block
+                            for layer in self.in_feature_dict.keys(): # calculate every layer in this block
+                                if (l+'.') in layer:
+                                    mem_per_module[name] += 4*np.prod(self.in_feature_dict[layer])
+                        
+                    mem_per_module[name] += 3*4*params_per_module[name] # memory for parameter
+                    
+            validate(flops_per_module)
+            validate(params_per_module)
+            validate(mem_per_module)
+
+            module_name_list = list(flops_per_module.keys())
+            module_name_list.remove("total")
+
+            # calculate the output size of each module
+            for n in range(len(module_name_list)-1):
+                self.out_feature_dict[module_name_list[n]] = None
+                nidx = n+1
+                while self.out_feature_dict[module_name_list[n]] == None and nidx < len(module_name_list):
+                    # find the first layer in the next module
+                    for nl in module_name_list[nidx].split('+'):
+                        if nl in self.in_feature_dict.keys():
+                            self.out_feature_dict[module_name_list[n]] = self.in_feature_dict[nl]
+                            break
+                        else:
+                            for layer in self.in_feature_dict.keys():
+                                if (nl+'.') in layer:
+                                    self.out_feature_dict[module_name_list[n]] = self.in_feature_dict[layer]
+                                    break
+                            if self.out_feature_dict[module_name_list[n]] is not None:
+                                break
+                    nidx += 1
+                if self.out_feature_dict[module_name_list[n]] == None:
+                    raise RuntimeWarning("Cannot fetch the output size of the module: "+ module_name_list[n])
+            self.out_feature_dict[module_name_list[-1]]=[inputsize[0],self.num_classes]
 
 
         return module_name_list, flops_per_module, params_per_module, mem_per_module
     
-    @staticmethod
-    def mul(list):
-        res = 1
-        for i in list:
-            res *= i
-        return res
     
 
-    def model_partition(self,max_module_flops=None,max_module_mem=None):
-        """
-        partition the model in a greedy manner, with each module in the 
-        max_flops and max_mem constraints
-        """
-        
-        flops_dict = deepcopy(self.flops_dict)
-        flops_dict.pop("total")
-        mem_dict = deepcopy(self.mem_dict)
-        mem_dict.pop("total")
-
-        # use the largest atom layer as the lower bound
-        if max_module_flops is None:
-            max_module_flops = max(flops_dict.values())
-        else:
-            assert max(flops_dict.values()) <= max_module_flops, "Max allowed flops is too small to partition!"
-        if max_module_mem is None: 
-            max_module_mem = max(mem_dict.values())
-        else:
-            assert max(mem_dict.values()) <= max_module_mem, "Max allowed memory is too small to partition!"
-
-        
-        partition_module_list = []
-
-        current_partition_module_list = []
-
-        current_sum_flops = 0
-        current_sum_mem = 0
-
-        for atom in flops_dict.keys():
-            if current_sum_flops + int(flops_dict[atom]) <= max_module_flops and \
-            current_sum_mem + int(mem_dict[atom]) <= max_module_mem:
-                current_sum_flops += int(flops_dict[atom])
-                current_sum_mem += int(mem_dict[atom])
-                current_partition_module_list += atom.split("+")
-            
-            else:
-                partition_module_list.append(current_partition_module_list)
-                current_partition_module_list = atom.split("+")
-                current_sum_flops = int(flops_dict[atom])
-                current_sum_mem = int(mem_dict[atom])
-
-
-        
-        # not including 'normalize' and 'total'
-        return partition_module_list
+    
