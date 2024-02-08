@@ -106,7 +106,9 @@ def modularization(model):
     module_list = []
     continue_layer = []
     for n,m in model.named_modules():
-        if n.count('.') == 1:
+        if n == 'normalize':
+            module_list.insert(0,n)
+        elif n.count('.') == 1:
             if isinstance(m,nn.Conv2d) or isinstance(m,nn.Linear):
                 if len(continue_layer)>0:
                     module_list.append(continue_layer)

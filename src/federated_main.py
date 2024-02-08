@@ -19,7 +19,7 @@ from utils.utils import setup_seed, get_log_path, exp_details
 from datasets.dataset_utils import get_dataset, get_data_matrix
 from datasets import dataset_to_datafamily
 
-from hardware.sys_utils import get_devices
+from hardware.sys_utils import get_devices, model_summary
 
 
 
@@ -65,7 +65,8 @@ if __name__ == '__main__':
                                adv_norm = (args.adv_train or args.adv_test),
                                modularization = (args.flalg == "FedProphet"))
         print(global_model)
-
+        model_profile = model_summary(global_model,[args.local_bs]+list(train_dataset[0][0].shape))
+        
 
         ## ==================================Build Clients==================================
         if args.flalg == 'FedAvg':

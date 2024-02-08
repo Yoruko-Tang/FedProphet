@@ -69,22 +69,17 @@ def modularization(model):
         if n.count('.') == 0 and n != '' and 'layer' not in n:
             if n == 'normalize':
                 module_list.insert(0,n)
-            elif (n== 'avgpool' or n == 'fc'):
-                if len(continue_layer)>0:
-                    module_list.append(continue_layer)
-                    continue_layer = []
-                module_list.append(n)
             elif isinstance(m,nn.Conv2d):
                 if len(continue_layer)>0:
                     module_list.append(continue_layer)
                 continue_layer = [n]
-            else:
+            else: # 'conv1', 'bn1', 'relu', 'maxpool', 'avgpool', 'fc'
                 continue_layer += [n]
-        elif n.count('.') == 1:
+        elif n.count('.') == 1: # 'layerx.x'
             if len(continue_layer)>0:
                 module_list.append(continue_layer)
-                continue_layer = []
-            module_list.append(n)
+            continue_layer = [n]
+
     if len(continue_layer) > 0: # the last continue layer has not been appended
         module_list.append(continue_layer)
 

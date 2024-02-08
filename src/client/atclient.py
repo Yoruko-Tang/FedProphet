@@ -19,10 +19,11 @@ class AT_Client(ST_Client):
                  test_adv_method='pgd',test_adv_epsilon=0.0,test_adv_alpha=0.0,
                  test_adv_T=0,test_adv_norm='inf',test_adv_bound=[0.0,1.0],
                  device=torch.device('cpu'), 
-                 verbose=False, random_seed=None, **kwargs):
+                 verbose=False, random_seed=None, 
+                 reserved_performance = 0, reserved_memory = 0, **kwargs):
         super().__init__(dataset, data_idxs, sys_info, 
                          local_state_preserve, device, verbose, 
-                         random_seed, **kwargs)
+                         random_seed, reserved_performance, reserved_memory, **kwargs)
         
         self.test_adv_method = test_adv_method
         self.test_adv_epsilon = test_adv_epsilon

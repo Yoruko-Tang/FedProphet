@@ -13,7 +13,8 @@ class ST_Client():
     def __init__(self,dataset,data_idxs,sys_info=None,
                  local_state_preserve=False,
                  device = torch.device('cpu'), 
-                 verbose=False, random_seed=None, **kwargs):
+                 verbose=False, random_seed=None, 
+                 reserved_performance = 0, reserved_memory = 0, **kwargs):
         self.trainset, self.testset = self.train_test(dataset, list(data_idxs))
         self.dev_name,self.performance,self.memory=sys_info
         self.runtime_app,self.perf_degrade,self.mem_degrade = None,None,None
@@ -25,7 +26,8 @@ class ST_Client():
         self.local_states = None
         self.verbose = verbose
         self.rs = np.random.RandomState(random_seed)
-
+        self.reserved_performance = reserved_performance
+        self.reserved_memory = reserved_memory
 
     def train_test(self, dataset, idxs):
         """
@@ -111,8 +113,8 @@ class ST_Client():
     
     def get_runtime_sys_stat(self,model_dict=None):
         self.runtime_app,self.perf_degrade,self.mem_degrade=sample_runtime_app(self.rs)
-        self.avail_perf = self.performance*self.perf_degrade
-        self.avail_mem = self.memory*self.mem_degrade
+        self.avail_perf = max([self.performance*self.perf_degrade,self.reserved_performance])
+        self.avail_mem = max([self.memory*self.mem_degrade,self.reserved_memory])
         
         self.latency = training_latency(model_dict,self.batches,self.avail_perf,self.avail_mem)
 

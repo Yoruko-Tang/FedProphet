@@ -82,14 +82,17 @@ def modularization(model):
     module_list = []
     continue_layer = []
     for n,m in model.named_modules():
-        if n.count('.') == 0 and (n == 'avgpool' or n == 'classifier'):
-            if len(continue_layer)>0:
-                module_list.append(continue_layer)
-                continue_layer = []
-            module_list.append(n)
-        elif n.count('.') ==0 and n == 'normalize':
-            module_list.insert(0,n)
-        elif n.count('.') == 1 and 'features' in n:
+        if n.count('.') == 0: # '','normalize', 'features', 'avgpool', 'classifier'
+            if n == 'normalize':
+                module_list.insert(0,n)
+            elif n == 'avgpool':
+                continue_layer += [n]
+            # elif n == 'classifier':
+            #     if len(continue_layer)>0:
+            #         module_list.append(continue_layer)
+            #     continue_layer = [n]
+            
+        elif n.count('.') == 1: # 'features.x', 'classifier.x'
             if isinstance(m,nn.Conv2d):
                 if len(continue_layer)>0:
                     module_list.append(continue_layer)
