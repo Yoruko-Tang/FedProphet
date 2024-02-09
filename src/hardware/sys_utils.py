@@ -2,6 +2,7 @@ import numpy as np
 from numpy.random import RandomState
 from fvcore.nn import FlopCountAnalysis, parameter_count
 import torch
+from copy import deepcopy
 
 
 unique_runtime_app_list = ['idle', '1080p', '4k', 'inference', 'detection', 'web']
@@ -108,9 +109,10 @@ class model_summary():
     flops of each layer, and sizes of intermediate features. 
     The granulty of the model is defined by the model itself.
     """
-    def __init__(self,model,inputsize):
-        self.model = model
+    def __init__(self,model,inputsize,default_local_eps=1):
+        self.model = deepcopy(model) # avoid modify original model
         self.inputsize = inputsize
+        self.default_local_eps = default_local_eps
         self.module_list, self.flops_dict, self.num_parameter_dict, self.mem_dict = self.profile_model(self.model,inputsize) 
 
 

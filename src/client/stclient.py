@@ -19,8 +19,9 @@ class ST_Client():
         self.trainset, self.testset = self.train_test(dataset, list(data_idxs))
         self.dev_name,self.performance,self.memory=sys_info
         self.local_state_preserve = local_state_preserve
-        self.runtime_app,self.perf_degrade,self.mem_degrade = None,None,None
+        self.runtime_app,self.perf_degrade,self.mem_degrade,_,_ = self.get_runtime_sys_stat()
         self.latency,self.est_latency = None,None
+        self.model_profile = None
         self.batches = None
         self.device = device
         self.final_local_loss = None
@@ -118,11 +119,12 @@ class ST_Client():
         return accuracy, loss/(batch_idx+1)
     
     
-    def get_runtime_sys_stat(self):
+    def get_runtime_sys_stat(self,model_profile=None):
         self.runtime_app,self.perf_degrade,self.mem_degrade=sample_runtime_app(self.rs)
         self.avail_perf = max([self.performance*self.perf_degrade,self.reserved_performance])
         self.avail_mem = max([self.memory*self.mem_degrade,self.reserved_memory])
-        self.est_latency = self.estimate_latency(self.avail_perf,self.avail_mem)
+        ms = model_profile if self.model_profile is None else self.model_profile
+        self.est_latency = self.estimate_latency(ms,self.avail_perf,self.avail_mem)
         # return the current availale performance, memory, and the training latency of the last round
         return self.runtime_app, self.avail_perf, self.avail_mem, self.latency, self.est_latency
 
@@ -134,14 +136,16 @@ class ST_Client():
         If memory_bandwidth is not None, then the memory-to-cache latency will be counted.
         If network_bandwidth is nto None, then the server-device communication latency will be counted.
         """
-        # model_profile = model_summary(model,batches[0])
+        self.model_profile = model_summary(model,batches[0],len(batches))
         
         return 0
     
-    def estimate_latency(self,performance,memory,memory_bandwidth=None,network_bandwidth=None):
+    def estimate_latency(self,model_profile,performance,memory,memory_bandwidth=None,network_bandwidth=None):
         """
         Estimate the training latency with only performance and memory information.
         """
+        if model_profile is None:
+            return None
         return 1.0
     
     def get_local_state_dict(self,model):
