@@ -19,7 +19,8 @@ class ST_Client():
         self.trainset, self.testset = self.train_test(dataset, list(data_idxs))
         self.dev_name,self.performance,self.memory=sys_info
         self.local_state_preserve = local_state_preserve
-        self.runtime_app,self.perf_degrade,self.mem_degrade,self.latency = None,None,None,None
+        self.runtime_app,self.perf_degrade,self.mem_degrade = None,None,None
+        self.latency,self.est_latency = None,None
         self.batches = None
         self.device = device
         self.final_local_loss = None
