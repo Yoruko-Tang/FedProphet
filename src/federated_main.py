@@ -4,6 +4,7 @@ import datetime
 import json
 from tqdm import tqdm
 import torch
+from copy import deepcopy
 
 from client import *
 from server import *
@@ -65,7 +66,7 @@ if __name__ == '__main__':
                                adv_norm = (args.adv_train or args.adv_test),
                                modularization = (args.flalg == "FedProphet"))
         print(global_model)
-        model_profile = model_summary(model = global_model,
+        model_profile = model_summary(model = deepcopy(global_model),
                                       inputsize=[args.local_bs]+list(train_dataset[0][0].shape),
                                       default_local_eps=args.local_ep*(args.adv_T+1 if not args.adv_train else 1))
         
