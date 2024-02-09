@@ -69,16 +69,36 @@ if __name__ == '__main__':
         
 
         ## ==================================Build Clients==================================
-        if args.flalg in ['FedAvg','FedBN']:
-            clients = [ST_Client(train_dataset,user_groups[i],model_profile,
+        if args.flalg == 'FedAvg':
+            clients = [ST_Client(train_dataset,user_groups[i],
                                  sys_info=user_devices[i],
+                                 local_state_preserve = False,
+                                 device=device,verbose=args.verbose,
+                                 random_seed=i+args.device_random_seed
+                                 ) for i in range(args.num_users)]
+        elif args.flalg == 'FedBN':
+            clients = [ST_Client(train_dataset,user_groups[i],
+                                 sys_info=user_devices[i],
+                                 local_state_preserve = True,
                                  device=device,verbose=args.verbose,
                                  random_seed=i+args.device_random_seed
                                  ) for i in range(args.num_users)]
         
-        elif args.flalg in ['FedAvgAT','FedBNAT']:
-            clients = [AT_Client(train_dataset,user_groups[i],model_profile,
+        elif args.flalg == 'FedAvgAT':
+            clients = [AT_Client(train_dataset,user_groups[i],
                                  sys_info=user_devices[i],
+                                 local_state_preserve = False,
+                                 test_adv_method=args.advt_method,
+                                 test_adv_epsilon=args.advt_epsilon,
+                                 test_adv_alpha=args.advt_alpha,
+                                 test_adv_T=args.advt_T,
+                                 device=device,verbose=args.verbose,
+                                 random_seed=i+args.device_random_seed
+                                 ) for i in range(args.num_users)]
+        elif args.flalg == 'FedBNAT':
+            clients = [AT_Client(train_dataset,user_groups[i],
+                                 sys_info=user_devices[i],
+                                 local_state_preserve = True,
                                  test_adv_method=args.advt_method,
                                  test_adv_epsilon=args.advt_epsilon,
                                  test_adv_alpha=args.advt_alpha,

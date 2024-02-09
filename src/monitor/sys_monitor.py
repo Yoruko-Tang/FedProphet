@@ -19,6 +19,8 @@ class Sys_Monitor():
         self.round_times = []
         self.total_times = []
 
+        self.estimate_times = []
+
         self.epochs = []
         
         # create log file
@@ -38,18 +40,22 @@ class Sys_Monitor():
         runtime_app = [] # running apps of all clients
         avail_perf = [] # available performance of all clients
         avail_mem = []  # available memory of all clients
-        train_times = [] # trainning latency of all clients
-        for c in self.clients:
+        train_times = [] # trainning latency of chosen clients in this round
+        est_times = [] # estimated training time of the next round
+        for n,c in enumerate(self.clients):
             # collect performance, memory and training latency
-            cruntime_app,cavail_perf,cavail_mem,clatency = c.get_runtime_sys_stat()
+            cruntime_app,cavail_perf,cavail_mem,clatency,cestlatency = c.get_runtime_sys_stat()
             
             runtime_app.append(cruntime_app)
             avail_perf.append(cavail_perf)
             avail_mem.append(cavail_mem)
-            train_times.append(clatency)
 
-        train_times = np.array(train_times)
-        round_time = np.max(train_times[chosen_idxs])
+            if n in chosen_idxs:
+                train_times.append(clatency)
+
+            est_times.append(cestlatency)
+
+        round_time = np.max(train_times)
         total_time = (self.total_times[-1] if len(self.total_times)>0 else 0)+round_time
         
         
@@ -69,6 +75,8 @@ class Sys_Monitor():
             self.round_times.append(round_time)
             self.total_times.append(total_time)
 
+            self.estimate_times.append(est_times)
+
             print(f"Round: {epoch}\t|Round Time: {round_time}s\t|Total Time: {total_time}s")
 
             if save:
@@ -84,7 +92,7 @@ class Sys_Monitor():
                 with open(self.pkl_file,'wb') as sys_f:
                     pickle.dump([self.epochs,self.chosen_clients,self.chosen_devices,
                                 self.runtime_apps,self.avail_perfs,self.avail_mems,
-                                self.train_times,self.round_times,self.total_times], sys_f)
+                                self.train_times,self.round_times,self.total_times,self.estimate_times], sys_f)
 
         res = {"epoch":epoch,
                "runtime_apps":runtime_app,
@@ -92,7 +100,8 @@ class Sys_Monitor():
                "available_mems":avail_mem,
                "train_times":train_times,
                "round_time":round_time,
-               "total_time":total_time}
+               "total_time":total_time,
+               "estimate_times":est_times}
         
         return res
     

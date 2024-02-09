@@ -126,6 +126,6 @@ class Harmony_Selector(Selector):
             self.dist_class = np.sum(self.data_matrix,axis=0)/np.sum(self.data_matrix) # P_exp
             self.stat_utils = np.array([Harmony_Selector.KL_Div(self.dist_client[i],self.dist_class) for i in range(self.total_client_num)])
         if sys_info is not None: # update the training time
-            self.sys_utils = np.array(sys_info["train_times"])
+            self.sys_utils = np.array(sys_info["estimate_times"])
 
         

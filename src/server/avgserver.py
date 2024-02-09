@@ -37,8 +37,6 @@ class Avg_Server():
         self.test_every = test_every
 
         # collect the init loss and training latency
-        self.train_idx(list(range(self.num_users)))
-        
         self.stat_info = self.stat_monitor.collect(self.global_model,epoch=0)
         self.sys_info = self.sys_monitor.collect(epoch=0)
 

@@ -3,22 +3,23 @@ from torch.utils.data import DataLoader, Subset
 import torch.nn
 import copy
 import numpy as np
-from hardware.sys_utils import sample_runtime_app
+from hardware.sys_utils import sample_runtime_app,model_summary
 
 class ST_Client():
     """
     This is the standard fl client, who uses standard local SGD for training
     Typical use case: FedAvg, FedBN
     """
-    def __init__(self,dataset,data_idxs,model_profile,sys_info=None,
+    def __init__(self,dataset,data_idxs,sys_info=None,
+                 local_state_preserve = False,
                  device = torch.device('cpu'), 
                  verbose=False, random_seed=None, 
                  reserved_performance = 0, reserved_memory = 0, 
                  **kwargs):
         self.trainset, self.testset = self.train_test(dataset, list(data_idxs))
         self.dev_name,self.performance,self.memory=sys_info
+        self.local_state_preserve = local_state_preserve
         self.runtime_app,self.perf_degrade,self.mem_degrade,self.latency = None,None,None,None
-        self.model_profile = model_profile
         self.batches = None
         self.device = device
         self.final_local_loss = None
@@ -27,6 +28,7 @@ class ST_Client():
         self.rs = np.random.RandomState(random_seed)
         self.reserved_performance = reserved_performance
         self.reserved_memory = reserved_memory
+        
         
 
     def train_test(self, dataset, idxs):
@@ -45,7 +47,7 @@ class ST_Client():
     def train(self,init_model,local_ep,local_bs,lr,optimizer='sgd',
               momentum=0.0,reg=0.0,
               criterion=torch.nn.CrossEntropyLoss(),
-              local_state_preserve = False,**kwargs):
+              **kwargs):
         """train the model for one communication round."""
         model = copy.deepcopy(init_model) # avoid modifying global model
         model.to(self.device)
@@ -82,9 +84,10 @@ class ST_Client():
             if self.verbose:
                 print('Local Epoch : {}/{} |\tLoss: {:.4f}'.format(iters, local_ep, loss.item()))
         
-        if local_state_preserve:
+        if self.local_state_preserve:
             self.local_states = copy.deepcopy(self.get_local_state_dict(model))
         self.final_local_loss = loss.item()
+        self.latency = self.training_latency(model,self.batches,self.avail_perf,self.avail_mem)
 
         return model
 
@@ -118,23 +121,27 @@ class ST_Client():
         self.runtime_app,self.perf_degrade,self.mem_degrade=sample_runtime_app(self.rs)
         self.avail_perf = max([self.performance*self.perf_degrade,self.reserved_performance])
         self.avail_mem = max([self.memory*self.mem_degrade,self.reserved_memory])
-        
-        self.latency = self.training_latency(self.batches,self.avail_perf,self.avail_mem)
+        self.est_latency = self.estimate_latency(self.avail_perf,self.avail_mem)
+        # return the current availale performance, memory, and the training latency of the last round
+        return self.runtime_app, self.avail_perf, self.avail_mem, self.latency, self.est_latency
 
-        return self.runtime_app, self.avail_perf, self.avail_mem, self.latency
-
-    def training_latency(self,batches,performance,memory,memory_bandwidth=None,network_bandwidth=None):
+    def training_latency(self,model,batches,performance,memory,memory_bandwidth=None,network_bandwidth=None):
         """
-        Estimate the training latency of the whole model with the model profile.
+        Calculate the training latency of the whole model with the model profile.
         The inputsizes can be a list of sizes, one for each minibatch.
         The total training latency should be calculated as the sum of all minibatches.
         If memory_bandwidth is not None, then the memory-to-cache latency will be counted.
         If network_bandwidth is nto None, then the server-device communication latency will be counted.
         """
-        if batches is None:
-            return None
+        # model_profile = model_summary(model,batches[0])
         
         return 0
+    
+    def estimate_latency(self,performance,memory,memory_bandwidth=None,network_bandwidth=None):
+        """
+        Estimate the training latency with only performance and memory information.
+        """
+        return 1.0
     
     def get_local_state_dict(self,model):
         sd = model.state_dict()
