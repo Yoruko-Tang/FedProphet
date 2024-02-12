@@ -7,6 +7,7 @@ import copy
 import numpy as np
 
 from utils.adversarial import Adv_Sample_Generator
+from hardware.sys_utils import model_summary
 
 
 
@@ -92,7 +93,10 @@ class AT_Client(ST_Client):
         if self.local_state_preserve:
             self.local_states = copy.deepcopy(self.get_local_state_dict(model))
         self.final_local_loss = loss.item()
-        self.latency = self.training_latency(model,self.batches,self.avail_perf,self.avail_mem)
+        
+        # calculate training latency
+        self.model_profile = model_summary(model,self.batches[0],len(self.batches))
+        self.latency = self.model_profile.training_latency(self.batches,self.avail_perf,self.avail_mem)
         
         return model
         

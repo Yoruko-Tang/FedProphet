@@ -51,12 +51,12 @@ class Sys_Monitor():
             avail_perf.append(cavail_perf)
             avail_mem.append(cavail_mem)
 
-            if n in chosen_idxs:
+            if chosen_idxs is not None and n in chosen_idxs:
                 train_times.append(clatency)
 
             est_times.append(cestlatency)
 
-        round_time = np.max(train_times)
+        round_time = np.max(train_times) if len(train_times)>0 else 0
         total_time = (self.total_times[-1] if len(self.total_times)>0 else 0)+round_time
         
         
@@ -66,7 +66,7 @@ class Sys_Monitor():
             if chosen_idxs is not None:
                 chosen_dev = [self.clients[idx].dev_name for idx in chosen_idxs]
             else:
-                chosen_dev = [c.dev_name for c in self.clients]
+                chosen_dev = None
             self.chosen_devices.append(chosen_dev)
             self.runtime_apps.append(runtime_app)
             self.avail_perfs.append(avail_perf)

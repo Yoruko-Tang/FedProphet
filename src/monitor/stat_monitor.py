@@ -53,8 +53,7 @@ class ST_Stat_Monitor():
             for idx in chosen_idxs:
                 local_losses.append(self.clients[idx].final_local_loss)
         else: 
-            for c in self.clients:
-                local_losses.append(c.final_local_loss)
+            local_losses = None
         
         # validation acc and loss
         for n,c in enumerate(self.clients):
@@ -81,9 +80,11 @@ class ST_Stat_Monitor():
             test_acc,test_loss = 0,None
 
         # collect
-        
-        local_losses = np.array(local_losses)
-        weighted_local_loss = np.sum(local_losses*self.weights[chosen_idxs])/np.sum(self.weights[chosen_idxs])
+        if local_losses is not None:
+            local_losses = np.array(local_losses)
+            weighted_local_loss = np.sum(local_losses*self.weights[chosen_idxs])/np.sum(self.weights[chosen_idxs])
+        else:
+            weighted_local_loss = None
     
         
 

@@ -102,10 +102,14 @@ def profile_model(model, inputsize):
     
 
 
-model = get_net('vgg16_bn','cifar',num_classes=100,adv_norm=True,modularization=True)
-print(model)
-inputsize = [64,3,32,32]
+# model = get_net('vgg16_bn','cifar',num_classes=10,adv_norm=True,modularization=True)
+# inputsize = [64,3,32,32]
+# ms = model_summary(model,inputsize)
+# sche = module_scheduler({"dataset":"CIFAR10","max_module_flops":5*10**9,"max_module_mem":64*10**6},ms)
+model = get_net('resnet50','imagenet',num_classes=256,adv_norm=True,modularization=True)
+inputsize = [48,3,224,224]
 ms = model_summary(model,inputsize)
+sche = module_scheduler({"dataset":"Caltech256","max_module_flops":50*10**9,"max_module_mem":1*10**9},ms)
 
 print(ms.out_feature_dict)
 print(ms.module_list)
@@ -115,7 +119,8 @@ print(ms.mem_dict)
 print(sorted(ms.flops_dict.values())[-2])
 print(sorted(ms.mem_dict.values())[-2])
 
-sche = module_scheduler({"dataset":"CIFAR100","max_module_flops":5*10**9,"max_module_mem":48*10**6},ms)
+#sche = module_scheduler({"dataset":"Caltech256","max_module_flops":50*10**9,"max_module_mem":1*10**9},ms)
+
 print(sche.partition_module_list)
 for n in sche.auxiliary_model_dict.keys():
     print(sche.auxiliary_model_dict[n])
