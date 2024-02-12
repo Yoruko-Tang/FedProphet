@@ -102,13 +102,13 @@ def profile_model(model, inputsize):
 
 
 model = get_net('resnet50','cifar',num_classes=10,adv_norm=True,modularization=True)
-print(model)
+print(model.module_list)
 inputsize = [10,3,32,32]
 ms = model_summary(model,inputsize)
 
-print(ms.in_feature_dict)
-print(ms.out_feature_dict)
-print(ms.module_list)
-print(ms.flops_dict)
-print(ms.num_parameter_dict)
+
+# print(ms.in_feature_dict)
+# print(ms.out_feature_dict)
+# print(ms.module_list)
+# print(ms.flops_dict)
 print(ms.mem_dict)
