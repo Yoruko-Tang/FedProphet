@@ -52,8 +52,9 @@ class ST_Stat_Monitor():
         if chosen_idxs is not None:
             for idx in chosen_idxs:
                 local_losses.append(self.clients[idx].final_local_loss)
-        else: # do not collect training data
-            local_losses = None
+        else: 
+            for c in self.clients:
+                local_losses.append(c.final_local_loss)
         
         # validation acc and loss
         for n,c in enumerate(self.clients):
@@ -80,11 +81,10 @@ class ST_Stat_Monitor():
             test_acc,test_loss = 0,None
 
         # collect
-        if local_losses is not None:
-            local_losses = np.array(local_losses)
-            weighted_local_loss = np.sum(local_losses*self.weights[chosen_idxs])/np.sum(self.weights[chosen_idxs])
-        else:
-            weighted_local_loss = None
+        
+        local_losses = np.array(local_losses)
+        weighted_local_loss = np.sum(local_losses*self.weights[chosen_idxs])/np.sum(self.weights[chosen_idxs])
+    
         
 
         global_accs, global_losses  = np.array(global_accs),np.array(global_losses)
@@ -113,8 +113,7 @@ class ST_Stat_Monitor():
                             max(self.weighted_global_accs)]
                 test_column = [epoch,'test',test_loss,test_acc,max(self.test_accs)]
                 with open(self.tsv_file, 'a') as af:
-                    if chosen_idxs is not None:
-                        af.write('\t'.join([str(c) for c in train_column]) + '\n')
+                    af.write('\t'.join([str(c) for c in train_column]) + '\n')
                     af.write('\t'.join([str(c) for c in val_column]) + '\n')
                     if test_dataset is not None:
                         af.write('\t'.join([str(c) for c in test_column]) + '\n')
@@ -280,8 +279,7 @@ class AT_Stat_Monitor(ST_Stat_Monitor):
                 val_column = [epoch,'val',self.weighted_global_losses[-1],self.weighted_global_accs[-1],max(self.weighted_global_accs),weighted_global_adv_loss,weighted_global_adv_acc,max(self.weighted_global_adv_accs)]
                 test_column = [epoch,'test',self.test_losses[-1],self.test_accs[-1],max(self.test_accs),test_adv_loss,test_adv_acc,max(self.test_adv_accs)]
                 with open(self.tsv_file, 'a') as af:
-                    if chosen_idxs is not None:
-                        af.write('\t'.join([str(c) for c in train_column]) + '\n')
+                    af.write('\t'.join([str(c) for c in train_column]) + '\n')
                     af.write('\t'.join([str(c) for c in val_column]) + '\n')
                     if test_dataset is not None:
                         af.write('\t'.join([str(c) for c in test_column]) + '\n')

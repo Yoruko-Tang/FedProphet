@@ -2,6 +2,7 @@ from models.model_utils import get_net
 from fvcore.nn import FlopCountAnalysis,flop_count_table, parameter_count
 import torch
 from hardware.sys_utils import model_summary
+from scheduler.module_scheduler import module_scheduler
 
 # model = get_net('vgg11','cifar',num_classes=10)
 # print("model-----------------------------------------")
@@ -101,14 +102,22 @@ def profile_model(model, inputsize):
     
 
 
-model = get_net('resnet50','cifar',num_classes=10,adv_norm=True,modularization=True)
-print(model.module_list)
-inputsize = [10,3,32,32]
+model = get_net('vgg16_bn','cifar',num_classes=100,adv_norm=True,modularization=True)
+print(model)
+inputsize = [64,3,32,32]
 ms = model_summary(model,inputsize)
 
-
-# print(ms.in_feature_dict)
-# print(ms.out_feature_dict)
-# print(ms.module_list)
-# print(ms.flops_dict)
+print(ms.out_feature_dict)
+print(ms.module_list)
+print(ms.flops_dict)
+print(ms.num_parameter_dict)
 print(ms.mem_dict)
+print(sorted(ms.flops_dict.values())[-2])
+print(sorted(ms.mem_dict.values())[-2])
+
+sche = module_scheduler({"dataset":"CIFAR100","max_module_flops":5*10**9,"max_module_mem":48*10**6},ms)
+print(sche.partition_module_list)
+for n in sche.auxiliary_model_dict.keys():
+    print(sche.auxiliary_model_dict[n])
+print(sche.module_flops_dict)
+print(sche.module_mem_dict)

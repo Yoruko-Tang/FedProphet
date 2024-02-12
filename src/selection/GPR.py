@@ -741,7 +741,7 @@ class FedCor_Selector(Selector):
             self.gpr.Reset_Discount() # reset discount after each training
         
         if sys_info is not None:
-            self.gpr.Update_System_Stat(np.arange(self.total_client_num),sys_info["train_times"]) # update systematic information
+            self.gpr.Update_System_Stat(np.arange(self.total_client_num),sys_info["estimate_times"]) # update systematic information
 
 
 # if __name__=='__main__':

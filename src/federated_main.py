@@ -4,6 +4,7 @@ import datetime
 import json
 from tqdm import tqdm
 import torch
+from copy import deepcopy
 
 from client import *
 from server import *
@@ -19,7 +20,7 @@ from utils.utils import setup_seed, get_log_path, exp_details
 from datasets.dataset_utils import get_dataset, get_data_matrix
 from datasets import dataset_to_datafamily
 
-from hardware.sys_utils import get_devices
+from hardware.sys_utils import get_devices, model_summary
 
 
 
@@ -65,24 +66,31 @@ if __name__ == '__main__':
                                adv_norm = (args.adv_train or args.adv_test),
                                modularization = (args.flalg == "FedProphet"))
         print(global_model)
-
+        model_profile = model_summary(model = deepcopy(global_model),
+                                      inputsize=[args.local_bs]+list(train_dataset[0][0].shape),
+                                      default_local_eps=args.local_ep*(args.adv_T+1 if not args.adv_train else 1))
+        
 
         ## ==================================Build Clients==================================
         if args.flalg == 'FedAvg':
-            clients = [ST_Client(train_dataset,user_groups[i],sys_info=user_devices[i],
-                                 local_state_preserve=False,
+            clients = [ST_Client(train_dataset,user_groups[i],
+                                 sys_info=user_devices[i],
+                                 local_state_preserve = False,
                                  device=device,verbose=args.verbose,
                                  random_seed=i+args.device_random_seed
                                  ) for i in range(args.num_users)]
         elif args.flalg == 'FedBN':
-            clients = [ST_Client(train_dataset,user_groups[i],sys_info=user_devices[i],
-                                 local_state_preserve=True,
+            clients = [ST_Client(train_dataset,user_groups[i],
+                                 sys_info=user_devices[i],
+                                 local_state_preserve = True,
                                  device=device,verbose=args.verbose,
                                  random_seed=i+args.device_random_seed
                                  ) for i in range(args.num_users)]
+        
         elif args.flalg == 'FedAvgAT':
-            clients = [AT_Client(train_dataset,user_groups[i],sys_info=user_devices[i],
-                                 local_state_preserve=False,
+            clients = [AT_Client(train_dataset,user_groups[i],
+                                 sys_info=user_devices[i],
+                                 local_state_preserve = False,
                                  test_adv_method=args.advt_method,
                                  test_adv_epsilon=args.advt_epsilon,
                                  test_adv_alpha=args.advt_alpha,
@@ -91,8 +99,9 @@ if __name__ == '__main__':
                                  random_seed=i+args.device_random_seed
                                  ) for i in range(args.num_users)]
         elif args.flalg == 'FedBNAT':
-            clients = [AT_Client(train_dataset,user_groups[i],sys_info=user_devices[i],
-                                 local_state_preserve=True,
+            clients = [AT_Client(train_dataset,user_groups[i],
+                                 sys_info=user_devices[i],
+                                 local_state_preserve = True,
                                  test_adv_method=args.advt_method,
                                  test_adv_epsilon=args.advt_epsilon,
                                  test_adv_alpha=args.advt_alpha,
@@ -100,6 +109,7 @@ if __name__ == '__main__':
                                  device=device,verbose=args.verbose,
                                  random_seed=i+args.device_random_seed
                                  ) for i in range(args.num_users)]
+
         # Todo: add other types of clients
         else:
             raise RuntimeError("Not supported FL optimizer: "+args.flalg) 
@@ -121,13 +131,15 @@ if __name__ == '__main__':
                                            log_path = file_name)
 
         # systematic monitor
-        sys_monitor = Sys_Monitor(clients=clients,log_path=file_name)
+        sys_monitor = Sys_Monitor(clients=clients,model_profile=model_profile,log_path=file_name)
         
         ##  ==================================Build Scheduler==================================
         if args.flalg in ["FedAvg","FedBN"]:
             scheduler = base_scheduler(vars(args))
         elif args.flalg in ["FedAvgAT","FedBNAT"]:
             scheduler = base_AT_scheduler(vars(args))
+        elif args.flalg == "FedProphet":
+            scheduler = module_scheduler(vars(args),model_profile)
         # Todo: Add schedulers for other baselines
         else:
             raise RuntimeError("FL optimizer {} has no registered scheduler!".format(args.flalg)) 

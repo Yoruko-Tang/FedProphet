@@ -8,6 +8,7 @@ def args_parser():
     parser = opt_option(parser)
     parser = selector_option(parser)
     parser = at_option(parser)
+    parser = fedprophet_option(parser)
     
     args = parser.parse_args()
     return args
@@ -189,6 +190,12 @@ def at_option(parser):
     parser.add_argument('--advt_T', type = int, default=10)
 
     return parser
+
+def fedprophet_option(parser):
+    parser.add_argument('--max_module_flops',type=int,default=None,
+                        help='the maximum number of flops allowed in model partition')
+    parser.add_argument('--max_module_mem',type=int,default=None,
+                        help='the maximum memory allowed in model partition')
 
 if __name__ == '__main__':
     args = args_parser()

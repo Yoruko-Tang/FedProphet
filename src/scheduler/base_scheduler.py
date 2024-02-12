@@ -18,7 +18,6 @@ class base_scheduler():
                 loc = self.args["lr_schedule"].index(self.round)
                 lr = lr*(self.args["lr_decay"]**(loc+1))
         
-        
                 
         args = copy.deepcopy(self.args)
         args["lr"] = lr
