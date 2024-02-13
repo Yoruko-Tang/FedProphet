@@ -24,8 +24,8 @@ class module_scheduler(base_AT_scheduler):
         self.num_classes = model_profile.num_classes
         self.datafamily = dataset_to_datafamily[self.args["dataset"]]
 
-        self.partition_module_list,self.auxiliary_model_dict,\
-            self.module_flops_dict,self.module_mem_dict = self.model_partition(**args)
+        self.partition_module_list,self.module_dict,self.auxiliary_model_dict,\
+            self.module_flops_dict,self.module_mem_dict = self.model_partition(args["max_module_flops"],args["max_module_mem"])
         
 
     def model_partition(self,max_module_flops=None,max_module_mem=None,**kwargs):
@@ -47,7 +47,7 @@ class module_scheduler(base_AT_scheduler):
             assert sorted(self.atom_mem_dict.values())[-2] < max_module_mem, "Max allowed memory is too small to partition!"
 
         
-        
+        module_dict = {} # module name: module list
         auxiliary_model_dict = {}
         module_flops_dict = {}
         module_mem_dict = {}
@@ -85,7 +85,7 @@ class module_scheduler(base_AT_scheduler):
             if added_flops <= max_module_flops and added_mem <= max_module_mem:
                 current_sum_flops += (int(self.atom_flops_dict[atom]))
                 current_sum_mem += int(self.atom_mem_dict[atom])
-                current_partition_module_list += atom.split("+")
+                current_partition_module_list.append(atom)
                 
             # this module cannot be added into the current module
             else:
@@ -93,6 +93,7 @@ class module_scheduler(base_AT_scheduler):
                 module_name = "+".join(current_partition_module_list)
                 if len(module_name)>0:
                     # add the flops and memory of the last auxiliary model
+                    module_dict[module_name] = current_partition_module_list
                     auxiliary_model_dict[module_name] = last_aux_model
                     module_flops_dict[module_name] = current_sum_flops + last_aux_flops
                     module_mem_dict[module_name] = current_sum_mem + last_aux_mem
@@ -100,7 +101,7 @@ class module_scheduler(base_AT_scheduler):
                 # start the next module
                 current_sum_flops = int(self.atom_flops_dict[atom])
                 current_sum_mem = int(self.atom_mem_dict[atom])
-                current_partition_module_list = atom.split("+")
+                current_partition_module_list = [atom]
 
             last_aux_flops = aux_flops
             last_aux_mem = 4*int(np.prod(self.atom_output_dict[atom])) \
@@ -109,10 +110,11 @@ class module_scheduler(base_AT_scheduler):
 
         # add the last module into the list
         last_module_name = "+".join(current_partition_module_list)
+        module_dict[last_module_name] = current_partition_module_list
         auxiliary_model_dict[last_module_name] = None
         module_flops_dict[last_module_name] = current_sum_flops
         module_mem_dict[last_module_name] = current_sum_mem
 
-        partition_module_list = list(module_flops_dict.keys())
+        partition_module_list = list(module_dict.keys())
 
-        return partition_module_list,auxiliary_model_dict,module_flops_dict,module_mem_dict
+        return partition_module_list,module_dict,auxiliary_model_dict,module_flops_dict,module_mem_dict

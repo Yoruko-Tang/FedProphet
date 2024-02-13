@@ -251,53 +251,59 @@ class model_summary():
 
 
         total_iter = len(batches)
-
-        # baseline
         if module_list == None:
-            # the out feature size of a batch for a given model with batch size = self.inputsize[0]
-            _one_batch_feature_size = 0
-            for k in self.out_feature_size_dic:
-                _one_batch_feature_size += self.out_feature_size_dic[k]
+            module_list = ['total']
+        
+        memory_req = 0
+        for k in module_list:
+            memory_req += self.mem_dict[k]
+        
+        # baseline
+        # if module_list == None:
+        #     # the out feature size of a batch for a given model with batch size = self.inputsize[0]
+        #     _one_batch_feature_size = 0
+        #     for k in self.out_feature_size_dic:
+        #         _one_batch_feature_size += self.out_feature_size_dic[k]
             
-            # the total out feature size of batches
-            total_out_feature_size = 0
-            total_flops = 0
-            for i in range(total_iter):
-                batch_size = batches[i][0]
-                calibrated_factor = batch_size / self.inputsize[0]
-                total_out_feature_size += calibrated_factor * _one_batch_feature_size
-                total_flops += calibrated_factor * self.flops_dict['total']
+        #     # the total out feature size of batches
+        #     total_out_feature_size = 0
+        #     total_flops = 0
+        #     for i in range(total_iter):
+        #         batch_size = batches[i][0]
+        #         calibrated_factor = batch_size / self.inputsize[0]
+        #         total_out_feature_size += calibrated_factor * _one_batch_feature_size
+        #         total_flops += calibrated_factor * self.flops_dict['total']
 
 
-            total_params_access = self.num_parameter_dict['total'] * total_iter
+        #     total_params_access = self.num_parameter_dict['total'] * total_iter
 
-            # calculate the execution time: ns (if bandwidth - GB/s and performance - GFLOPS)
-            local_data_access_time = (total_out_feature_size + total_params_access * 2) * 2 / eff_bandwidth + access_latency * total_iter
-            compute_time = total_flops / performance
-            server_client_comm_time = self.num_parameter_dict['total'] / network_bandwidth
+        #     # calculate the execution time: ns (if bandwidth - GB/s and performance - GFLOPS)
+        #     local_data_access_time = (total_out_feature_size + total_params_access * 2) * 2 / eff_bandwidth + access_latency * total_iter
+        #     compute_time = total_flops / performance
+        #     server_client_comm_time = self.num_parameter_dict['total'] / network_bandwidth
 
-        else:
-            _one_batch_feature_size = 0
-            _one_batch_flops = 0
-            total_params = 0
-            for k in module_list:
-                _one_batch_feature_size += self.out_feature_size_dic[k]
-                _one_batch_flops += self.flops_dict[k]
-                total_params += self.num_parameter_dict[k]
-            
-            total_out_feature_size = 0
-            total_flops = 0
-            for i in range(total_iter):
-                batch_size = batches[i][0]
-                calibrated_factor = batch_size / self.inputsize[0]
-                total_out_feature_size += calibrated_factor * _one_batch_feature_size
-                total_flops += calibrated_factor * _one_batch_flops
-            
-            total_params_access = total_params
+        # else:
+        _one_batch_feature_size = 0
+        _one_batch_flops = 0
+        total_params = 0
+        for k in module_list:
+            _one_batch_feature_size += self.out_feature_size_dic[k]
+            _one_batch_flops += self.flops_dict[k]
+            total_params += self.num_parameter_dict[k]
+        
+        total_out_feature_size = 0
+        total_flops = 0
+        for i in range(total_iter):
+            batch_size = batches[i][0]
+            calibrated_factor = batch_size / self.inputsize[0]
+            total_out_feature_size += calibrated_factor * _one_batch_feature_size
+            total_flops += calibrated_factor * _one_batch_flops
+        
+        total_params_access = total_params
 
-            local_data_access_time = total_params_access / eff_bandwidth
-            compute_time = total_flops / performance
-            server_client_comm_time = total_params / network_bandwidth
+        local_data_access_time = total_params_access / eff_bandwidth
+        compute_time = total_flops / performance
+        server_client_comm_time = total_params / network_bandwidth
 
         total_training_latency = local_data_access_time + compute_time + server_client_comm_time
         
@@ -307,16 +313,6 @@ class model_summary():
 
 
 
-
-
-
-
-
-
-
-        
-        
-        return 0
 
     def estimate_latency(self,performance,memory,memory_bandwidth=None,network_bandwidth=None):
         """

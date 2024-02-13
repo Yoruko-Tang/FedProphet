@@ -135,6 +135,7 @@ print("module list---------------------------")
 print(ms.module_list)
 print("\n")
 
+
 print("flops dictionary----------------------")
 print(ms.flops_dict)
 print("\n")
@@ -159,6 +160,10 @@ print("\n")
 
 print("partitioned module list---------------")
 print(sche.partition_module_list)
+print("\n")
+
+print("patitioned module dict---------------------------")
+print(sche.module_dict)
 print("\n")
 # for n in sche.auxiliary_model_dict.keys():
 #     print(sche.auxiliary_model_dict[n])
