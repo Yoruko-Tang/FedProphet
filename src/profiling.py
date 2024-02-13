@@ -111,18 +111,62 @@ inputsize = [48,3,224,224]
 ms = model_summary(model,inputsize)
 sche = module_scheduler({"dataset":"Caltech256","max_module_flops":50*10**9,"max_module_mem":1*10**9},ms)
 
+print("out feature dictionary----------------")
 print(ms.out_feature_dict)
+print("\n")
+
+out_feature_size = {}
+
+for k in ms.out_feature_dict:
+    result = 1
+    ms.out_feature_dict[k] = list(ms.out_feature_dict[k])
+    for i in range(len(ms.out_feature_dict[k])):
+        result *= ms.out_feature_dict[k][i]
+    out_feature_size[k] = result
+
+print("out feature size dictionary----------")
+print(out_feature_size)
+print("\n")
+
+
+
+
+print("module list---------------------------")
 print(ms.module_list)
+print("\n")
+
+print("flops dictionary----------------------")
 print(ms.flops_dict)
+print("\n")
+
+print("number of parameters dictionary-------")
 print(ms.num_parameter_dict)
+print("\n")
+
+print("memory dictionary---------------------")
 print(ms.mem_dict)
-print(sorted(ms.flops_dict.values())[-2])
-print(sorted(ms.mem_dict.values())[-2])
+print("\n")
+
+# print("sorted flops dictionary---------------")
+# print(sorted(ms.flops_dict.values())[-2])
+# print("\n")
+
+# print("sorted memory dictionary--------------")
+# print(sorted(ms.mem_dict.values())[-2])
+# print("\n")
 
 #sche = module_scheduler({"dataset":"Caltech256","max_module_flops":50*10**9,"max_module_mem":1*10**9},ms)
 
+print("partitioned module list---------------")
 print(sche.partition_module_list)
-for n in sche.auxiliary_model_dict.keys():
-    print(sche.auxiliary_model_dict[n])
+print("\n")
+# for n in sche.auxiliary_model_dict.keys():
+#     print(sche.auxiliary_model_dict[n])
+
+print("partitioned module flops dictionary---")
 print(sche.module_flops_dict)
+print("\n")
+
+print("partitioned module memory dictionary--")
 print(sche.module_mem_dict)
+print("\n")
