@@ -19,7 +19,7 @@ This is a implementation of FedProphet.
 
 1. FedBN
 ```shell
-python3 src/federated_main.py --gpu=0 --dataset=CIFAR10 --model=vgg16_bn --pretrained --flalg=FedBNAT --epochs=500 --num_user=100 --frac=0.1 --strategy=rand --local_ep=30 --local_bs=64 --optimizer=sgd --lr=0.01 --lr_decay=0.1 --lr_schedule 300 400 --momentum=0.9 --iid=0 --alpha=1.0  --flsys_profile_info=./src/hardware/flsys_profile_info --device_random_seed=717 --sys_scaling_factor=0.0 --verbose --seed 1 2 3
+python3 src/federated_main.py --gpu=0 --dataset=CIFAR10 --model=vgg16_bn --pretrained --flalg=FedBN --epochs=500 --num_user=100 --frac=0.1 --strategy=rand --local_ep=30 --local_bs=64 --optimizer=sgd --lr=0.01 --lr_decay=0.1 --lr_schedule 300 400 --momentum=0.9 --iid=0 --alpha=1.0  --flsys_profile_info=./src/hardware/flsys_profile_info --device_random_seed=717 --sys_scaling_factor=0.0 --verbose --seed 1 2 3
 ```
 
 2. FedBNAT
@@ -36,5 +36,5 @@ python3 src/federated_main.py --gpu=0 --dataset=CIFAR100 --model=vgg16_bn --pret
 ### Caltech256
 1. FedBN
 ```shell
-python3 src/federated_main.py --gpu=0 --dataset=Caltech256 --model=resnet50 --pretrained --flalg=FedBN --epochs=500 --num_user=100 --frac=0.1 --strategy=rand --local_ep=30 --local_bs=32 --optimizer=sgd --lr=0.01 --lr_decay=0.1 --lr_schedule 300 400 --momentum=0.9 --iid=0 --alpha=25.6  --flsys_profile_info=./src/hardware/flsys_profile_info --device_random_seed=717 --sys_scaling_factor=0.0 --verbose --seed 1 2 3
+python3 src/federated_main.py --gpu=0 --dataset=Caltech256 --model=resnet50 --pretrained --flalg=FedBN --epochs=500 --num_user=100 --frac=0.1 --strategy=rand --local_ep=30 --local_bs=48 --optimizer=sgd --lr=0.01 --lr_decay=0.1 --lr_schedule 300 400 --momentum=0.9 --iid=0 --alpha=25.6  --flsys_profile_info=./src/hardware/flsys_profile_info --device_random_seed=717 --sys_scaling_factor=0.0 --verbose --seed 1 2 3
 ```

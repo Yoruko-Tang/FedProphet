@@ -110,10 +110,9 @@ class model_summary():
     The granulty of the model is defined by the model itself.
     """
     def __init__(self,model,inputsize,default_local_eps=1):
-        self.model = model
         self.inputsize = inputsize
         self.default_local_eps = default_local_eps
-        self.module_list, self.flops_dict, self.num_parameter_dict, self.mem_dict = self.profile_model(self.model,inputsize) 
+        self.module_list, self.flops_dict, self.num_parameter_dict, self.mem_dict = self.profile_model(model,inputsize) 
 
 
     def register_feature_hook(self,model):
@@ -150,8 +149,9 @@ class model_summary():
         self.num_classes = model.output_size
 
         self.register_feature_hook(model)
-        x = torch.rand(inputsize).to(next(model.parameters()).get_device())
+        x = torch.rand(inputsize,device=next(model.parameters()).device)
         flops = FlopCountAnalysis(model,x)
+        flops.unsupported_ops_warnings(False)
         _flops_per_module = flops.by_module()
         _params_per_module = parameter_count(model)
         flops_per_module = {}
@@ -229,6 +229,20 @@ class model_summary():
 
         return module_name_list, flops_per_module, params_per_module, mem_per_module
     
-    
+    def training_latency(self,batches,performance,memory,memory_bandwidth=None,network_bandwidth=None,module_list=None):
+        """
+        Calculate the training latency of the whole model with the model profile.
+        The inputsizes can be a list of sizes, one for each minibatch.
+        The total training latency should be calculated as the sum of all minibatches.
+        If memory_bandwidth is not None, then the memory-to-cache latency will be counted.
+        If network_bandwidth is nto None, then the server-device communication latency will be counted.
+        """
+        
+        
+        return 0
 
-    
+    def estimate_latency(self,performance,memory,memory_bandwidth=None,network_bandwidth=None):
+        """
+        Estimate the training latency with only performance and memory information.
+        """
+        return 1.0

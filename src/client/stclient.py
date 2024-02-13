@@ -19,10 +19,7 @@ class ST_Client():
         self.trainset, self.testset = self.train_test(dataset, list(data_idxs))
         self.dev_name,self.performance,self.memory=sys_info
         self.local_state_preserve = local_state_preserve
-        self.runtime_app,self.perf_degrade,self.mem_degrade,_,_ = self.get_runtime_sys_stat()
-        self.latency,self.est_latency = None,None
-        self.model_profile = None
-        self.batches = None
+        
         self.device = device
         self.final_local_loss = None
         self.local_states = None
@@ -30,6 +27,11 @@ class ST_Client():
         self.rs = np.random.RandomState(random_seed)
         self.reserved_performance = reserved_performance
         self.reserved_memory = reserved_memory
+
+        self.runtime_app,self.perf_degrade,self.mem_degrade = sample_runtime_app(self.rs)
+        self.latency,self.est_latency = None,None
+        self.model_profile = None
+        self.batches = None
         
         
 
@@ -89,7 +91,10 @@ class ST_Client():
         if self.local_state_preserve:
             self.local_states = copy.deepcopy(self.get_local_state_dict(model))
         self.final_local_loss = loss.item()
-        self.latency = self.training_latency(model,self.batches,self.avail_perf,self.avail_mem)
+
+        # calculate training latency
+        self.model_profile = model_summary(model,self.batches[0],len(self.batches))
+        self.latency = self.model_profile.training_latency(self.batches,self.avail_perf,self.avail_mem)
 
         return model
 
@@ -124,29 +129,11 @@ class ST_Client():
         self.avail_perf = max([self.performance*self.perf_degrade,self.reserved_performance])
         self.avail_mem = max([self.memory*self.mem_degrade,self.reserved_memory])
         ms = model_profile if self.model_profile is None else self.model_profile
-        self.est_latency = self.estimate_latency(ms,self.avail_perf,self.avail_mem)
+        if ms is not None:
+            self.est_latency = ms.estimate_latency(ms,self.avail_perf,self.avail_mem)
         # return the current availale performance, memory, and the training latency of the last round
         return self.runtime_app, self.avail_perf, self.avail_mem, self.latency, self.est_latency
 
-    def training_latency(self,model,batches,performance,memory,memory_bandwidth=None,network_bandwidth=None):
-        """
-        Calculate the training latency of the whole model with the model profile.
-        The inputsizes can be a list of sizes, one for each minibatch.
-        The total training latency should be calculated as the sum of all minibatches.
-        If memory_bandwidth is not None, then the memory-to-cache latency will be counted.
-        If network_bandwidth is nto None, then the server-device communication latency will be counted.
-        """
-        self.model_profile = model_summary(model,batches[0],len(batches))
-        
-        return 0
-    
-    def estimate_latency(self,model_profile,performance,memory,memory_bandwidth=None,network_bandwidth=None):
-        """
-        Estimate the training latency with only performance and memory information.
-        """
-        if model_profile is None:
-            return None
-        return 1.0
     
     def get_local_state_dict(self,model):
         sd = model.state_dict()
