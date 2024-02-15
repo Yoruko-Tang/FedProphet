@@ -40,17 +40,19 @@ class AT_Client(ST_Client):
               adv_train=True,adv_method='pgd',adv_epsilon=0.0,adv_alpha=0.0,adv_T=0,
               adv_norm='inf',adv_bound=[0.0,1.0],adv_ratio=1.0,**kwargs):
         """train the model for one communication round."""
-        if not adv_train: # conduct normal training if not adversarial training
-            model = super().train(init_model,local_ep,local_bs,lr,optimizer,
-                                  momentum,reg,criterion)
-            return model
+        def standard_loss(model,input,label):
+            output = model(input)
+            task_loss = criterion(output,label)
+            return task_loss
+        
+        
         model = copy.deepcopy(init_model) # avoid modifying global model
         model.to(self.device)
         if self.local_states is not None:
             model = self.load_local_state_dict(model,self.local_states)
         
 
-        self.trainloader = DataLoader(self.trainset,batch_size=local_bs,shuffle=True)
+        trainloader = DataLoader(self.trainset,batch_size=local_bs,shuffle=True)
 
         # Set optimizer for the local updates
         np = model.parameters()
@@ -59,8 +61,8 @@ class AT_Client(ST_Client):
         elif optimizer == 'adam':
             optimizer = torch.optim.Adam(np, lr=lr, weight_decay=reg)
         
-        adv_criterion = lambda m,i,y:criterion(m(i),y)
-        adv_data_gen = Adv_Sample_Generator(adv_criterion,adv_method,adv_epsilon,
+
+        adv_data_gen = Adv_Sample_Generator(standard_loss,adv_method,adv_epsilon,
                                             adv_alpha,adv_T,adv_norm,adv_bound)
         
 
@@ -68,20 +70,20 @@ class AT_Client(ST_Client):
         self.batches = []
         while iters < local_ep:
         #for iter in range(self.args.local_ep):
-            for _, (datas, labels) in enumerate(self.trainloader):
-                adv_bs = int(adv_ratio*len(datas))
-                for i in range(adv_T):
-                    # adv generating batches
-                    self.batches.append([adv_bs]+list(datas.shape)[1:])
+            for _, (datas, labels) in enumerate(trainloader):
                 # training batch
                 self.batches.append(list(datas.shape))
-
                 datas, labels = datas.to(self.device), labels.to(self.device)
-                adv_datas = adv_data_gen.attack_data(model,datas,labels)
+                if adv_train:
+                    adv_bs = int(adv_ratio*len(datas))
+                    # adv generating batches
+                    self.batches+=[[adv_bs]+list(datas.shape)[1:]]*adv_T
+                    datas = adv_data_gen.attack_data(model,datas,labels)
+                
                 model.train()
                 model.zero_grad()
-                output = model(adv_datas)
-                loss = criterion(output, labels)
+                
+                loss = standard_loss(datas, labels)
                 loss.backward()
                 optimizer.step()
                 iters += 1
@@ -97,13 +99,14 @@ class AT_Client(ST_Client):
         
         # calculate training latency
         self.model_profile = model_summary(model,self.batches[0],len(self.batches))
-        self.latency = self.model_profile.training_latency(performance=self.avail_perf,
-                                                           memory=self.avail_mem,
-                                                           batches=self.batches)
+        self.latency = self.model_profile.training_latency(batches=self.batches,
+                                                           performance=self.avail_perf,
+                                                           memory=self.avail_mem
+                                                           )
         
         return model
         
-    def adv_validate(self,model,criterion=torch.nn.CrossEntropyLoss()):
+    def adv_validate(self,model,criterion=torch.nn.CrossEntropyLoss(),**kwargs):
         """ Returns the validation adversarial accuracy and adversarial loss."""
         model = copy.deepcopy(model) # avoid modifying global model
         model.to(self.device)
@@ -111,7 +114,7 @@ class AT_Client(ST_Client):
             model = self.load_local_state_dict(model,self.local_states)
         model.eval()
         loss, total, correct = 0.0, 0.0, 0.0
-        self.testloader = DataLoader(self.testset,batch_size=128, shuffle=False)
+        testloader = DataLoader(self.testset,batch_size=128, shuffle=False)
 
         adv_data_gen = Adv_Sample_Generator(lambda m,i,y:criterion(m(i),y),
                                             self.test_adv_method,
@@ -121,7 +124,7 @@ class AT_Client(ST_Client):
                                             self.test_adv_norm,
                                             self.test_adv_bound)
 
-        for batch_idx, (datas, labels) in enumerate(self.testloader):
+        for batch_idx, (datas, labels) in enumerate(testloader):
             datas, labels = datas.to(self.device), labels.to(self.device)
             adv_datas = adv_data_gen.attack_data(model,datas,labels)
             outputs = model(adv_datas)

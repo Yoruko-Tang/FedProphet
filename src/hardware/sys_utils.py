@@ -237,7 +237,7 @@ class model_summary():
 
         return module_name_list, flops_per_module, params_per_module, mem_per_module
     
-    def training_latency(self,performance,memory,module_list=None,batches=None,eff_bandwidth=None,access_latency=None,network_bandwidth=None):
+    def training_latency(self,module_list=None,batches=None,performance=None,memory=None,eff_bandwidth=None,access_latency=None,network_bandwidth=None):
         """
         Calculate the training latency of the whole model with the model profile.
         The inputsizes can be a list of sizes, one for each minibatch.
@@ -275,10 +275,10 @@ class model_summary():
             batch_flops_req = calibrated_factor*flops_req
 
             # forward + backward computation
-            batch_computation_time = 2*batch_flops_req/performance 
+            batch_computation_time = 2*batch_flops_req/performance if performance is not None else 0
 
             batch_memory_access_time = 0
-            if eff_bandwidth is not None and access_latency is not None:
+            if memory is not None and eff_bandwidth is not None and access_latency is not None:
                 if batch_memory_req>memory: # the required memory exceeds the available memory
                     # we adopt load and offload method to train the module
                     # offload feature in forward and load feature in backward + load and offload parameters in forward and backward
@@ -293,7 +293,7 @@ class model_summary():
 
             # since the computation and memory access can be parallelized, 
             # we take the larger one as the final latency
-            batch_on_device_time = batch_computation_time+batch_memory_access_time
+            batch_on_device_time = batch_computation_time + batch_memory_access_time
 
             total_latency += batch_on_device_time
         

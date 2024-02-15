@@ -37,7 +37,8 @@ class Avg_Server():
         self.test_every = test_every
 
         # collect the init loss and training latency
-        self.stat_info = self.stat_monitor.collect(self.global_model,epoch=0)
+        monitor_params = self.scheduler.monitor_params()
+        self.stat_info = self.stat_monitor.collect(self.global_model,epoch=0,**monitor_params)
         self.sys_info = self.sys_monitor.collect(epoch=0)
 
 
@@ -75,11 +76,13 @@ class Avg_Server():
 
         if (self.round+1)%self.test_every == 0:
             # collect each client's statistical information
+            monitor_params = self.scheduler.monitor_params()
             self.stat_info = self.stat_monitor.collect(self.global_model,
                                                        epoch=self.round,
                                                        chosen_idxs=self.idxs_users,
                                                        test_dataset=self.test_dataset,
-                                                       device=self.device,log=True)
+                                                       device=self.device,log=True,
+                                                       **monitor_params)
         # collect each client's systematic information
         self.sys_info = self.sys_monitor.collect(epoch=self.round,
                                                  chosen_idxs=self.idxs_users,
@@ -91,7 +94,7 @@ class Avg_Server():
     def train_idx(self,idxs_users):
         local_weights = np.array([None for _ in range(self.num_users)])
         for idx in idxs_users:
-            training_hyperparameters = self.scheduler.set(idx=idx,round=self.round)
+            training_hyperparameters = self.scheduler.training_params(idx=idx)
             local_model = self.clients[idx].train(self.global_model,**training_hyperparameters)
             local_model.to(self.device) # return the local model to the server's device
             local_weights[idx] = copy.deepcopy(local_model.state_dict())

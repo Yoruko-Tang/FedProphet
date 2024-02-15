@@ -173,17 +173,17 @@ class ST_Stat_Monitor():
         accuracy = correct/total
         return accuracy, loss/(batch_idx+1)
 
-    def validation(self,model):
-        val_accs = []
-        val_losses = []
-        for n,c in enumerate(self.clients):
-            if isinstance(model,list):
-                acc,loss = c.validate(model[n])
-            else:
-                acc,loss = c.validate(model)
-            val_accs.append(acc)
-            val_losses.append(loss)
-        return val_accs, val_losses
+    # def validation(self,model):
+    #     val_accs = []
+    #     val_losses = []
+    #     for n,c in enumerate(self.clients):
+    #         if isinstance(model,list):
+    #             acc,loss = c.validate(model[n])
+    #         else:
+    #             acc,loss = c.validate(model)
+    #         val_accs.append(acc)
+    #         val_losses.append(loss)
+    #     return val_accs, val_losses
         
 class AT_Stat_Monitor(ST_Stat_Monitor):
     """
@@ -193,7 +193,7 @@ class AT_Stat_Monitor(ST_Stat_Monitor):
                  criterion = F.cross_entropy,
                  test_adv_method='PGD',test_adv_eps=8/255,
                  test_adv_alpha=2/255,test_adv_T=10,test_adv_norm='inf',
-                 test_adv_bound=[0.0,1.0],adv_warmup=0):
+                 test_adv_bound=[0.0,1.0]):
         super().__init__(clients,weights,log_path,criterion)
         self.test_adv_criterion = lambda m,i,y:self.criterion(m(i),y)
         self.test_adv_method=test_adv_method
@@ -202,7 +202,6 @@ class AT_Stat_Monitor(ST_Stat_Monitor):
         self.test_adv_T = test_adv_T
         self.test_adv_norm = test_adv_norm
         self.test_adv_bound = test_adv_bound
-        self.adv_warmup = adv_warmup
         self.adv_sample_gen = Adv_Sample_Generator(criterion=self.test_adv_criterion,
                                                    attack_method=self.test_adv_method,
                                                    epsilon=self.test_adv_eps,
@@ -223,8 +222,8 @@ class AT_Stat_Monitor(ST_Stat_Monitor):
             columns = ['epoch', 'mode', 'clean_loss', 'clean_accuracy', 'best_clean_accuracy','adv_loss', 'adv_accuracy', 'best_adv_accuracy']
             wf.write('\t'.join(columns) + '\n')
 
-    def collect(self,global_model,epoch=None,chosen_idxs=None,test_dataset=None,device=torch.device('cpu'),log=False,save=True,**kwargs):
-        if epoch is not None and epoch<self.adv_warmup:
+    def collect(self,global_model,adv_test=True,epoch=None,chosen_idxs=None,test_dataset=None,device=torch.device('cpu'),log=False,save=True,**kwargs):
+        if not adv_test:
             if log:
                 self.global_adv_accs.append(np.zeros(len(self.clients)))
                 self.global_adv_losses.append(np.zeros(len(self.clients)))

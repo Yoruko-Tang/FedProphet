@@ -58,13 +58,19 @@ class ST_Client():
               criterion=torch.nn.CrossEntropyLoss(),
               **kwargs):
         """train the model for one communication round."""
+        def standard_loss(model,input,label):
+            output = model(input)
+            task_loss = criterion(output,label)
+            return task_loss
+        
+
         model = copy.deepcopy(init_model) # avoid modifying global model
         model.to(self.device)
         if self.local_states is not None:
             model = self.load_local_state_dict(model,self.local_states)
-        model.train()
         
-        self.trainloader = DataLoader(self.trainset,batch_size=local_bs,shuffle=True)
+        
+        trainloader = DataLoader(self.trainset,batch_size=local_bs,shuffle=True)
 
         # Set optimizer for the local updates
         np = model.parameters()
@@ -78,12 +84,12 @@ class ST_Client():
         self.batches = []
         while iters < local_ep:
         #for iter in range(self.args.local_ep):
-            for _, (datas, labels) in enumerate(self.trainloader):
+            for _, (datas, labels) in enumerate(trainloader):
                 self.batches.append(list(datas.shape))
                 datas, labels = datas.to(self.device), labels.to(self.device)
+                model.train()
                 model.zero_grad()
-                output = model(datas)
-                loss = criterion(output, labels)
+                loss = standard_loss(model,datas,labels)
                 loss.backward()
                 optimizer.step()
                 iters += 1
@@ -99,13 +105,14 @@ class ST_Client():
 
         # calculate training latency
         self.model_profile = model_summary(model,self.batches[0],len(self.batches))
-        self.latency = self.model_profile.training_latency(performance=self.avail_perf,
-                                                           memory=self.avail_mem,
-                                                           batches=self.batches)
+        self.latency = self.model_profile.training_latency(batches=self.batches,
+                                                           performance=self.avail_perf,
+                                                           memory=self.avail_mem
+                                                           )
 
         return model
 
-    def validate(self,model,criterion=torch.nn.CrossEntropyLoss()):
+    def validate(self,model,criterion=torch.nn.CrossEntropyLoss(),**kwargs):
         """ Returns the validation accuracy and loss."""
         model = copy.deepcopy(model) # avoid modifying global model
         model.to(self.device)
@@ -113,9 +120,9 @@ class ST_Client():
             model = self.load_local_state_dict(model,self.local_states)
         model.eval()
         loss, total, correct = 0.0, 0.0, 0.0
-        self.testloader = DataLoader(self.testset,batch_size=128, shuffle=False)
+        testloader = DataLoader(self.testset,batch_size=128, shuffle=False)
 
-        for batch_idx, (datas, labels) in enumerate(self.testloader):
+        for batch_idx, (datas, labels) in enumerate(testloader):
             datas, labels = datas.to(self.device), labels.to(self.device)
             outputs = model(datas)
             batch_loss = criterion(outputs, labels)
@@ -136,8 +143,9 @@ class ST_Client():
         self.avail_perf = max([self.performance*self.perf_degrade,self.reserved_performance])
         self.avail_mem = max([self.memory*self.mem_degrade,self.reserved_memory])
         
-        self.est_latency = self.model_profile.training_latency(self.avail_perf,self.avail_mem,
-                                                               batches = self.batches)
+        self.est_latency = self.model_profile.training_latency(batches=self.batches,
+                                                               performance=self.avail_perf,
+                                                               memory=self.avail_mem)
         # return the current availale performance, memory, and the training latency of the last round
         return self.runtime_app, self.avail_perf, self.avail_mem, self.latency, self.est_latency
 

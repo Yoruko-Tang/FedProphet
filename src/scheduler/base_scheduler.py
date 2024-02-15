@@ -9,7 +9,7 @@ class base_scheduler():
 
         self.args = args
 
-    def set(self,**kwargs):
+    def training_params(self,**kwargs):
         lr = self.args["lr"]
         if self.args["lr_decay"] is not None:
             if self.args["lr_schedule"] is None:
@@ -24,6 +24,9 @@ class base_scheduler():
 
         return args
     
+    def monitor_params(self,**kwargs):
+        return {}
+    
     def stat_update(self,epoch,**kwargs):
         self.round = epoch
 
@@ -37,8 +40,8 @@ class base_AT_scheduler(base_scheduler):
         super().__init__(args)
 
 
-    def set(self,**kwargs):
-        args = super().set()
+    def training_params(self,**kwargs):
+        args = super().training_params()
         adv_train = self.args["adv_train"]
         if self.round < self.args["adv_warmup"]:
             adv_train = False
@@ -47,4 +50,11 @@ class base_AT_scheduler(base_scheduler):
 
         
         return args
+    
+    def monitor_params(self,**kwargs):
+        adv_test = self.args["adv_test"]
+        if self.round < self.args["adv_warmup"]:
+            adv_test = False
+
+        return {"adv_test":adv_test}
     
