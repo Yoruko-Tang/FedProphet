@@ -11,6 +11,7 @@ class ST_Client():
     Typical use case: FedAvg, FedBN
     """
     def __init__(self,dataset,data_idxs,sys_info=None,
+                 model_profile:model_summary = None,
                  local_state_preserve = False,
                  device = torch.device('cpu'), 
                  verbose=False, random_seed=None, 
@@ -18,6 +19,8 @@ class ST_Client():
                  **kwargs):
         self.trainset, self.testset = self.train_test(dataset, list(data_idxs))
         self.dev_name,self.performance,self.memory=sys_info
+        self.model_profile = model_profile
+
         self.local_state_preserve = local_state_preserve
         
         self.device = device
@@ -25,13 +28,15 @@ class ST_Client():
         self.local_states = None
         self.verbose = verbose
         self.rs = np.random.RandomState(random_seed)
+
         self.reserved_performance = reserved_performance
         self.reserved_memory = reserved_memory
-
-        self.runtime_app,self.perf_degrade,self.mem_degrade = sample_runtime_app(self.rs)
-        self.latency,self.est_latency = None,None
-        self.model_profile = None
+        
         self.batches = None
+        self.latency = None
+        self.get_runtime_sys_stat()
+        
+        
         
         
 
@@ -94,7 +99,9 @@ class ST_Client():
 
         # calculate training latency
         self.model_profile = model_summary(model,self.batches[0],len(self.batches))
-        self.latency = self.model_profile.training_latency(self.batches,self.avail_perf,self.avail_mem)
+        self.latency = self.model_profile.training_latency(performance=self.avail_perf,
+                                                           memory=self.avail_mem,
+                                                           batches=self.batches)
 
         return model
 
@@ -124,13 +131,13 @@ class ST_Client():
         return accuracy, loss/(batch_idx+1)
     
     
-    def get_runtime_sys_stat(self,model_profile=None):
+    def get_runtime_sys_stat(self):
         self.runtime_app,self.perf_degrade,self.mem_degrade=sample_runtime_app(self.rs)
         self.avail_perf = max([self.performance*self.perf_degrade,self.reserved_performance])
         self.avail_mem = max([self.memory*self.mem_degrade,self.reserved_memory])
-        ms = model_profile if self.model_profile is None else self.model_profile
-        if ms is not None:
-            self.est_latency = ms.estimate_latency(ms,self.avail_perf,self.avail_mem)
+        
+        self.est_latency = self.model_profile.training_latency(self.avail_perf,self.avail_mem,
+                                                               batches = self.batches)
         # return the current availale performance, memory, and the training latency of the last round
         return self.runtime_app, self.avail_perf, self.avail_mem, self.latency, self.est_latency
 

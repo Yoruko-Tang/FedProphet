@@ -75,6 +75,7 @@ if __name__ == '__main__':
         if args.flalg == 'FedAvg':
             clients = [ST_Client(train_dataset,user_groups[i],
                                  sys_info=user_devices[i],
+                                 model_profile=model_profile,
                                  local_state_preserve = False,
                                  device=device,verbose=args.verbose,
                                  random_seed=i+args.device_random_seed
@@ -82,6 +83,7 @@ if __name__ == '__main__':
         elif args.flalg == 'FedBN':
             clients = [ST_Client(train_dataset,user_groups[i],
                                  sys_info=user_devices[i],
+                                 model_profile=model_profile,
                                  local_state_preserve = True,
                                  device=device,verbose=args.verbose,
                                  random_seed=i+args.device_random_seed
@@ -90,6 +92,7 @@ if __name__ == '__main__':
         elif args.flalg == 'FedAvgAT':
             clients = [AT_Client(train_dataset,user_groups[i],
                                  sys_info=user_devices[i],
+                                 model_profile=model_profile,
                                  local_state_preserve = False,
                                  test_adv_method=args.advt_method,
                                  test_adv_epsilon=args.advt_epsilon,
@@ -101,6 +104,7 @@ if __name__ == '__main__':
         elif args.flalg == 'FedBNAT':
             clients = [AT_Client(train_dataset,user_groups[i],
                                  sys_info=user_devices[i],
+                                 model_profile=model_profile,
                                  local_state_preserve = True,
                                  test_adv_method=args.advt_method,
                                  test_adv_epsilon=args.advt_epsilon,
@@ -131,7 +135,7 @@ if __name__ == '__main__':
                                            log_path = file_name)
 
         # systematic monitor
-        sys_monitor = Sys_Monitor(clients=clients,model_profile=model_profile,log_path=file_name)
+        sys_monitor = Sys_Monitor(clients=clients,log_path=file_name)
         
         ##  ==================================Build Scheduler==================================
         if args.flalg in ["FedAvg","FedBN"]:

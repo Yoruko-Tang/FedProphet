@@ -7,9 +7,8 @@ class Sys_Monitor():
     """
     collect the validation loss of each client
     """
-    def __init__(self,clients,model_profile,log_path=None):
+    def __init__(self,clients,log_path=None):
         self.clients=clients
-        self.model_profile = model_profile
         self.chosen_clients = []
         self.chosen_devices = []
         self.runtime_apps = []
@@ -45,7 +44,7 @@ class Sys_Monitor():
         est_times = [] # estimated training time of the next round
         for n,c in enumerate(self.clients):
             # collect performance, memory and training latency
-            cruntime_app,cavail_perf,cavail_mem,clatency,cestlatency = c.get_runtime_sys_stat(self.model_profile)
+            cruntime_app,cavail_perf,cavail_mem,clatency,cestlatency = c.get_runtime_sys_stat()
             
             runtime_app.append(cruntime_app)
             avail_perf.append(cavail_perf)

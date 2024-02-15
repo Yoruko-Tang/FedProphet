@@ -1,4 +1,4 @@
-from client.stclient import ST_Client
+from client.atclient import AT_Client
 
 import torch
 from torch.utils.data import DataLoader
@@ -11,9 +11,9 @@ from hardware.sys_utils import model_summary
 
 
 
-class AT_Client(ST_Client):
+class Module_Client(AT_Client):
     """
-    This is a client that conducts adversarial training
+    This is a client that conducts adversarial training with fedprophet
     """
     def __init__(self, dataset, data_idxs, sys_info=None,
                  model_profile:model_summary = None,
@@ -23,20 +23,17 @@ class AT_Client(ST_Client):
                  device=torch.device('cpu'), 
                  verbose=False, random_seed=None, 
                  reserved_performance = 0, reserved_memory = 0, **kwargs):
-        super().__init__(dataset, data_idxs, sys_info, model_profile, local_state_preserve,
+        super().__init__(dataset, data_idxs, sys_info, model_profile, 
+                         local_state_preserve,test_adv_method,test_adv_epsilon,
+                         test_adv_alpha,test_adv_T,test_adv_norm,test_adv_bound,
                          device, verbose, random_seed, reserved_performance, 
                          reserved_memory, **kwargs)
+        self.module_list = None
         
-        self.test_adv_method = test_adv_method
-        self.test_adv_epsilon = test_adv_epsilon
-        self.test_adv_alpha = test_adv_alpha
-        self.test_adv_T = test_adv_T
-        self.test_adv_norm = test_adv_norm
-        self.test_adv_bound = test_adv_bound
 
         
     def train(self,init_model,local_ep,local_bs,lr,optimizer='sgd',
-              momentum=0.0,reg=0.0, criterion=torch.nn.CrossEntropyLoss(),
+              momentum=0.0,reg=0.0, criterion=torch.nn.CrossEntropyLoss(),module_list=None,
               adv_train=True,adv_method='pgd',adv_epsilon=0.0,adv_alpha=0.0,adv_T=0,
               adv_norm='inf',adv_bound=[0.0,1.0],adv_ratio=1.0,**kwargs):
         """train the model for one communication round."""

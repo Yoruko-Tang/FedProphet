@@ -2,7 +2,7 @@ import numpy as np
 from numpy.random import RandomState
 from fvcore.nn import FlopCountAnalysis, parameter_count
 import torch
-
+from math import ceil
 
 
 unique_runtime_app_list = ['idle', '1080p', '4k', 'inference', 'detection', 'web']
@@ -112,7 +112,7 @@ class model_summary():
     def __init__(self,model,inputsize,default_local_eps=1):
         self.inputsize = inputsize
         self.default_local_eps = default_local_eps
-        self.module_list, self.flops_dict, self.num_parameter_dict, self.mem_dict, self.out_feature_size_dic\
+        self.module_list, self.flops_dict, self.num_parameter_dict, self.mem_dict\
               = self.profile_model(model,inputsize) 
 
 
@@ -227,37 +227,82 @@ class model_summary():
                     raise RuntimeWarning("Cannot fetch the output size of the module: "+ module_name_list[n])
             self.out_feature_dict[module_name_list[-1]]=[inputsize[0],self.num_classes]
             
-            out_feature_size_per_module = {}
-            for k in self.out_feature_dict:
-                result = 1
-                for i in range(len(self.out_feature_dict[k])):
-                    result *= self.out_feature_dict[k][i]
-                out_feature_size_per_module[k] = result
+            # out_feature_size_per_module = {}
+            # for k in self.out_feature_dict:
+            #     result = 1
+            #     for i in range(len(self.out_feature_dict[k])):
+            #         result *= self.out_feature_dict[k][i]
+            #     out_feature_size_per_module[k] = result
 
 
-        return module_name_list, flops_per_module, params_per_module, mem_per_module, out_feature_size_per_module
+        return module_name_list, flops_per_module, params_per_module, mem_per_module
     
-    def training_latency(self,batches,performance,memory,eff_bandwidth=None,access_latency=None,network_bandwidth=None,module_list=None):
+    def training_latency(self,performance,memory,module_list=None,batches=None,eff_bandwidth=None,access_latency=None,network_bandwidth=None):
         """
         Calculate the training latency of the whole model with the model profile.
         The inputsizes can be a list of sizes, one for each minibatch.
         The total training latency should be calculated as the sum of all minibatches.
         If memory_bandwidth is not None, then the memory-to-cache latency will be counted.
-        If network_bandwidth is nto None, then the server-device communication latency will be counted.
+        If network_bandwidth is not None, then the server-device communication latency will be counted.
         """
 
         # To do: network latency emulation ...
         # ...
 
-
-        total_iter = len(batches)
+        total_latency = 0
+        
         if module_list == None:
             module_list = ['total']
         
-        memory_req = 0
-        for k in module_list:
-            memory_req += self.mem_dict[k]
         
+        total_params = 0
+        total_feature_size = 0
+        flops_req = 0
+        for k in module_list:
+            total_params += int(self.num_parameter_dict[k])
+            total_feature_size += int(np.prod(self.in_feature_dict[k]))
+            flops_req += int(self.flops_dict[k])
+        if module_list[-1] in self.out_feature_dict:
+            total_feature_size += int(np.prod(self.out_feature_dict[module_list[-1]]))
+        
+        if batches is None:
+            batches = [self.inputsize]*self.default_local_eps
+
+        for n,batch in enumerate(batches):
+            calibrated_factor = batch[0]/self.inputsize[0]
+            batch_memory_req = 4*calibrated_factor*total_feature_size \
+                                + 3*4*total_params
+            batch_flops_req = calibrated_factor*flops_req
+
+            # forward + backward computation
+            batch_computation_time = 2*batch_flops_req/performance 
+
+            batch_memory_access_time = 0
+            if eff_bandwidth is not None and access_latency is not None:
+                if batch_memory_req>memory: # the required memory exceeds the available memory
+                    # we adopt load and offload method to train the module
+                    # offload feature in forward and load feature in backward + load and offload parameters in forward and backward
+                    memory_access_size = 2*4*calibrated_factor*total_feature_size + 4*4*total_params
+                    memory_access_times = ceil(memory_access_size/2/memory) # offload can be done together with load
+                    batch_memory_access_time += memory_access_size/eff_bandwidth+access_latency*memory_access_times
+                else:# we do not need to offload the parameter and intermediate features
+                    if n == 0: # load the parameter at the beginning
+                        batch_memory_access_time += 4*total_params/eff_bandwidth
+                    # only load the input in later iterations
+                    batch_memory_access_time += 4*int(np.prod(batch))/eff_bandwidth+access_latency
+
+            # since the computation and memory access can be parallelized, 
+            # we take the larger one as the final latency
+            batch_on_device_time = batch_computation_time+batch_memory_access_time
+
+            total_latency += batch_on_device_time
+        
+        if network_bandwidth is not None:
+            # download and upload time
+            communication_time = 4*total_params/network_bandwidth[0]+4*total_params/network_bandwidth[1]
+            total_latency += communication_time
+        
+        return total_latency
         # baseline
         # if module_list == None:
         #     # the out feature size of a batch for a given model with batch size = self.inputsize[0]
@@ -283,39 +328,30 @@ class model_summary():
         #     server_client_comm_time = self.num_parameter_dict['total'] / network_bandwidth
 
         # else:
-        _one_batch_feature_size = 0
-        _one_batch_flops = 0
-        total_params = 0
-        for k in module_list:
-            _one_batch_feature_size += self.out_feature_size_dic[k]
-            _one_batch_flops += self.flops_dict[k]
-            total_params += self.num_parameter_dict[k]
+        # _one_batch_feature_size = 0
+        # _one_batch_flops = 0
+        # total_params = 0
+        # for k in module_list:
+        #     _one_batch_feature_size += self.out_feature_size_dic[k]
+        #     _one_batch_flops += self.flops_dict[k]
+        #     total_params += self.num_parameter_dict[k]
         
-        total_out_feature_size = 0
-        total_flops = 0
-        for i in range(total_iter):
-            batch_size = batches[i][0]
-            calibrated_factor = batch_size / self.inputsize[0]
-            total_out_feature_size += calibrated_factor * _one_batch_feature_size
-            total_flops += calibrated_factor * _one_batch_flops
+        # total_out_feature_size = 0
+        # total_flops = 0
+        # for i in range(total_iter):
+        #     batch_size = batches[i][0]
+        #     calibrated_factor = batch_size / self.inputsize[0]
+        #     total_out_feature_size += calibrated_factor * _one_batch_feature_size
+        #     total_flops += calibrated_factor * _one_batch_flops
         
-        total_params_access = total_params
+        # total_params_access = total_params
 
-        local_data_access_time = total_params_access / eff_bandwidth
-        compute_time = total_flops / performance
-        server_client_comm_time = total_params / network_bandwidth
+        # local_data_access_time = total_params_access / eff_bandwidth
+        # compute_time = total_flops / performance
+        # server_client_comm_time = total_params / network_bandwidth
 
-        total_training_latency = local_data_access_time + compute_time + server_client_comm_time
+        # total_training_latency = local_data_access_time + compute_time + server_client_comm_time
         
-        return total_training_latency
+        # return total_training_latency
 
             
-
-
-
-
-    def estimate_latency(self,performance,memory,memory_bandwidth=None,network_bandwidth=None):
-        """
-        Estimate the training latency with only performance and memory information.
-        """
-        return 1.0
