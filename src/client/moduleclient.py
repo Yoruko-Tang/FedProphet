@@ -209,7 +209,7 @@ class Module_Client(AT_Client):
         accuracy = correct/total
         return accuracy, loss/(batch_idx+1)
     
-    def adv_validate(self,model,module_list,auxiliary_model = None,criterion=torch.nn.CrossEntropyLoss(),**kwargs):
+    def adv_validate(self,model,module_list=None,auxiliary_model = None,criterion=torch.nn.CrossEntropyLoss(),**kwargs):
         """ Returns the validation adversarial accuracy and adversarial loss."""
         def early_exit_loss(model,input,label):
             output = model.module_forward(input,module_list)

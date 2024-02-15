@@ -44,7 +44,7 @@ class ST_Stat_Monitor():
                 columns = ['epoch', 'mode', 'loss', 'accuracy', 'best_accuracy']
                 wf.write('\t'.join(columns) + '\n')
 
-    def collect(self,global_model,epoch=None,chosen_idxs=None,test_dataset=None,device=torch.device('cpu'),log=False,save=True,**kwargs):
+    def collect(self,global_model,epoch=None,chosen_idxs=None,test_dataset=None,device=torch.device('cpu'),log=False,save=True,**validation_kwargs):
         local_losses = []
         global_accs, global_losses = [],[]
         
@@ -58,23 +58,23 @@ class ST_Stat_Monitor():
         # validation acc and loss
         for n,c in enumerate(self.clients):
             if isinstance(global_model,list):
-                acc,loss = c.validate(global_model[n])
+                acc,loss = c.validate(global_model[n],**validation_kwargs)
             else:
-                acc,loss = c.validate(global_model)
+                acc,loss = c.validate(global_model,**validation_kwargs)
             global_accs.append(acc)
             global_losses.append(loss)
         
         # test acc and loss
         if test_dataset is not None:
-            if not isinstance(global_model,list):
-                test_acc,test_loss = self.test_inference(global_model,test_dataset,device)
-            else:
-                test_accs,test_losses = [],[]
-                for n in range(len(global_model)):
-                    test_acc_n,test_loss_n = self.test_inference(global_model[n],test_dataset,device)
-                    test_accs.append(test_acc_n)
-                    test_losses.append(test_loss_n)
-                    test_acc,test_loss = np.mean(test_accs),np.mean(test_losses)
+            
+            test_acc,test_loss = self.test_inference(global_model,test_dataset,device)
+            # else:
+            #     test_accs,test_losses = [],[]
+            #     for n in range(len(global_model)):
+            #         test_acc_n,test_loss_n = self.test_inference(global_model[n],test_dataset,device)
+            #         test_accs.append(test_acc_n)
+            #         test_losses.append(test_loss_n)
+            #     test_acc,test_loss = np.mean(test_accs),np.mean(test_losses)
         
         else:
             test_acc,test_loss = 0,None
@@ -222,7 +222,7 @@ class AT_Stat_Monitor(ST_Stat_Monitor):
             columns = ['epoch', 'mode', 'clean_loss', 'clean_accuracy', 'best_clean_accuracy','adv_loss', 'adv_accuracy', 'best_adv_accuracy']
             wf.write('\t'.join(columns) + '\n')
 
-    def collect(self,global_model,adv_test=True,epoch=None,chosen_idxs=None,test_dataset=None,device=torch.device('cpu'),log=False,save=True,**kwargs):
+    def collect(self,global_model,adv_test=True,epoch=None,chosen_idxs=None,test_dataset=None,device=torch.device('cpu'),log=False,save=True,**validation_kwargs):
         if not adv_test:
             if log:
                 self.global_adv_accs.append(np.zeros(len(self.clients)))
@@ -241,8 +241,11 @@ class AT_Stat_Monitor(ST_Stat_Monitor):
         
         # val acc and loss
         global_adv_accs, global_adv_losses = [],[]
-        for c in self.clients:
-            adv_acc,adv_loss = c.adv_validate(global_model)
+        for n,c in enumerate(self.clients):
+            if isinstance(global_model,list):
+                adv_acc,adv_loss = c.adv_validate(global_model[n],**validation_kwargs)
+            else:
+                adv_acc,adv_loss = c.adv_validate(global_model,**validation_kwargs)
             global_adv_accs.append(adv_acc)
             global_adv_losses.append(adv_loss)
         global_adv_accs = np.array(global_adv_accs)

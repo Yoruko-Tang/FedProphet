@@ -128,8 +128,7 @@ if __name__ == '__main__':
                                            test_adv_alpha=args.advt_alpha,
                                            test_adv_T=args.advt_T,
                                            test_adv_norm=args.advt_norm,
-                                           test_adv_bound=args.advt_bound,
-                                           adv_warmup=args.adv_warmup)
+                                           test_adv_bound=args.advt_bound)
         else:
             stat_monitor = ST_Stat_Monitor(clients=clients,weights=weights,
                                            log_path = file_name)
