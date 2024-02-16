@@ -286,11 +286,10 @@ class model_summary():
                     memory_access_times = ceil(memory_access_size/2/memory) # offload can be done together with load
                     batch_memory_access_time = iters_per_input*(memory_access_size/eff_bandwidth+access_latency*memory_access_times)
                 else:# we do not need to offload the parameter and intermediate features
-                    # only load the input once for every iters_per_input
-                    if n%iters_per_input == 0:
-                        batch_memory_access_time = 4*int(np.prod(batch))/eff_bandwidth+access_latency
-                        if n == 0: # load the parameter at the beginning
-                            batch_memory_access_time = 4*total_params/eff_bandwidth
+                    # load the input once for every iters_per_input
+                    batch_memory_access_time = 4*int(np.prod(batch))/eff_bandwidth+access_latency
+                    if n == 0: # only load the parameter at the beginning
+                        batch_memory_access_time += 4*total_params/eff_bandwidth
 
             # since the computation and memory access can be parallelized, 
             # we take the larger one as the final latency
