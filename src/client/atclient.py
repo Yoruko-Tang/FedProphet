@@ -76,7 +76,7 @@ class AT_Client(ST_Client):
                 datas, labels = datas.to(self.device), labels.to(self.device)
                 if adv_train:
                     self.iters_per_input = adv_T+1
-                    datas = adv_data_gen.attack_data(model,datas,labels)
+                    datas = adv_data_gen.attack_data(model,datas,labels,adv_ratio)
                 else:
                     self.iters_per_input = 1
                 

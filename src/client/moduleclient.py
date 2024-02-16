@@ -34,10 +34,16 @@ class Module_Client(AT_Client):
 
         self.module_list = None
         
-    def forward_feature_set(self,model,module_list):
+    def forward_feature_set(self,model,module_list,adv_train=True,adv_method='pgd',
+                            adv_epsilon=0.0,adv_alpha=0.0,adv_T=0,adv_norm='inf',adv_bound=[0.0,1.0]):
         """
         forward the current feature to the feature of the next stage
         """
+        def feature_adv_loss(model,input,clean_output):
+            output = model.module_forward(input,module_list)
+            loss = torch.sum((output-clean_output)**2)/len(output)
+            return loss
+
         model = copy.deepcopy(model) # avoid modifying global model
         model.to(self.device)
         if self.local_states is not None:
@@ -49,28 +55,53 @@ class Module_Client(AT_Client):
 
         new_train_feature,new_test_feature = [],[]
         train_labels,test_labels = [],[]
+        if adv_train:
+            train_adv_feature_pert = []
+            adv_data_gen = Adv_Sample_Generator(feature_adv_loss,adv_method,adv_epsilon,
+                                            adv_alpha,adv_T,adv_norm,adv_bound)
 
         for datas,labels in trainloader:
             datas = datas.to(self.device)
             new_feature = model.module_forward(datas,module_list)
-            new_feature = new_feature.detach().cpu()
-            new_train_feature.append(new_feature)
-            train_labels.append(labels)
+            new_feature = new_feature.detach()
+            if adv_train:
+                adv_datas = adv_data_gen.attack_data(model,datas,new_feature)
+                new_adv_feature = model.module_forward(adv_datas,module_list)
+                adv_feature_pert = torch.norm(new_adv_feature-new_feature,p=2,dim=list(range(1,new_feature.dim()))).max()
+                train_adv_feature_pert.append(adv_feature_pert.item())
+            new_train_feature.append(new_feature.cpu())
+            train_labels.append(labels.cpu())
         new_train_feature = torch.cat(new_train_feature,dim=0)
         train_labels = torch.cat(train_labels,dim=0)
-        self.feature_trainset = TensorDataset(new_train_feature,train_labels)
+        smallest_value = torch.min(new_train_feature).item()
+        largest_value = torch.max(new_train_feature).item()
 
         for datas,labels in testloader:
             datas = datas.to(self.device)
             new_feature = model.module_forward(datas,module_list)
-            new_feature = new_feature.detach().cpu()
-            new_test_feature.append(new_feature)
-            test_labels.append(labels)
+            new_feature = new_feature.detach()
+            # if adv_train:
+            #     adv_datas = adv_data_gen.attack_data(model,datas,new_feature)
+            #     new_adv_feature = model.module_forward(adv_datas,module_list)
+            #     adv_feature_pert = torch.norm(new_adv_feature-new_feature,p=2,dim=list(range(1,new_feature.dim()))).max()
+            #     test_adv_feature_pert.append(adv_feature_pert.item())
+            new_test_feature.append(new_feature.cpu())
+            test_labels.append(labels.cpu())
         new_test_feature = torch.cat(new_test_feature,dim=0)
         test_labels = torch.cat(test_labels,dim=0)
-        self.feature_testset = TensorDataset(new_test_feature,test_labels)
 
-        return self.feature_trainset,self.feature_testset
+        
+            
+
+        self.feature_trainset = TensorDataset(new_train_feature,train_labels)
+        self.feature_testset = TensorDataset(new_test_feature,test_labels)
+        if adv_train:
+            max_train_adv_feature_pert = max(train_adv_feature_pert)
+            # max_test_adv_feature_pert = max(test_adv_feature_pert)
+        else:
+            max_train_adv_feature_pert = 0.0
+
+        return max_train_adv_feature_pert, smallest_value, largest_value
 
 
         
@@ -158,7 +189,7 @@ class Module_Client(AT_Client):
                 datas, labels = datas.to(self.device), labels.to(self.device)
                 if adv_train:
                     self.iters_per_input = adv_T+1
-                    datas = adv_data_gen.attack_data(model,datas,labels)
+                    datas = adv_data_gen.attack_data(model,datas,labels,adv_ratio)
                 else:
                     self.iters_per_input = 1
                 
@@ -266,10 +297,13 @@ class Module_Client(AT_Client):
         self.avail_perf = max([self.performance*self.perf_degrade,self.reserved_performance])
         self.avail_mem = max([self.memory*self.mem_degrade,self.reserved_memory])
         
-        self.est_latency = self.model_profile.training_latency(module_list=self.module_list,
-                                                               iters_per_input=self.iters_per_input,
-                                                               batches=self.batches,
-                                                               performance=self.avail_perf,
-                                                               memory=self.avail_mem)
+        if self.model_profile is not None:
+            self.est_latency = self.model_profile.training_latency(module_list=self.module_list,
+                                                                iters_per_input=self.iters_per_input,
+                                                                batches=self.batches,
+                                                                performance=self.avail_perf,
+                                                                memory=self.avail_mem)
+        else:
+            self.est_latency = None
         # return the current availale performance, memory, and the training latency of the last round
         return self.runtime_app, self.avail_perf, self.avail_mem, self.latency, self.est_latency

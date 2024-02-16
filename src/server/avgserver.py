@@ -55,12 +55,14 @@ class Avg_Server():
         self.selector.stat_update(epoch=self.round,
                                   selected_clients=self.idxs_users,
                                   stat_info=self.stat_info,
-                                  sys_info=self.sys_info,server=self)
+                                  sys_info=self.sys_info,
+                                  server=self)
         
         #update the scheduler's information
         self.scheduler.stat_update(epoch =self.round,
                                    stat_info = self.stat_info,
-                                   sys_info = self.sys_info)
+                                   sys_info = self.sys_info,
+                                   global_model = self.global_model)
         
         # select clients
         if self.train_frac is None:

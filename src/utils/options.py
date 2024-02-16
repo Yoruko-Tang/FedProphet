@@ -196,6 +196,9 @@ def fedprophet_option(parser):
                         help='the maximum number of flops allowed in model partition')
     parser.add_argument('--max_module_mem',type=int,default=None,
                         help='the maximum memory allowed in model partition')
+    parser.add_argument('--mu',type = float,default=0.0, help='mu in fedprophet')
+    parser.add_argument('--lamb',type = float,default=0.0, help='lambda in fedprophet')
+    parser.add_argument('--psi',type = float,default=0.0, help='psi in fedprophet')
     
     return parser
 

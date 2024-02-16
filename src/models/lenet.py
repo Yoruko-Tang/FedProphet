@@ -79,7 +79,10 @@ def modularization(model):
     This function will also set the granulity of the model, which is the atom in modularization
     """
 
-    def module_forward(self, x: torch.Tensor, layer_list: List[str]) -> torch.Tensor:
+    def module_forward(self, x: torch.Tensor, module_list: List[str]) -> torch.Tensor:
+        layer_list = []
+        for m in module_list:
+            layer_list += m.split("+")
         valid_features = []
         valid_classifier = []
         for n,m in self.named_modules():

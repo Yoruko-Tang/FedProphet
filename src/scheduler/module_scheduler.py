@@ -13,7 +13,7 @@ class module_scheduler(base_AT_scheduler):
     client the training modules according to their available resources.
     """
 
-    def __init__(self, args, model_profile):
+    def __init__(self, args, model_profile, clients):
         super().__init__(args)
         self.model_profile = model_profile
         self.atom_list = self.model_profile.module_list
@@ -26,6 +26,123 @@ class module_scheduler(base_AT_scheduler):
 
         self.partition_module_list,self.module_dict,self.auxiliary_model_dict,\
             self.module_flops_dict,self.module_mem_dict = self.model_partition(args["max_module_flops"],args["max_module_mem"])
+        
+        self.total_round = args["epochs"]
+        self.round_per_stage = self.total_round//len(self.partition_module_list)
+        self.stage = 0
+        self.clients = clients
+        self.available_performance = [c.avail_perf for c in self.clients]
+        self.available_memory = [c.avail_mem for c in self.clients]
+
+
+        self.adv_epsilon = args["adv_epsilon"]
+        self.adv_alpha = args["adv_alpha"]
+        self.adv_norm = args["adv_norm"]
+        self.adv_bound = args["adv_bound"]
+
+        self.mu = args["mu"]
+        self.lamb = args["lamb"]
+        self.psi = args["psi"]
+
+
+    def training_params(self, idx, **kwargs):
+        args = super().training_params()
+
+        stage_module = self.partition_module_list[self.stage]
+        stage_module_list = self.module_dict[stage_module]
+        stage_aux_model = self.auxiliary_model_dict[stage_module]
+
+        avail_perf = self.available_performance[idx]
+        avail_mem = self.available_memory[idx]
+
+        # config the prophet training
+        # the allowed time is the time of finishing training 
+        # the current module with the smallest available performance
+        allowed_flops = avail_perf/min(self.available_performance)*self.module_flops_dict[stage_module]
+        cum_flops = self.module_flops_dict[stage_module]
+        cum_mem = self.module_mem_dict[stage_module]
+        last_output = self.atom_output_dict[stage_module[-1]]
+
+        prophet_module_list = []
+        prophet_aux_model = None
+
+        for next_module in self.partition_module_list[self.stage+1:]:
+            cum_flops += self.module_flops_dict[next_module]
+            # we subtract the output of the last module since it's counted twice
+            cum_mem += (self.module_mem_dict[next_module]-4*int(np.prod(last_output)))
+            if cum_flops < allowed_flops and cum_mem < avail_mem:
+                prophet_module_list += self.module_dict[next_module]
+                prophet_aux_model = self.auxiliary_model_dict[next_module]
+                last_output = self.atom_output_dict[self.module_dict[next_module][-1]]
+            else:
+                break
+
+        # modularization configuration
+        args["stage_module_list"] = stage_module_list
+        args["prophet_module_list"] = prophet_module_list
+        args["stage_aux_model"] = stage_aux_model
+        args["prophet_aux_model"] = prophet_aux_model
+
+        args["mu"] = self.mu
+        args["lamb"] = self.lamb
+        args["psi"] = self.psi
+
+        # adversarial training configuration
+        args["adv_epsilon"] = self.adv_epsilon
+        args["adv_alpha"] = self.adv_alpha
+        args["adv_norm"] = self.adv_norm
+        args["adv_bound"] = self.adv_bound
+
+        return args
+    
+    def monitor_params(self, **kwargs):
+        args = super().monitor_params(**kwargs)
+        module_list = []
+        for i in range(self.stage+1):
+            stage_module = self.partition_module_list[i]
+            module_list += self.module_dict[stage_module]
+        
+        stage_aux_model = self.auxiliary_model_dict[stage_module]
+        args["module_list"] = module_list
+        args["auxiliary_model"] = stage_aux_model
+
+        return args
+
+    def stat_update(self, epoch, stat_info, sys_info, global_model, **kwargs):
+        super().stat_update(epoch%self.round_per_stage) # periodic lr/adv_train adjustment
+        new_stage = epoch//self.round_per_stage
+        if new_stage != self.stage: # update the adversarial training params
+            current_module_list = self.module_dict[self.partition_module_list[self.stage]]
+            new_adv_epsilons = []
+            lowers = []
+            uppers = []
+            for c in self.clients:
+                max_adv_pert,l,u = c.forward_feature_set(global_model,current_module_list,
+                                                    adv_train = self.args["adv_train"],
+                                                    adv_method = self.args["adv_method"],
+                                                    adv_epsilon = self.adv_epsilon,
+                                                    adv_alpha = self.adv_alpha,
+                                                    adv_T = self.args["adv_T"],
+                                                    adv_norm = self.adv_norm,
+                                                    adv_bound = self.adv_bound)
+                new_adv_epsilons.append(max_adv_pert)
+                lowers.append(l)
+                uppers.append(u)
+            # take the largest perturbation as the new epsilon
+            self.adv_epsilon = max(new_adv_epsilons)
+            self.adv_alpha = 2*self.adv_epsilon/self.args["adv_T"]
+            self.adv_norm = 'l2'
+            lower = min(lowers)
+            upper = max(uppers)
+            # usually end with relu, with bound [0.0,np.inf]
+            self.adv_bound = [0 if lower>=0 else -np.inf,0 if upper<=0 else np.inf]
+        
+        self.stage = new_stage
+
+        self.available_performance = sys_info["available_perfs"]
+        self.available_memory = sys_info["available_mems"]
+
+        # Todo: add adaptive adjustment of mu, lamb and psi
         
 
     def model_partition(self,max_module_flops=None,max_module_mem=None,**kwargs):
