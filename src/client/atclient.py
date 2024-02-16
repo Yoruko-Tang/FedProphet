@@ -75,9 +75,7 @@ class AT_Client(ST_Client):
                 self.batches.append(list(datas.shape))
                 datas, labels = datas.to(self.device), labels.to(self.device)
                 if adv_train:
-                    adv_bs = int(adv_ratio*len(datas))
-                    # adv generating batches
-                    self.batches+=[[adv_bs]+list(datas.shape)[1:]]*adv_T
+                    self.iters_per_input = adv_T+1
                     datas = adv_data_gen.attack_data(model,datas,labels)
                 
                 model.train()
@@ -100,9 +98,9 @@ class AT_Client(ST_Client):
         # calculate training latency
         self.model_profile = model_summary(model,self.batches[0],len(self.batches))
         self.latency = self.model_profile.training_latency(batches=self.batches,
+                                                           iters_per_input=self.iters_per_input,
                                                            performance=self.avail_perf,
-                                                           memory=self.avail_mem
-                                                           )
+                                                           memory=self.avail_mem)
         
         return model
         

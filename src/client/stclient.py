@@ -32,6 +32,8 @@ class ST_Client():
         self.reserved_performance = reserved_performance
         self.reserved_memory = reserved_memory
         
+        self.iters_per_input = 1
+
         self.batches = None
         self.latency = None
         self.get_runtime_sys_stat()
@@ -106,9 +108,9 @@ class ST_Client():
         # calculate training latency
         self.model_profile = model_summary(model,self.batches[0],len(self.batches))
         self.latency = self.model_profile.training_latency(batches=self.batches,
+                                                           iters_per_input=self.iters_per_input,
                                                            performance=self.avail_perf,
-                                                           memory=self.avail_mem
-                                                           )
+                                                           memory=self.avail_mem)
 
         return model
 
@@ -144,6 +146,7 @@ class ST_Client():
         self.avail_mem = max([self.memory*self.mem_degrade,self.reserved_memory])
         
         self.est_latency = self.model_profile.training_latency(batches=self.batches,
+                                                               iters_per_input=self.iters_per_input,
                                                                performance=self.avail_perf,
                                                                memory=self.avail_mem)
         # return the current availale performance, memory, and the training latency of the last round

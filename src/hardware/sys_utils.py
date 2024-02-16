@@ -109,7 +109,7 @@ class model_summary():
     flops of each layer, and sizes of intermediate features. 
     The granulty of the model is defined by the model itself.
     """
-    def __init__(self,model,inputsize,default_local_eps=1):
+    def __init__(self,model,inputsize,default_local_eps=[1,]):
         self.inputsize = inputsize
         self.default_local_eps = default_local_eps
         self.module_list, self.flops_dict, self.num_parameter_dict, self.mem_dict\
@@ -237,7 +237,7 @@ class model_summary():
 
         return module_name_list, flops_per_module, params_per_module, mem_per_module
     
-    def training_latency(self,module_list=None,batches=None,performance=None,memory=None,eff_bandwidth=None,access_latency=None,network_bandwidth=None):
+    def training_latency(self,module_list=None,batches=None,iters_per_input=1,performance=None,memory=None,eff_bandwidth=None,access_latency=None,network_bandwidth=None):
         """
         Calculate the training latency of the whole model with the model profile.
         The inputsizes can be a list of sizes, one for each minibatch.
@@ -275,7 +275,7 @@ class model_summary():
             batch_flops_req = calibrated_factor*flops_req
 
             # forward + backward computation
-            batch_computation_time = 2*batch_flops_req/performance if performance is not None else 0
+            batch_computation_time = 2*iters_per_input*batch_flops_req/performance if performance is not None else 0
 
             batch_memory_access_time = 0
             if memory is not None and eff_bandwidth is not None and access_latency is not None:
@@ -284,12 +284,13 @@ class model_summary():
                     # offload feature in forward and load feature in backward + load and offload parameters in forward and backward
                     memory_access_size = 2*4*calibrated_factor*total_feature_size + 4*4*total_params
                     memory_access_times = ceil(memory_access_size/2/memory) # offload can be done together with load
-                    batch_memory_access_time += memory_access_size/eff_bandwidth+access_latency*memory_access_times
+                    batch_memory_access_time = iters_per_input*(memory_access_size/eff_bandwidth+access_latency*memory_access_times)
                 else:# we do not need to offload the parameter and intermediate features
-                    if n == 0: # load the parameter at the beginning
-                        batch_memory_access_time += 4*total_params/eff_bandwidth
-                    # only load the input in later iterations
-                    batch_memory_access_time += 4*int(np.prod(batch))/eff_bandwidth+access_latency
+                    # only load the input once for every iters_per_input
+                    if n%iters_per_input == 0:
+                        batch_memory_access_time = 4*int(np.prod(batch))/eff_bandwidth+access_latency
+                        if n == 0: # load the parameter at the beginning
+                            batch_memory_access_time = 4*total_params/eff_bandwidth
 
             # since the computation and memory access can be parallelized, 
             # we take the larger one as the final latency

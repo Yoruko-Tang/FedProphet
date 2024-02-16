@@ -68,7 +68,7 @@ if __name__ == '__main__':
         print(global_model)
         model_profile = model_summary(model = deepcopy(global_model),
                                       inputsize=[args.local_bs]+list(train_dataset[0][0].shape),
-                                      default_local_eps=args.local_ep*(args.adv_T+1 if args.adv_train else 1))
+                                      default_local_eps=args.local_ep)
         
 
         ## ==================================Build Clients==================================

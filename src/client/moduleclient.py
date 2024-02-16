@@ -148,9 +148,7 @@ class Module_Client(AT_Client):
                 self.batches.append(list(datas.shape))
                 datas, labels = datas.to(self.device), labels.to(self.device)
                 if adv_train:
-                    adv_bs = int(adv_ratio*len(datas))
-                    # adv generating batches
-                    self.batches+=[[adv_bs]+list(datas.shape)[1:]]*adv_T
+                    self.iters_per_input = adv_T+1
                     datas = adv_data_gen.attack_data(model,datas,labels)
                 
                 model.train()
@@ -175,6 +173,7 @@ class Module_Client(AT_Client):
         self.module_list = stage_module_list + prophet_module_list
         self.latency = self.model_profile.training_latency(module_list=self.module_list,
                                                            batches=self.batches,
+                                                           iters_per_input=self.iters_per_input,
                                                            performance=self.avail_perf,
                                                            memory=self.avail_mem
                                                            )
@@ -257,8 +256,9 @@ class Module_Client(AT_Client):
         self.avail_mem = max([self.memory*self.mem_degrade,self.reserved_memory])
         
         self.est_latency = self.model_profile.training_latency(module_list=self.module_list,
-                                                                batches=self.batches,
-                                                                performance=self.avail_perf,
-                                                                memory=self.avail_mem)
+                                                               iters_per_input=self.iters_per_input,
+                                                               batches=self.batches,
+                                                               performance=self.avail_perf,
+                                                               memory=self.avail_mem)
         # return the current availale performance, memory, and the training latency of the last round
         return self.runtime_app, self.avail_perf, self.avail_mem, self.latency, self.est_latency
