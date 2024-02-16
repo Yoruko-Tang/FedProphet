@@ -77,6 +77,8 @@ class AT_Client(ST_Client):
                 if adv_train:
                     self.iters_per_input = adv_T+1
                     datas = adv_data_gen.attack_data(model,datas,labels)
+                else:
+                    self.iters_per_input = 1
                 
                 model.train()
                 model.zero_grad()

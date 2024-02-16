@@ -108,6 +108,12 @@ class model_summary():
     This class will profile a given model and get its number of parameters,
     flops of each layer, and sizes of intermediate features. 
     The granulty of the model is defined by the model itself.
+    self.module_list: name of atom module lists, could be a combination of multiple layers (block)
+    self.flops_dict: {module_name: flops}
+    self.num_parameter_dict: {module_name: parameters}
+    self.mem_dict: {module_name: parameters}
+    self.in_feature_dict: {layer_name: input_feature_size}
+    self.out_feature_dict: {module_name: output_feature_size}
     """
     def __init__(self,model,inputsize,default_local_eps=[1,]):
         self.inputsize = inputsize
@@ -145,8 +151,8 @@ class model_summary():
             assert sum == dic['total'], "Wrong profiling data!"
 
         # initialize the dicts
-        self.in_feature_dict = {}
-        self.out_feature_dict = {}
+        self.in_feature_dict = {} # layer: input_feature_size
+        self.out_feature_dict = {} # module: output_feature_size
         self.num_classes = model.output_size
 
         self.register_feature_hook(model)
@@ -240,6 +246,8 @@ class model_summary():
     def training_latency(self,module_list=None,batches=None,iters_per_input=1,performance=None,memory=None,eff_bandwidth=None,access_latency=None,network_bandwidth=None):
         """
         Calculate the training latency of the whole model with the model profile.
+        module_list: a list of atom module names in self.module_lists, 
+        notice that this name may not be used to access self.in_feature_dict.
         The inputsizes can be a list of sizes, one for each minibatch.
         The total training latency should be calculated as the sum of all minibatches.
         If memory_bandwidth is not None, then the memory-to-cache latency will be counted.
@@ -260,7 +268,7 @@ class model_summary():
         flops_req = 0
         for k in module_list:
             total_params += int(self.num_parameter_dict[k])
-            total_feature_size += int(np.prod(self.in_feature_dict[k]))
+            total_feature_size += (int(self.mem_dict[k])-4*3*int(self.num_parameter_dict[k]))//4
             flops_req += int(self.flops_dict[k])
         if module_list[-1] in self.out_feature_dict:
             total_feature_size += int(np.prod(self.out_feature_dict[module_list[-1]]))

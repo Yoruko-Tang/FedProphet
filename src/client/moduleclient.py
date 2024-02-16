@@ -82,10 +82,22 @@ class Module_Client(AT_Client):
               adv_norm='inf',adv_bound=[0.0,1.0],adv_ratio=1.0,
               mu=0.0,lamb=0.0,psi=0.0,**kwargs):
         """train the model for one communication round."""
+        # model preparation
+        model = copy.deepcopy(init_model) # avoid modifying global model
+        model.to(self.device)
+        if self.local_states is not None:
+            model = self.load_local_state_dict(model,self.local_states)
+        current_aux_model = copy.deepcopy(stage_aux_model)
+        if current_aux_model is not None:
+            current_aux_model.to(self.device)
+        future_aux_model = copy.deepcopy(prophet_aux_model)
+        if future_aux_model is not None:
+            future_aux_model.to(self.device)
+
         def fedprophet_loss(model,input,label):
             output = model.module_forward(input,stage_module_list)
-            if stage_aux_model is not None:
-                final_output = stage_aux_model(output)
+            if current_aux_model is not None:
+                final_output = current_aux_model(output)
             else:
                 final_output = output
             stage_task_loss = criterion(final_output,label)
@@ -94,8 +106,8 @@ class Module_Client(AT_Client):
             
             if len(prophet_module_list)>0:
                 prophet_output = model.module_forward(output,prophet_module_list)
-                if prophet_aux_model is not None:
-                    prophet_final_output = prophet_aux_model(prophet_output)
+                if future_aux_model is not None:
+                    prophet_final_output = future_aux_model(prophet_output)
                 else:
                     prophet_final_output = prophet_output
                 prophet_task_loss = criterion(prophet_final_output,label)
@@ -105,22 +117,19 @@ class Module_Client(AT_Client):
             return loss
 
         
-        model = copy.deepcopy(init_model) # avoid modifying global model
-        model.to(self.device)
-        if self.local_states is not None:
-            model = self.load_local_state_dict(model,self.local_states)
+        
         
 
         self.trainloader = DataLoader(self.feature_trainset,batch_size=local_bs,shuffle=True)
 
         # Set optimizer for the local updates
         np = model.parameters()
-        if stage_aux_model is not None:
-            anp = stage_aux_model.parameters()
+        if current_aux_model is not None:
+            anp = current_aux_model.parameters()
         else:
             anp = []
-        if prophet_aux_model is not None:
-            panp = prophet_aux_model.parameters()
+        if future_aux_model is not None:
+            panp = future_aux_model.parameters()
         else:
             panp = []
         if optimizer == 'sgd':
@@ -150,6 +159,8 @@ class Module_Client(AT_Client):
                 if adv_train:
                     self.iters_per_input = adv_T+1
                     datas = adv_data_gen.attack_data(model,datas,labels)
+                else:
+                    self.iters_per_input = 1
                 
                 model.train()
                 model.zero_grad()
@@ -178,7 +189,7 @@ class Module_Client(AT_Client):
                                                            memory=self.avail_mem
                                                            )
         
-        return model
+        return model,current_aux_model,future_aux_model
         
     def validate(self,model,module_list,auxiliary_model = None,criterion=torch.nn.CrossEntropyLoss(),**kwargs):
         """ Returns the validation accuracy and loss."""
