@@ -80,8 +80,8 @@ def sample_devices(num_users,rs,device_dic,sys_scaling_factor):
 
 
     client_device_name_list = []
-    client_device_perf_list = [] #GFLOPS
-    client_device_mem_list  = [] #GB
+    client_device_perf_list = [] # GFLOPS
+    client_device_mem_list  = [] # MB
 
 
     device_id_list = rs.choice(unique_id_list, p=prob_list, size=num_users)
@@ -115,9 +115,20 @@ class model_summary():
     self.in_feature_dict: {layer_name: input_feature_size}
     self.out_feature_dict: {module_name: output_feature_size}
     """
-    def __init__(self,model,inputsize,default_local_eps=[1,]):
+
+    data_Byte = 4 # FP32
+    def __init__(self,model,inputsize,default_local_eps=[1,],optimizer='sgd',**opt_kwargs):
         self.inputsize = inputsize
         self.default_local_eps = default_local_eps
+        if optimizer == 'adam':
+            self.param_mem_scale = 8
+        elif optimizer == 'sgd':
+            if 'momentum' in opt_kwargs and opt_kwargs['momentum'] > 0:
+                self.param_mem_scale = 3
+            else:
+                self.param_mem_scale = 2 
+        else:
+            raise RuntimeError("Not a supported optimizer: {} for model profiling!".format(optimizer))
         self.module_list, self.flops_dict, self.num_parameter_dict, self.mem_dict\
               = self.profile_model(model,inputsize) 
 
@@ -168,23 +179,23 @@ class model_summary():
 
         flops_per_module['total'] = _flops_per_module['']
         params_per_module['total'] = _params_per_module['']
-        mem_per_module['total'] = 3*4*params_per_module['total']
+        mem_per_module['total'] = self.param_mem_scale*self.data_Byte*params_per_module['total']
         for k in self.in_feature_dict.keys():
-            mem_per_module['total'] += 4*np.prod(self.in_feature_dict[k])
+            mem_per_module['total'] += self.data_Byte*np.prod(self.in_feature_dict[k])
         
         if hasattr(model,"module_list"): # if this model is modularized
             for key in model.module_list:
                 if isinstance(key,str):
                     flops_per_module[key] = _flops_per_module[key]
                     params_per_module[key] = _params_per_module[key]
-                    mem_per_module[key] = 3*4*params_per_module[key] # memory for parameter
+                    mem_per_module[key] = self.param_mem_scale*self.data_Byte*params_per_module[key] # memory for parameter
                     if key in self.in_feature_dict.keys():# this module is a layer
-                        mem_per_module[key] += 4*np.prod(self.in_feature_dict[key])
+                        mem_per_module[key] += self.data_Byte*np.prod(self.in_feature_dict[key])
 
                     else: # this module is a block
                         for layer in self.in_feature_dict.keys(): # calculate every layer in this block
                             if (key+'.') in layer:
-                                mem_per_module[key] += 4*np.prod(self.in_feature_dict[layer])
+                                mem_per_module[key] += self.data_Byte*np.prod(self.in_feature_dict[layer])
                                 
                 else: # this module is a combination of multiple sub-modules
                     name = "+".join(key)
@@ -195,14 +206,14 @@ class model_summary():
                         flops_per_module[name] += _flops_per_module[l]
                         params_per_module[name] += _params_per_module[l]                  
                         if l in self.in_feature_dict.keys(): # this sub-module is a layer
-                            mem_per_module[name] += 4*np.prod(self.in_feature_dict[l])
+                            mem_per_module[name] += self.data_Byte*np.prod(self.in_feature_dict[l])
                         
                         else: # this sub-module is a block
                             for layer in self.in_feature_dict.keys(): # calculate every layer in this block
                                 if (l+'.') in layer:
-                                    mem_per_module[name] += 4*np.prod(self.in_feature_dict[layer])
+                                    mem_per_module[name] += self.data_Byte*np.prod(self.in_feature_dict[layer])
                         
-                    mem_per_module[name] += 3*4*params_per_module[name] # memory for parameter
+                    mem_per_module[name] += self.param_mem_scale*self.data_Byte*params_per_module[name] # memory for parameter
                     
             validate(flops_per_module)
             validate(params_per_module)
@@ -233,12 +244,8 @@ class model_summary():
                     raise RuntimeWarning("Cannot fetch the output size of the module: "+ module_name_list[n])
             self.out_feature_dict[module_name_list[-1]]=[inputsize[0],self.num_classes]
             
-            # out_feature_size_per_module = {}
-            # for k in self.out_feature_dict:
-            #     result = 1
-            #     for i in range(len(self.out_feature_dict[k])):
-            #         result *= self.out_feature_dict[k][i]
-            #     out_feature_size_per_module[k] = result
+
+        
 
 
         return module_name_list, flops_per_module, params_per_module, mem_per_module
@@ -268,7 +275,7 @@ class model_summary():
         flops_req = 0
         for k in module_list:
             total_params += int(self.num_parameter_dict[k])
-            total_feature_size += (int(self.mem_dict[k])-4*3*int(self.num_parameter_dict[k]))//4
+            total_feature_size += (int(self.mem_dict[k])-self.param_mem_scale*self.data_Byte*int(self.num_parameter_dict[k]))//self.data_Byte
             flops_req += int(self.flops_dict[k])
         if module_list[-1] in self.out_feature_dict:
             total_feature_size += int(np.prod(self.out_feature_dict[module_list[-1]]))
@@ -278,11 +285,11 @@ class model_summary():
 
         for n,batch in enumerate(batches):
             calibrated_factor = batch[0]/self.inputsize[0]
-            batch_memory_req = 4*calibrated_factor*total_feature_size \
-                                + 3*4*total_params
+            batch_memory_req = self.data_Byte*calibrated_factor*total_feature_size \
+                                + self.param_mem_scale*self.data_Byte*total_params
             batch_flops_req = calibrated_factor*flops_req
 
-            # forward + backward computation
+            # forward + backward computation (performance in GFLOPs)
             batch_computation_time = 2*iters_per_input*batch_flops_req/performance if performance is not None else 0
 
             batch_memory_access_time = 0
@@ -290,14 +297,15 @@ class model_summary():
                 if batch_memory_req>memory: # the required memory exceeds the available memory
                     # we adopt load and offload method to train the module
                     # offload feature in forward and load feature in backward + load and offload parameters in forward and backward
-                    memory_access_size = 2*4*calibrated_factor*total_feature_size + 4*4*total_params
-                    memory_access_times = ceil(memory_access_size/2/memory) # offload can be done together with load
+                    memory_access_size = 2*self.data_Byte*calibrated_factor*total_feature_size \
+                                        + 4*self.data_Byte*total_params
+                    memory_access_times = ceil(memory_access_size/memory) # 1x parameter + 1x feature in forward, and 3x parameter + 1x feature in backward
                     batch_memory_access_time = iters_per_input*(memory_access_size/eff_bandwidth+access_latency*memory_access_times)
                 else:# we do not need to offload the parameter and intermediate features
-                    # load the input once for every iters_per_input
-                    batch_memory_access_time = 4*int(np.prod(batch))/eff_bandwidth+access_latency
-                    if n == 0: # only load the parameter at the beginning
-                        batch_memory_access_time += 4*total_params/eff_bandwidth
+                    # load the input (MB) once for every iters_per_input
+                    batch_memory_access_time = self.data_Byte*int(np.prod(batch))/eff_bandwidth+access_latency
+                    if n == 0: # only load the parameter (MB) at the beginning
+                        batch_memory_access_time += self.data_Byte*total_params/eff_bandwidth
 
             # since the computation and memory access can be parallelized, 
             # we take the larger one as the final latency
@@ -307,59 +315,10 @@ class model_summary():
         
         if network_bandwidth is not None:
             # download and upload time
-            communication_time = 4*total_params/network_bandwidth[0]+4*total_params/network_bandwidth[1]
+            communication_time = self.data_Byte*total_params/network_bandwidth[0]+self.data_Byte*total_params/network_bandwidth[1]
             total_latency += communication_time
         
         return total_latency
-        # baseline
-        # if module_list == None:
-        #     # the out feature size of a batch for a given model with batch size = self.inputsize[0]
-        #     _one_batch_feature_size = 0
-        #     for k in self.out_feature_size_dic:
-        #         _one_batch_feature_size += self.out_feature_size_dic[k]
-            
-        #     # the total out feature size of batches
-        #     total_out_feature_size = 0
-        #     total_flops = 0
-        #     for i in range(total_iter):
-        #         batch_size = batches[i][0]
-        #         calibrated_factor = batch_size / self.inputsize[0]
-        #         total_out_feature_size += calibrated_factor * _one_batch_feature_size
-        #         total_flops += calibrated_factor * self.flops_dict['total']
-
-
-        #     total_params_access = self.num_parameter_dict['total'] * total_iter
-
-        #     # calculate the execution time: ns (if bandwidth - GB/s and performance - GFLOPS)
-        #     local_data_access_time = (total_out_feature_size + total_params_access * 2) * 2 / eff_bandwidth + access_latency * total_iter
-        #     compute_time = total_flops / performance
-        #     server_client_comm_time = self.num_parameter_dict['total'] / network_bandwidth
-
-        # else:
-        # _one_batch_feature_size = 0
-        # _one_batch_flops = 0
-        # total_params = 0
-        # for k in module_list:
-        #     _one_batch_feature_size += self.out_feature_size_dic[k]
-        #     _one_batch_flops += self.flops_dict[k]
-        #     total_params += self.num_parameter_dict[k]
         
-        # total_out_feature_size = 0
-        # total_flops = 0
-        # for i in range(total_iter):
-        #     batch_size = batches[i][0]
-        #     calibrated_factor = batch_size / self.inputsize[0]
-        #     total_out_feature_size += calibrated_factor * _one_batch_feature_size
-        #     total_flops += calibrated_factor * _one_batch_flops
-        
-        # total_params_access = total_params
-
-        # local_data_access_time = total_params_access / eff_bandwidth
-        # compute_time = total_flops / performance
-        # server_client_comm_time = total_params / network_bandwidth
-
-        # total_training_latency = local_data_access_time + compute_time + server_client_comm_time
-        
-        # return total_training_latency
 
             

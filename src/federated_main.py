@@ -59,7 +59,7 @@ if __name__ == '__main__':
 
         ## ==================================Build Model==================================
         # try to get the model from torchvision.models with pretraining
-        global_model = get_net(modelname = args.model,
+        global_model = get_net(modelname = args.model_arch,
                                modeltype = dataset_to_datafamily[args.dataset],
                                num_classes = args.num_classes,
                                pretrained = args.pretrained,
@@ -68,7 +68,8 @@ if __name__ == '__main__':
         print(global_model)
         model_profile = model_summary(model = deepcopy(global_model),
                                       inputsize=[args.local_bs]+list(train_dataset[0][0].shape),
-                                      default_local_eps=args.local_ep)
+                                      default_local_eps=args.local_ep,
+                                      **vars(args))
         
 
         ## ==================================Build Clients==================================
@@ -113,7 +114,19 @@ if __name__ == '__main__':
                                  device=device,verbose=args.verbose,
                                  random_seed=i+args.device_random_seed
                                  ) for i in range(args.num_users)]
-
+        elif args.flalg == 'FedProphet':
+            clients = [Module_Client(train_dataset,user_groups[i],
+                                     sys_info=user_devices[i],
+                                     model_profile=model_profile,
+                                     local_state_preserve = True,
+                                     test_adv_method=args.advt_method,
+                                     test_adv_epsilon=args.advt_epsilon,
+                                     test_adv_alpha=args.advt_alpha,
+                                     test_adv_T=args.advt_T,
+                                     device=device,verbose=args.verbose,
+                                     random_seed=i+args.device_random_seed,
+                                     reserved_memory=args.max_module_mem
+                                     ) for i in range(args.num_users)]
         # Todo: add other types of clients
         else:
             raise RuntimeError("Not supported FL optimizer: "+args.flalg) 
@@ -122,16 +135,10 @@ if __name__ == '__main__':
         # statistical monitor
         if args.adv_test:
             stat_monitor = AT_Stat_Monitor(clients=clients,weights=weights,
-                                           log_path = file_name,
-                                           test_adv_method=args.advt_method,
-                                           test_adv_eps=args.advt_epsilon,
-                                           test_adv_alpha=args.advt_alpha,
-                                           test_adv_T=args.advt_T,
-                                           test_adv_norm=args.advt_norm,
-                                           test_adv_bound=args.advt_bound)
+                                           log_path=file_name)
         else:
             stat_monitor = ST_Stat_Monitor(clients=clients,weights=weights,
-                                           log_path = file_name)
+                                           log_path=file_name)
 
         # systematic monitor
         sys_monitor = Sys_Monitor(clients=clients,log_path=file_name)
@@ -142,46 +149,82 @@ if __name__ == '__main__':
         elif args.flalg in ["FedAvgAT","FedBNAT"]:
             scheduler = base_AT_scheduler(vars(args))
         elif args.flalg == "FedProphet":
-            scheduler = module_scheduler(vars(args),model_profile)
+            scheduler = module_scheduler(vars(args),
+                                         model_profile=model_profile,
+                                         clients=clients)
         # Todo: Add schedulers for other baselines
         else:
             raise RuntimeError("FL optimizer {} has no registered scheduler!".format(args.flalg)) 
             
         ## ==================================Build Selector==================================
         if args.strategy == 'rand':
-            selector = Random_Selector(total_client_num = args.num_users,weights = weights)
+            selector = Random_Selector(total_client_num = args.num_users,
+                                       weights = weights)
         elif args.strategy == 'afl':
-            selector = AFL_Selector(total_client_num = args.num_users,weights = weights,**params)
+            selector = AFL_Selector(total_client_num = args.num_users,
+                                    weights = weights,**params)
         elif args.strategy == 'powerd':
-            selector = PowerD_Selector(total_client_num = args.num_users,weights = weights,**params)
+            selector = PowerD_Selector(total_client_num = args.num_users,
+                                       weights = weights,**params)
         elif args.strategy == 'oort':
-            # set gamma = 1.0 for only time in cost
-            selector = Oort_Selector(total_client_num = args.num_users,weights = weights,**params) 
+            selector = Oort_Selector(total_client_num = args.num_users,
+                                     weights = weights,**params) 
         elif args.strategy == 'fedcbs':
-            selector = FedCBS_Selector(total_client_num = args.num_users,weights = weights,data_matrix = data_matrix,**params)
+            selector = FedCBS_Selector(total_client_num = args.num_users,
+                                       weights = weights,
+                                       data_matrix = data_matrix,**params)
         elif args.strategy == 'harmony':
-            # set gamma = 1.0 for only time in cost
-            selector = Harmony_Selector(total_client_num = args.num_users,weights = weights,data_matrix = data_matrix,**params)
+            selector = Harmony_Selector(total_client_num = args.num_users,
+                                        weights = weights,
+                                        data_matrix = data_matrix,**params)
         elif args.strategy == 'fedcor':
-            selector = FedCor_Selector(total_client_num = args.num_users,weights = weights,clustered = False,**params)
-        elif args.strategy == 'cfedcor':
-            selector = FedCor_Selector(total_client_num = args.num_users,weights = weights,clustered = True,**params)
+            selector = FedCor_Selector(total_client_num = args.num_users,
+                                       weights = weights,
+                                       clustered = False,**params)
+        elif args.strategy == 'fedrepre':
+            selector = FedCor_Selector(total_client_num = args.num_users,
+                                       weights = weights,
+                                       clustered = True,**params)
         else:
             raise NotImplementedError("Not a supported selection strategy: {}".format(args.strategy))
         
         ## ==================================Build Server==================================
         if args.flalg in ["FedAvg","FedAvgAT"]:
-            server = Avg_Server(global_model=global_model,clients = clients,
-                                selector = selector,scheduler = scheduler,
-                                stat_monitor=stat_monitor,sys_monitor=sys_monitor,
-                                frac=args.frac,weights=weights,test_dataset=test_dataset,
-                                device=device,test_every = args.test_every)
-        if args.flalg in ["FedBN","FedBNAT"]:
-            server = Avg_Server(global_model=global_model,clients = clients,
-                                selector = selector,scheduler = scheduler,
-                                stat_monitor=stat_monitor,sys_monitor=sys_monitor,
-                                frac=args.frac,weights=weights,test_dataset=None,
-                                device=device,test_every = args.test_every)
+            server = Avg_Server(global_model=global_model,
+                                clients = clients,
+                                selector = selector,
+                                scheduler = scheduler,
+                                stat_monitor=stat_monitor,
+                                sys_monitor=sys_monitor,
+                                frac=args.frac,
+                                weights=weights,
+                                test_dataset=test_dataset,
+                                device=device,
+                                test_every = args.test_every)
+        elif args.flalg in ["FedBN","FedBNAT"]:
+            server = Avg_Server(global_model=global_model,
+                                clients = clients,
+                                selector = selector,
+                                scheduler = scheduler,
+                                stat_monitor=stat_monitor,
+                                sys_monitor=sys_monitor,
+                                frac=args.frac,
+                                weights=weights,
+                                test_dataset=None,
+                                device=device,
+                                test_every = args.test_every)
+        elif args.flalg == "FedProphet":
+            server = Fedprophet_Avg_Server(global_model=global_model,
+                                           clients = clients,
+                                           selector = selector,
+                                           scheduler = scheduler,
+                                           stat_monitor=stat_monitor,
+                                           sys_monitor=sys_monitor,
+                                           frac=args.frac,
+                                           weights=weights,
+                                           test_dataset=None,
+                                           device=device,
+                                           test_every = args.test_every)
 
 
         ## ==================================Start Training==================================

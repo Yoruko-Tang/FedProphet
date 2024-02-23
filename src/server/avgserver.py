@@ -14,7 +14,10 @@ class Avg_Server():
         scheduler: generate training hyperparameters for each client
         monitor: return the statistical and systematic information of each device
         """
-        self.global_model = global_model
+        self.device = device
+        global_model.to(device)
+        self.global_model = {"model":global_model}
+
         self.clients = clients
         self.num_users = len(self.clients)
         self.train_frac = frac
@@ -29,17 +32,15 @@ class Avg_Server():
         self.stat_monitor = stat_monitor
         self.sys_monitor = sys_monitor
 
-        self.device = device
-        self.global_model.to(self.device)
         
         self.round = 0
         self.idxs_users = None
         self.test_every = test_every
 
         # collect the init loss and training latency
-        monitor_params = self.scheduler.monitor_params()
-        self.stat_info = self.stat_monitor.collect(self.global_model,epoch=0,**monitor_params)
-        self.sys_info = self.sys_monitor.collect(epoch=0)
+        
+        self.stat_info = self.val(self.global_model)
+        self.sys_info = self.sys_monitor.collect()
 
 
 
@@ -59,7 +60,7 @@ class Avg_Server():
                                   server=self)
         
         #update the scheduler's information
-        self.scheduler.stat_update(epoch =self.round,
+        self.scheduler.stat_update(epoch = self.round,
                                    stat_info = self.stat_info,
                                    sys_info = self.sys_info,
                                    global_model = self.global_model)
@@ -83,7 +84,7 @@ class Avg_Server():
                                                        epoch=self.round,
                                                        chosen_idxs=self.idxs_users,
                                                        test_dataset=self.test_dataset,
-                                                       device=self.device,log=True,
+                                                       log=True,
                                                        **monitor_params)
         # collect each client's systematic information
         self.sys_info = self.sys_monitor.collect(epoch=self.round,
@@ -96,23 +97,26 @@ class Avg_Server():
     def train_idx(self,idxs_users):
         local_weights = np.array([None for _ in range(self.num_users)])
         for idx in idxs_users:
-            training_hyperparameters = self.scheduler.training_params(idx=idx)
-            local_model = self.clients[idx].train(self.global_model,**training_hyperparameters)
+            training_hyperparameters = self.scheduler.training_params(idx=idx,chosen_idxs=idxs_users)
+            local_model = self.clients[idx].train(**self.global_model,**training_hyperparameters)
+            if isinstance(local_model,list):
+                local_model = local_model[0]
             local_model.to(self.device) # return the local model to the server's device
             local_weights[idx] = copy.deepcopy(local_model.state_dict())
             
-        global_model = self.aggregate(local_weights)
+        global_model = self.aggregate(weights = local_weights,
+                                      init_model = self.global_model["model"])
         
         
-        return global_model
+        return {"model":global_model}
     
-    def aggregate(self,weights):
+    def aggregate(self,weights,init_model,**kwargs):
         """
         weighted average of all updated weights
         The average is conducted in a parameter-by-parameter fashion, 
         and the weights are normalized respectively.
         """
-        model = copy.deepcopy(self.global_model)
+        model = copy.deepcopy(init_model)
         w0 = model.state_dict()
         for p in w0.keys():
             weights_sum = 0.0
@@ -125,3 +129,7 @@ class Avg_Server():
                 w0[p] = w/weights_sum
         model.load_state_dict(w0)
         return model
+
+    def val(self,model):
+        monitor_params = self.scheduler.monitor_params()
+        return self.stat_monitor.collect(model,**monitor_params)

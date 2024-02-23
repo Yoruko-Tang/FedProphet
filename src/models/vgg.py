@@ -61,14 +61,16 @@ def modularization(model):
             layer_list += m.split("+")
         valid_features = []
         valid_classifier = []
+        all_modules = {}
         for n,m in self.named_modules():
-            if n in layer_list:
-                if 'classifier' not in n:
-                    valid_features += [m]
-        
-                else:
-                    valid_classifier += [m]
-        
+            all_modules[n] = m
+        for n in layer_list:
+            if 'classifier' not in n:
+                valid_features.append(all_modules[n])
+    
+            else:
+                valid_classifier.append(all_modules[n])
+
         if len(valid_features)>0:
             for f in valid_features:
                 x = f(x)

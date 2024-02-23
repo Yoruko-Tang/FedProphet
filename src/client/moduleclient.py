@@ -23,19 +23,35 @@ class Module_Client(AT_Client):
                  device=torch.device('cpu'), 
                  verbose=False, random_seed=None, 
                  reserved_performance = 0, reserved_memory = 0, **kwargs):
-        super().__init__(dataset, data_idxs, sys_info, model_profile, 
-                         local_state_preserve,test_adv_method,test_adv_epsilon,
-                         test_adv_alpha,test_adv_T,test_adv_norm,test_adv_bound,
-                         device, verbose, random_seed, reserved_performance, 
-                         reserved_memory, **kwargs)
 
+        self.trainset, self.testset = self.train_test(dataset, list(data_idxs))
         self.feature_trainset = self.trainset
         self.feature_testset = self.testset
+        self.dev_name,self.performance,self.memory=sys_info
+        self.model_profile = model_profile
 
-        self.module_list = None
+        self.local_state_preserve = local_state_preserve
         
-    def forward_feature_set(self,model,module_list,adv_train=True,adv_method='pgd',
-                            adv_epsilon=0.0,adv_alpha=0.0,adv_T=0,adv_norm='inf',adv_bound=[0.0,1.0]):
+        self.device = device
+        self.final_local_loss = None
+        self.local_states = None
+        self.verbose = verbose
+        self.rs = np.random.RandomState(random_seed)
+
+        self.reserved_performance = reserved_performance
+        self.reserved_memory = reserved_memory
+        
+        self.iters_per_input = 1
+
+        self.batches = None
+        self.latency = None
+        self.module_list = None
+        self.get_runtime_sys_stat()
+        
+        
+    def forward_feature_set(self,model,module_list,adv_train=True,
+                            adv_method='pgd',adv_epsilon=0.0,adv_alpha=0.0,
+                            adv_T=0,adv_norm='inf',adv_bound=[0.0,1.0]):
         """
         forward the current feature to the feature of the next stage
         """
@@ -105,25 +121,34 @@ class Module_Client(AT_Client):
 
 
         
-    def train(self,init_model,stage_module_list,prophet_module_list,
-              stage_aux_model,prophet_aux_model,
+    def train(self,model,aux_models,stage_module_list,prophet_module_list,
+              stage_aux_model_name,prophet_aux_model_name,
               local_ep,local_bs,lr,optimizer='sgd',momentum=0.0,reg=0.0, 
               criterion=torch.nn.CrossEntropyLoss(),
               adv_train=True,adv_method='pgd',adv_epsilon=0.0,adv_alpha=0.0,adv_T=0,
               adv_norm='inf',adv_bound=[0.0,1.0],adv_ratio=1.0,
-              mu=0.0,lamb=0.0,psi=0.0,**kwargs):
+              mu=0.0,lamb=0.0,psi=0.0,model_profile=None,**kwargs):
         """train the model for one communication round."""
+
         # model preparation
-        model = copy.deepcopy(init_model) # avoid modifying global model
+        model = copy.deepcopy(model) # avoid modifying global model
         model.to(self.device)
         if self.local_states is not None:
             model = self.load_local_state_dict(model,self.local_states)
-        current_aux_model = copy.deepcopy(stage_aux_model)
-        if current_aux_model is not None:
-            current_aux_model.to(self.device)
-        future_aux_model = copy.deepcopy(prophet_aux_model)
-        if future_aux_model is not None:
-            future_aux_model.to(self.device)
+
+        if stage_aux_model_name is not None:
+            current_aux_model = copy.deepcopy(aux_models[stage_aux_model_name])
+            if current_aux_model is not None:
+                current_aux_model.to(self.device)
+        else:
+            current_aux_model = None
+        
+        if prophet_aux_model_name is not None:
+            future_aux_model = copy.deepcopy(aux_models[prophet_aux_model_name])
+            if future_aux_model is not None:
+                future_aux_model.to(self.device)
+        else:
+            future_aux_model = None
 
         def fedprophet_loss(model,input,label):
             output = model.module_forward(input,stage_module_list)
@@ -163,16 +188,19 @@ class Module_Client(AT_Client):
             panp = future_aux_model.parameters()
         else:
             panp = []
+        # normalize the step size of the stage aux model
+        #alr = lr/(1-psi) if len(prophet_module_list)>0 else lr
+        alr = lr
         if optimizer == 'sgd':
-            optimizer = torch.optim.SGD([{'params':np,'weight_decay':reg},
-                                        {'params':anp,'weight_decay':lamb},
-                                        {'params':panp,'weight_decay':lamb}], 
-                                        lr=lr,momentum=momentum)
+            opt = torch.optim.SGD([{'params':np,'lr':lr,'weight_decay':reg},
+                                        {'params':anp,'lr':alr,'weight_decay':lamb},
+                                        {'params':panp,'lr':lr,'weight_decay':lamb}], 
+                                        momentum=momentum)
         elif optimizer == 'adam':
-            optimizer = torch.optim.Adam([{'params':np,'weight_decay':reg},
-                                         {'params':anp,'weight_decay':lamb},
-                                         {'params':panp,'weight_decay':lamb}], 
-                                         lr=lr)
+            # normalize the step size of the stage aux model
+            opt = torch.optim.Adam([{'params':np,'lr':lr,'weight_decay':reg},
+                                         {'params':anp,'lr':alr,'weight_decay':lamb},
+                                         {'params':panp,'lr':lr,'weight_decay':lamb}])
         
 
         adv_data_gen = Adv_Sample_Generator(fedprophet_loss,adv_method,adv_epsilon,
@@ -198,7 +226,7 @@ class Module_Client(AT_Client):
 
                 loss = fedprophet_loss(model,datas,labels)
                 loss.backward()
-                optimizer.step()
+                opt.step()
                 iters += 1
                 if iters == local_ep:
                     break
@@ -206,12 +234,15 @@ class Module_Client(AT_Client):
             if self.verbose:
                 print('Local Epoch : {}/{} |\tLoss: {:.4f}'.format(iters, local_ep, loss.item()))
         
+
+        
         if self.local_state_preserve:
             self.local_states = copy.deepcopy(self.get_local_state_dict(model))
         self.final_local_loss = loss.item()
         
         # calculate training latency
-        self.model_profile = model_summary(model,self.batches[0],len(self.batches))
+        if model_profile is not None:
+            self.model_profile = model_profile
         self.module_list = stage_module_list + prophet_module_list
         self.latency = self.model_profile.training_latency(module_list=self.module_list,
                                                            batches=self.batches,
@@ -222,7 +253,9 @@ class Module_Client(AT_Client):
         
         return model,current_aux_model,future_aux_model
         
-    def validate(self,model,module_list,auxiliary_model = None,criterion=torch.nn.CrossEntropyLoss(),**kwargs):
+    def validate(self,model,aux_models,module_list,
+                 aux_module_name = None,testset=None,
+                 criterion=torch.nn.CrossEntropyLoss(),**kwargs):
         """ Returns the validation accuracy and loss."""
         
         model = copy.deepcopy(model) # avoid modifying global model
@@ -230,14 +263,23 @@ class Module_Client(AT_Client):
         if self.local_states is not None:
             model = self.load_local_state_dict(model,self.local_states)
         model.eval()
+        
+        if aux_module_name is not None:
+            aux_model = aux_models[aux_module_name]
+        else:
+            aux_model = None
+
         loss, total, correct = 0.0, 0.0, 0.0
-        testloader = DataLoader(self.testset,batch_size=128, shuffle=False)
+        if testset is None:
+            testset = self.testset
+        testloader = DataLoader(testset,batch_size=128, shuffle=False)
 
         for batch_idx, (datas, labels) in enumerate(testloader):
             datas, labels = datas.to(self.device), labels.to(self.device)
-            outputs = model.module_forward(input,module_list)
-            if auxiliary_model is not None:
-                outputs = auxiliary_model(outputs)
+            outputs = model.module_forward(datas,module_list)
+            if aux_model is not None:
+                outputs = aux_model(outputs)
+                
             batch_loss = criterion(outputs, labels)
             loss += batch_loss.item()
 
@@ -250,21 +292,33 @@ class Module_Client(AT_Client):
         accuracy = correct/total
         return accuracy, loss/(batch_idx+1)
     
-    def adv_validate(self,model,module_list=None,auxiliary_model = None,criterion=torch.nn.CrossEntropyLoss(),**kwargs):
+    def adv_validate(self,model,aux_models,module_list,
+                     aux_module_name = None, testset=None,
+                     criterion=torch.nn.CrossEntropyLoss(),**kwargs):
         """ Returns the validation adversarial accuracy and adversarial loss."""
-        def early_exit_loss(model,input,label):
-            output = model.module_forward(input,module_list)
-            if auxiliary_model is not None:
-                output = auxiliary_model(output)
-            loss = criterion(output,label)
-            return loss
+        
         model = copy.deepcopy(model) # avoid modifying global model
         model.to(self.device)
         if self.local_states is not None:
             model = self.load_local_state_dict(model,self.local_states)
         model.eval()
+
+        if aux_module_name is not None:
+            aux_model = aux_models[aux_module_name]
+        else:
+            aux_model = None
+
+        def early_exit_loss(model,input,label):
+            output = model.module_forward(input,module_list)
+            if aux_model is not None:
+                output = aux_model(output)
+            loss = criterion(output,label)
+            return loss
+        
         loss, total, correct = 0.0, 0.0, 0.0
-        self.testloader = DataLoader(self.testset,batch_size=128, shuffle=False)
+        if testset is None:
+            testset = self.testset
+        self.testloader = DataLoader(testset,batch_size=128, shuffle=False)
 
         adv_data_gen = Adv_Sample_Generator(early_exit_loss,
                                             self.test_adv_method,
@@ -278,8 +332,8 @@ class Module_Client(AT_Client):
             datas, labels = datas.to(self.device), labels.to(self.device)
             adv_datas = adv_data_gen.attack_data(model,datas,labels)
             outputs = model(adv_datas)
-            if auxiliary_model is not None:
-                outputs = auxiliary_model(outputs)
+            if aux_model is not None:
+                outputs = aux_model(outputs)
             batch_loss = criterion(outputs, labels)
             loss += batch_loss.item()
 

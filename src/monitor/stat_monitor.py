@@ -2,18 +2,14 @@ import numpy as np
 import os.path as osp
 import os
 import torch
-from torch.utils.data import DataLoader
-import torch.nn.functional as F
 import pickle
-from utils.adversarial import Adv_Sample_Generator
 import json
 
 class ST_Stat_Monitor():
     """
     collect the training,validation and test accuracy and loss
     """
-    def __init__(self,clients,weights = None,log_path=None,
-                 criterion=F.cross_entropy):
+    def __init__(self,clients,weights = None,log_path=None):
         self.clients = clients
         self.weights = weights if weights is not None else np.ones(len(self.clients))/len(self.clients)
         self.chosen_clients = []
@@ -30,7 +26,6 @@ class ST_Stat_Monitor():
 
         self.epochs = []
         
-        self.criterion = criterion
 
         # create log files
         self.log_path = log_path
@@ -44,7 +39,7 @@ class ST_Stat_Monitor():
                 columns = ['epoch', 'mode', 'loss', 'accuracy', 'best_accuracy']
                 wf.write('\t'.join(columns) + '\n')
 
-    def collect(self,global_model,epoch=None,chosen_idxs=None,test_dataset=None,device=torch.device('cpu'),log=False,save=True,**validation_kwargs):
+    def collect(self,global_model,epoch=None,chosen_idxs=None,test_dataset=None,log=False,save=True,**validation_kwargs):
         local_losses = []
         global_accs, global_losses = [],[]
         
@@ -58,23 +53,28 @@ class ST_Stat_Monitor():
         # validation acc and loss
         for n,c in enumerate(self.clients):
             if isinstance(global_model,list):
-                acc,loss = c.validate(global_model[n],**validation_kwargs)
+                # valid_param = dict(validation_kwargs,**global_model[n])
+                acc,loss = c.validate(**global_model[n],**validation_kwargs)
             else:
-                acc,loss = c.validate(global_model,**validation_kwargs)
+                # valid_param = dict(validation_kwargs,**global_model)
+                acc,loss = c.validate(**global_model,**validation_kwargs)
             global_accs.append(acc)
             global_losses.append(loss)
         
         # test acc and loss
         if test_dataset is not None:
-            
-            test_acc,test_loss = self.test_inference(global_model,test_dataset,device)
-            # else:
-            #     test_accs,test_losses = [],[]
-            #     for n in range(len(global_model)):
-            #         test_acc_n,test_loss_n = self.test_inference(global_model[n],test_dataset,device)
-            #         test_accs.append(test_acc_n)
-            #         test_losses.append(test_loss_n)
-            #     test_acc,test_loss = np.mean(test_accs),np.mean(test_losses)
+            if isinstance(global_model,list):
+                test_accs,test_losses = [],[]
+                for n in range(len(global_model)):
+                    # test_param = dict(validation_kwargs,**global_model[n])
+                    test_acc_n,test_loss_n = self.clients[n].validate(testset=test_dataset,**global_model[n],**validation_kwargs)
+                    test_accs.append(test_acc_n)
+                    test_losses.append(test_loss_n)
+                test_acc,test_loss = np.mean(test_accs),np.mean(test_losses)
+                
+            else:
+                # test_param = dict(validation_kwargs,**global_model)
+                test_acc,test_loss = self.clients[0].validate(testset=test_dataset,**global_model,**validation_kwargs)
         
         else:
             test_acc,test_loss = 0,None
@@ -142,73 +142,15 @@ class ST_Stat_Monitor():
             "test_loss": test_loss}
         return res
     
-      
-            
-    def test_inference(self, model, test_dataset,device = torch.device('cpu')):
-        """ Returns the test accuracy and loss.
-        """
-
-        model.eval()
-        loss, total, correct = 0.0, 0.0, 0.0
-
-        model.to(device)
-        
-        testloader = DataLoader(test_dataset, batch_size=128,
-                                shuffle=False)
-
-        for batch_idx, (datas, labels) in enumerate(testloader):
-            datas, labels = datas.to(device), labels.to(device)
-
-            # Inference
-            outputs = model(datas)
-            batch_loss = self.criterion(outputs, labels)
-            loss += batch_loss.item()
-
-            # Prediction
-            _, pred_labels = torch.max(outputs, 1)
-            pred_labels = pred_labels.view(-1)
-            correct += torch.sum(torch.eq(pred_labels, labels)).item()
-            total += len(labels)
-
-        accuracy = correct/total
-        return accuracy, loss/(batch_idx+1)
-
-    # def validation(self,model):
-    #     val_accs = []
-    #     val_losses = []
-    #     for n,c in enumerate(self.clients):
-    #         if isinstance(model,list):
-    #             acc,loss = c.validate(model[n])
-    #         else:
-    #             acc,loss = c.validate(model)
-    #         val_accs.append(acc)
-    #         val_losses.append(loss)
-    #     return val_accs, val_losses
         
 class AT_Stat_Monitor(ST_Stat_Monitor):
     """
     collect the training,validation and test accuracy and loss
     """
-    def __init__(self,clients,weights = None,log_path=None,
-                 criterion = F.cross_entropy,
-                 test_adv_method='PGD',test_adv_eps=8/255,
-                 test_adv_alpha=2/255,test_adv_T=10,test_adv_norm='inf',
-                 test_adv_bound=[0.0,1.0]):
-        super().__init__(clients,weights,log_path,criterion)
-        self.test_adv_criterion = lambda m,i,y:self.criterion(m(i),y)
-        self.test_adv_method=test_adv_method
-        self.test_adv_eps = test_adv_eps
-        self.test_adv_alpha = test_adv_alpha
-        self.test_adv_T = test_adv_T
-        self.test_adv_norm = test_adv_norm
-        self.test_adv_bound = test_adv_bound
-        self.adv_sample_gen = Adv_Sample_Generator(criterion=self.test_adv_criterion,
-                                                   attack_method=self.test_adv_method,
-                                                   epsilon=self.test_adv_eps,
-                                                   alpha=self.test_adv_alpha,
-                                                   T=self.test_adv_T,
-                                                   norm=self.test_adv_norm,
-                                                   bound=self.test_adv_bound)
+    def __init__(self,clients,weights = None,log_path=None):
+        super().__init__(clients,weights,log_path)
+        
+        
         # validation
         self.global_adv_accs,self.global_adv_losses = [],[]
         self.weighted_global_adv_accs,self.weighted_global_adv_losses = [],[]
@@ -222,7 +164,7 @@ class AT_Stat_Monitor(ST_Stat_Monitor):
             columns = ['epoch', 'mode', 'clean_loss', 'clean_accuracy', 'best_clean_accuracy','adv_loss', 'adv_accuracy', 'best_adv_accuracy']
             wf.write('\t'.join(columns) + '\n')
 
-    def collect(self,global_model,adv_test=True,epoch=None,chosen_idxs=None,test_dataset=None,device=torch.device('cpu'),log=False,save=True,**validation_kwargs):
+    def collect(self,global_model,adv_test=True,epoch=None,chosen_idxs=None,test_dataset=None,log=False,save=True,**validation_kwargs):
         if not adv_test:
             if log:
                 self.global_adv_accs.append(np.zeros(len(self.clients)))
@@ -233,9 +175,9 @@ class AT_Stat_Monitor(ST_Stat_Monitor):
 
                 self.test_adv_accs.append(0)
                 self.test_adv_losses.append(None)
-            return super().collect(global_model,epoch,chosen_idxs,test_dataset,device,log,save)
+            return super().collect(global_model,epoch,chosen_idxs,test_dataset,log,save,**validation_kwargs)
 
-        res = super().collect(global_model,epoch,chosen_idxs,test_dataset,device,log,save=False)
+        res = super().collect(global_model,epoch,chosen_idxs,test_dataset,log,save=False,**validation_kwargs)
 
 
         
@@ -243,16 +185,29 @@ class AT_Stat_Monitor(ST_Stat_Monitor):
         global_adv_accs, global_adv_losses = [],[]
         for n,c in enumerate(self.clients):
             if isinstance(global_model,list):
-                adv_acc,adv_loss = c.adv_validate(global_model[n],**validation_kwargs)
+                # valid_param = dict(validation_kwargs,**global_model[n])
+                adv_acc,adv_loss = c.adv_validate(**global_model[n],**validation_kwargs)
             else:
-                adv_acc,adv_loss = c.adv_validate(global_model,**validation_kwargs)
+                # valid_param = dict(validation_kwargs,**global_model)
+                adv_acc,adv_loss = c.adv_validate(**global_model,**validation_kwargs)
             global_adv_accs.append(adv_acc)
             global_adv_losses.append(adv_loss)
         global_adv_accs = np.array(global_adv_accs)
         global_adv_losses = np.array(global_adv_losses)
 
         if test_dataset is not None:
-            test_adv_acc,test_adv_loss = self.test_adv_inference(global_model,test_dataset,device)
+            if isinstance(global_model,list):
+                test_adv_accs,test_adv_losses = [],[]
+                for n in range(len(global_model)):
+                    # test_param = dict(validation_kwargs,**global_model[n])
+                    test_adv_acc_n,test_adv_loss_n = self.clients[n].adv_validate(testset=test_dataset,**global_model[n],**validation_kwargs)
+                    test_adv_accs.append(test_adv_acc_n)
+                    test_adv_losses.append(test_adv_loss_n)
+                test_adv_acc,test_adv_loss = np.mean(test_adv_accs),np.mean(test_adv_losses)
+                
+            else:
+                # test_param = dict(validation_kwargs,**global_model)
+                test_adv_acc,test_adv_loss = self.clients[0].adv_validate(testset=test_dataset,**global_model,**validation_kwargs)
         else:
             test_adv_acc,test_adv_loss = 0,None
 
@@ -310,34 +265,3 @@ class AT_Stat_Monitor(ST_Stat_Monitor):
         
         return res
     
-        
-            
-
-    def test_adv_inference(self,model, test_dataset,device = torch.device('cpu')):
-        """ Returns the adversarial test accuracy and loss.
-        """
-
-        model.eval()
-        loss, total, correct = 0.0, 0.0, 0.0
-
-        model.to(device)
-        
-        testloader = DataLoader(test_dataset, batch_size=128,
-                                shuffle=False)
-
-        for batch_idx, (datas, labels) in enumerate(testloader):
-            datas, labels = datas.to(device), labels.to(device)
-            adv_datas = self.adv_sample_gen.attack_data(model,datas,labels)
-            # Inference
-            outputs = model(adv_datas)
-            batch_loss = self.criterion(outputs, labels)
-            loss += batch_loss.item()
-
-            # Prediction
-            _, pred_labels = torch.max(outputs, 1)
-            pred_labels = pred_labels.view(-1)
-            correct += torch.sum(torch.eq(pred_labels, labels)).item()
-            total += len(labels)
-
-        accuracy = correct/total
-        return accuracy, loss/(batch_idx+1)

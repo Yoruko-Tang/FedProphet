@@ -27,7 +27,7 @@ def fl_options(parser):
     
 
     # model arguments
-    parser.add_argument('--model', type=str, default='mlp', 
+    parser.add_argument('--model_arch', type=str, default='mlp', 
                         help='model name')
     parser.add_argument('--pretrained',action="store_true",default=False,
                         help="Whether to use pretrained model from torchvision")
@@ -192,9 +192,9 @@ def at_option(parser):
     return parser
 
 def fedprophet_option(parser):
-    parser.add_argument('--max_module_flops',type=int,default=None,
+    parser.add_argument('--max_module_flops',type=float,default=None,
                         help='the maximum number of flops allowed in model partition')
-    parser.add_argument('--max_module_mem',type=int,default=None,
+    parser.add_argument('--max_module_mem',type=float,default=None,
                         help='the maximum memory allowed in model partition')
     parser.add_argument('--mu',type = float,default=0.0, help='mu in fedprophet')
     parser.add_argument('--lamb',type = float,default=0.0, help='lambda in fedprophet')

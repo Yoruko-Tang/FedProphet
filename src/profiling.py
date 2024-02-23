@@ -3,6 +3,7 @@ from fvcore.nn import FlopCountAnalysis,flop_count_table, parameter_count
 import torch
 from hardware.sys_utils import model_summary
 from scheduler.module_scheduler import module_scheduler
+from client import *
 
 # model = get_net('vgg11','cifar',num_classes=10)
 # print("model-----------------------------------------")
@@ -102,14 +103,14 @@ def profile_model(model, inputsize):
     
 
 
-# model = get_net('vgg16_bn','cifar',num_classes=10,adv_norm=True,modularization=True)
-# inputsize = [64,3,32,32]
+model = get_net('vgg16_bn','cifar',num_classes=10,adv_norm=True,modularization=True)
+inputsize = [64,3,32,32]
+ms = model_summary(model,inputsize,optimizer_kwargs={"optimizer":'sgd',"momentum":0.9})
+
+# model = get_net('resnet50','imagenet',num_classes=256,adv_norm=True,modularization=True)
+# inputsize = [48,3,224,224]
 # ms = model_summary(model,inputsize)
-# sche = module_scheduler({"dataset":"CIFAR10","max_module_flops":5*10**9,"max_module_mem":64*10**6},ms)
-model = get_net('resnet50','imagenet',num_classes=256,adv_norm=True,modularization=True)
-inputsize = [48,3,224,224]
-ms = model_summary(model,inputsize)
-sche = module_scheduler({"dataset":"Caltech256","max_module_flops":50*10**9,"max_module_mem":1*10**9},ms)
+
 
 
 print("module list---------------------------")
@@ -128,19 +129,7 @@ print("memory dictionary---------------------")
 print(ms.mem_dict)
 print("\n")
 
-
-print("partitioned module list---------------")
-print(sche.partition_module_list)
+print("output dictionary---------------------")
+print(ms.out_feature_dict)
 print("\n")
 
-print("patitioned module dict---------------------------")
-print(sche.module_dict)
-print("\n")
-
-print("partitioned module flops dictionary---")
-print(sche.module_flops_dict)
-print("\n")
-
-print("partitioned module memory dictionary--")
-print(sche.module_mem_dict)
-print("\n")

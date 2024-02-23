@@ -18,9 +18,9 @@ def setup_seed(seed):
 def get_log_path(args):
 
     if not args.iid:
-        file_name = f"./save/{args.dataset}_{args.model}_{args.epochs}_N[{args.num_users}]_{'all' if args.frac == 1.0 else args.strategy}[{args.frac}]_{'sp' if args.alpha is None else 'alpha'}[{args.shards_per_client+args.skew if args.alpha is None else args.alpha}]_sys[{args.sys_scaling_factor}]_E[{args.local_ep}]_B[{args.local_bs}]_lr[{args.lr}]"
+        file_name = f"./save/{args.dataset}_{args.model_arch}_{args.epochs}_N[{args.num_users}]_{'all' if args.frac == 1.0 else args.strategy}[{args.frac}]_{'sp' if args.alpha is None else 'alpha'}[{args.shards_per_client+args.skew if args.alpha is None else args.alpha}]_sys[{args.sys_scaling_factor}]_E[{args.local_ep}]_B[{args.local_bs}]_lr[{args.lr}]"
     else:
-        file_name = f"./save/{args.dataset}_{args.model}_{args.epochs}_N[{args.num_users}]_{'all' if args.frac == 1.0 else args.strategy}[{args.frac}]_iid_sys[{args.sys_scaling_factor}]_E[{args.local_ep}]_B[{args.local_bs}]_lr[{args.lr}]"
+        file_name = f"./save/{args.dataset}_{args.model_arch}_{args.epochs}_N[{args.num_users}]_{'all' if args.frac == 1.0 else args.strategy}[{args.frac}]_iid_sys[{args.sys_scaling_factor}]_E[{args.local_ep}]_B[{args.local_bs}]_lr[{args.lr}]"
     
     file_name = os.path.join(file_name,args.flalg)
     
@@ -34,7 +34,7 @@ def get_log_path(args):
 
 def exp_details(args):
     print('\nExperimental details:')
-    print('    Model     : {}'.format(args.model))
+    print('    Model     : {}'.format(args.model_arch))
     print('    Optimizer : {}'.format(args.optimizer))
     print('    Learning  : {}'.format(args.lr))
     print('    Global Rounds   : {}'.format(args.epochs))

@@ -35,10 +35,10 @@ class AT_Client(ST_Client):
         self.test_adv_bound = test_adv_bound
 
         
-    def train(self,init_model,local_ep,local_bs,lr,optimizer='sgd',
+    def train(self,model,local_ep,local_bs,lr,optimizer='sgd',
               momentum=0.0,reg=0.0, criterion=torch.nn.CrossEntropyLoss(),
               adv_train=True,adv_method='pgd',adv_epsilon=0.0,adv_alpha=0.0,adv_T=0,
-              adv_norm='inf',adv_bound=[0.0,1.0],adv_ratio=1.0,**kwargs):
+              adv_norm='inf',adv_bound=[0.0,1.0],adv_ratio=1.0,model_profile=None,**kwargs):
         """train the model for one communication round."""
         def standard_loss(model,input,label):
             output = model(input)
@@ -46,7 +46,7 @@ class AT_Client(ST_Client):
             return task_loss
         
         
-        model = copy.deepcopy(init_model) # avoid modifying global model
+        model = copy.deepcopy(model) # avoid modifying global model
         model.to(self.device)
         if self.local_states is not None:
             model = self.load_local_state_dict(model,self.local_states)
@@ -57,9 +57,9 @@ class AT_Client(ST_Client):
         # Set optimizer for the local updates
         np = model.parameters()
         if optimizer == 'sgd':
-            optimizer = torch.optim.SGD(np, lr=lr, momentum=momentum,weight_decay=reg)
+            opt = torch.optim.SGD(np, lr=lr, momentum=momentum,weight_decay=reg)
         elif optimizer == 'adam':
-            optimizer = torch.optim.Adam(np, lr=lr, weight_decay=reg)
+            opt = torch.optim.Adam(np, lr=lr, weight_decay=reg)
         
 
         adv_data_gen = Adv_Sample_Generator(standard_loss,adv_method,adv_epsilon,
@@ -83,9 +83,9 @@ class AT_Client(ST_Client):
                 model.train()
                 model.zero_grad()
                 
-                loss = standard_loss(datas, labels)
+                loss = standard_loss(model, datas, labels)
                 loss.backward()
-                optimizer.step()
+                opt.step()
                 iters += 1
                 if iters == local_ep:
                     break
@@ -98,7 +98,8 @@ class AT_Client(ST_Client):
         self.final_local_loss = loss.item()
         
         # calculate training latency
-        self.model_profile = model_summary(model,self.batches[0],len(self.batches))
+        if model_profile is not None:
+            self.model_profile = model_profile
         self.latency = self.model_profile.training_latency(batches=self.batches,
                                                            iters_per_input=self.iters_per_input,
                                                            performance=self.avail_perf,
@@ -106,15 +107,18 @@ class AT_Client(ST_Client):
         
         return model
         
-    def adv_validate(self,model,criterion=torch.nn.CrossEntropyLoss(),**kwargs):
+    def adv_validate(self,model,testset=None,criterion=torch.nn.CrossEntropyLoss(),**kwargs):
         """ Returns the validation adversarial accuracy and adversarial loss."""
         model = copy.deepcopy(model) # avoid modifying global model
         model.to(self.device)
         if self.local_states is not None:
             model = self.load_local_state_dict(model,self.local_states)
         model.eval()
+
         loss, total, correct = 0.0, 0.0, 0.0
-        testloader = DataLoader(self.testset,batch_size=128, shuffle=False)
+        if testset is None:
+            testset = self.testset
+        testloader = DataLoader(testset,batch_size=128, shuffle=False)
 
         adv_data_gen = Adv_Sample_Generator(lambda m,i,y:criterion(m(i),y),
                                             self.test_adv_method,

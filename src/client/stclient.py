@@ -55,9 +55,10 @@ class ST_Client():
                                 
         return trainset, testset
     
-    def train(self,init_model,local_ep,local_bs,lr,optimizer='sgd',
+    def train(self,model,local_ep,local_bs,lr,optimizer='sgd',
               momentum=0.0,reg=0.0,
               criterion=torch.nn.CrossEntropyLoss(),
+              model_profile=None,
               **kwargs):
         """train the model for one communication round."""
         def standard_loss(model,input,label):
@@ -66,7 +67,7 @@ class ST_Client():
             return task_loss
         
 
-        model = copy.deepcopy(init_model) # avoid modifying global model
+        model = copy.deepcopy(model) # avoid modifying global model
         model.to(self.device)
         if self.local_states is not None:
             model = self.load_local_state_dict(model,self.local_states)
@@ -77,9 +78,9 @@ class ST_Client():
         # Set optimizer for the local updates
         np = model.parameters()
         if optimizer == 'sgd':
-            optimizer = torch.optim.SGD(np, lr=lr, momentum=momentum,weight_decay=reg)
+            opt = torch.optim.SGD(np, lr=lr, momentum=momentum,weight_decay=reg)
         elif optimizer == 'adam':
-            optimizer = torch.optim.Adam(np, lr=lr, weight_decay=reg)
+            opt = torch.optim.Adam(np, lr=lr, weight_decay=reg)
         
 
         iters = 0
@@ -93,7 +94,7 @@ class ST_Client():
                 model.zero_grad()
                 loss = standard_loss(model,datas,labels)
                 loss.backward()
-                optimizer.step()
+                opt.step()
                 iters += 1
                 if iters == local_ep:
                     break
@@ -106,7 +107,9 @@ class ST_Client():
         self.final_local_loss = loss.item()
 
         # calculate training latency
-        self.model_profile = model_summary(model,self.batches[0],len(self.batches))
+        if model_profile is not None:
+            self.model_profile = model_profile
+        
         self.latency = self.model_profile.training_latency(batches=self.batches,
                                                            iters_per_input=self.iters_per_input,
                                                            performance=self.avail_perf,
@@ -114,15 +117,18 @@ class ST_Client():
 
         return model
 
-    def validate(self,model,criterion=torch.nn.CrossEntropyLoss(),**kwargs):
+    def validate(self,model,testset=None,criterion=torch.nn.CrossEntropyLoss(),**kwargs):
         """ Returns the validation accuracy and loss."""
         model = copy.deepcopy(model) # avoid modifying global model
         model.to(self.device)
         if self.local_states is not None:
             model = self.load_local_state_dict(model,self.local_states)
         model.eval()
+
         loss, total, correct = 0.0, 0.0, 0.0
-        testloader = DataLoader(self.testset,batch_size=128, shuffle=False)
+        if testset is None:
+            testset = self.testset
+        testloader = DataLoader(testset,batch_size=128, shuffle=False)
 
         for batch_idx, (datas, labels) in enumerate(testloader):
             datas, labels = datas.to(self.device), labels.to(self.device)
