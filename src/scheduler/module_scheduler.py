@@ -94,10 +94,21 @@ class module_scheduler(base_AT_scheduler):
                 break
 
         # modularization configuration
-        args["stage_module_list"] = stage_module_list
-        args["prophet_module_list"] = prophet_module_list
-        args["stage_aux_model_name"] = stage_module
-        args["prophet_aux_model_name"] = prophet_last_module
+        if self.psi == 1: # only train the prophet module
+            args["stage_module_list"] = stage_module_list + prophet_module_list
+            args["prophet_module_list"] = []
+            args["stage_aux_model_name"] = prophet_last_module
+            args["prophet_aux_model_name"] = None
+        elif self.psi == 0: # only train the stage module
+            args["stage_module_list"] = stage_module_list
+            args["prophet_module_list"] = []
+            args["stage_aux_model_name"] = stage_module
+            args["prophet_aux_model_name"] = None
+        else: # train both stage module and prophet module
+            args["stage_module_list"] = stage_module_list
+            args["prophet_module_list"] = prophet_module_list
+            args["stage_aux_model_name"] = stage_module
+            args["prophet_aux_model_name"] = prophet_last_module
 
 
         args["mu"] = self.mu
