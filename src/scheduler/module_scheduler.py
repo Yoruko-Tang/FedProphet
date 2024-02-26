@@ -78,13 +78,12 @@ class module_scheduler(base_AT_scheduler):
             cum_flops += self.module_flops_dict[next_module]
             cum_mem += self.module_mem_dict[next_module]
 
-            if i == self.stage + 1: # subtract the output size of the last module
+            if i == self.stage + 1: # subtract the output size of the stage module since it's counted twice
                 cum_mem -= self.model_profile.data_Byte*int(np.prod(self.atom_output_dict[stage_module_list[-1]]))
                         
             else:# subtract the flops and memory of the last auxiliary model
-                last_module = self.partition_module_list[i-1]
-                cum_flops -= self.auxiliary_model_flops_dict[last_module]
-                cum_mem -= self.auxiliary_model_mem_dict[last_module]
+                cum_flops -= self.auxiliary_model_flops_dict[prophet_last_module]
+                cum_mem -= self.auxiliary_model_mem_dict[prophet_last_module]
             
             if cum_flops < allowed_flops and cum_mem < avail_mem:
                 prophet_module_list += self.module_dict[next_module]
