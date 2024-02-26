@@ -6,8 +6,8 @@ from server.avgserver import Avg_Server
 class Fedprophet_Avg_Server(Avg_Server):
     def __init__(self, global_model, clients, selector, scheduler, 
                  stat_monitor, sys_monitor, frac=None, weights=None, 
-                 test_dataset=None, device=torch.device('cpu'), 
-                 test_every=1, **kwargs):
+                 test_dataset=None, local_state_preserve = False, 
+                 device=torch.device('cpu'), test_every=1, **kwargs):
         
         
         self.device = device
@@ -28,6 +28,7 @@ class Fedprophet_Avg_Server(Avg_Server):
         else:
             self.weights = np.ones(self.num_users)/self.num_users
         self.test_dataset = test_dataset
+        self.local_state_preserve = local_state_preserve
 
         self.selector = selector
         self.scheduler = scheduler

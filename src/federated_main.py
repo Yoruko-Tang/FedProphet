@@ -199,6 +199,7 @@ if __name__ == '__main__':
                                 frac=args.frac,
                                 weights=weights,
                                 test_dataset=test_dataset,
+                                local_state_preserve=False,
                                 device=device,
                                 test_every = args.test_every)
         elif args.flalg in ["FedBN","FedBNAT"]:
@@ -210,7 +211,8 @@ if __name__ == '__main__':
                                 sys_monitor=sys_monitor,
                                 frac=args.frac,
                                 weights=weights,
-                                test_dataset=None,
+                                #test_dataset=test_dataset,
+                                #local_state_preserve=True,
                                 device=device,
                                 test_every = args.test_every)
         elif args.flalg == "FedProphet":
@@ -222,7 +224,8 @@ if __name__ == '__main__':
                                            sys_monitor=sys_monitor,
                                            frac=args.frac,
                                            weights=weights,
-                                           test_dataset=None,
+                                           #test_dataset=test_dataset,
+                                           #local_state_preserve=True,
                                            device=device,
                                            test_every = args.test_every)
 

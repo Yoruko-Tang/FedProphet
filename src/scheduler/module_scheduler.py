@@ -4,6 +4,7 @@ import torch
 import torch.nn as nn
 from fvcore.nn import FlopCountAnalysis,parameter_count
 from datasets import dataset_to_datafamily
+from math import ceil
 
 class module_scheduler(base_AT_scheduler):
     """
@@ -35,8 +36,9 @@ class module_scheduler(base_AT_scheduler):
         print("====> Module Memory: \n", self.module_mem_dict)
 
         self.total_round = args["epochs"]
-        self.round_per_stage = self.total_round//len(self.partition_module_list)
+        self.round_per_stage = ceil(self.total_round/len(self.partition_module_list))
         self.stage = 0
+        print("=================Stage 1=================")
         self.clients = clients
         self.available_performance = np.array([c.avail_perf for c in self.clients])
         self.available_memory = np.array([c.avail_mem for c in self.clients])
@@ -140,6 +142,7 @@ class module_scheduler(base_AT_scheduler):
         super().stat_update(epoch%self.round_per_stage) # periodic lr/adv_train adjustment
         new_stage = epoch//self.round_per_stage
         if new_stage != self.stage: # update the adversarial training params
+            print("=================Stage %d================="%(new_stage+1))
             current_module_list = self.module_dict[self.partition_module_list[self.stage]]
             new_adv_epsilons = []
             lowers = []

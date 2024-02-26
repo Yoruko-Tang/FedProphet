@@ -33,6 +33,8 @@ class AT_Client(ST_Client):
         self.test_adv_T = test_adv_T
         self.test_adv_norm = test_adv_norm
         self.test_adv_bound = test_adv_bound
+        
+        self.iters_per_input = test_adv_T+1
 
         
     def train(self,model,local_ep,local_bs,lr,optimizer='sgd',

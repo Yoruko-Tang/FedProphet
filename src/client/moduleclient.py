@@ -41,12 +41,20 @@ class Module_Client(AT_Client):
         self.reserved_performance = reserved_performance
         self.reserved_memory = reserved_memory
         
-        self.iters_per_input = 1
+        self.iters_per_input = test_adv_T+1
 
         self.batches = None
         self.latency = None
         self.module_list = None
         self.get_runtime_sys_stat()
+
+        self.test_adv_method = test_adv_method
+        self.test_adv_epsilon = test_adv_epsilon
+        self.test_adv_alpha = test_adv_alpha
+        self.test_adv_T = test_adv_T
+        self.test_adv_norm = test_adv_norm
+        self.test_adv_bound = test_adv_bound
+ 
         
         
     def forward_feature_set(self,model,module_list,adv_train=True,
@@ -189,8 +197,8 @@ class Module_Client(AT_Client):
         else:
             panp = []
         # normalize the step size of the stage aux model
-        #alr = lr/(1-psi) if len(prophet_module_list)>0 else lr
-        alr = lr
+        alr = lr/(1-psi) if len(prophet_module_list)>0 else lr
+        #alr = lr
         if optimizer == 'sgd':
             opt = torch.optim.SGD([{'params':np,'lr':lr,'weight_decay':reg},
                                         {'params':anp,'lr':alr,'weight_decay':lamb},
