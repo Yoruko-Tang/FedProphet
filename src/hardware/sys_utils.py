@@ -70,46 +70,7 @@ def read_client_device_info(flsys_profile_info):
     
     return unique_client_device_dic
 
-def get_truncated_normal(mean=0, sd=1, low=0, upp=10):
-    return truncnorm(
-        (low - mean) / sd, (upp - mean) / sd, loc=mean, scale=sd)
 
-def sample_networks(num_users, rand_seed):
-    # generate network speed/latency for each client
-    # type of network and runtime speed/latency of network for each client is dynamic - different rand seed per epoch
-    num_network = len(NETWORK_LIST)
-    network_for_each_client_list = []
-    network_upload_speed_for_each_client_list = []
-    network_download_speed_for_each_client_list = []
-    network_latency_for_each_client_list = []
-
-    random.seed(rand_seed)
-    network_id_list = [random.randint(0,num_network-1) for x in range(num_users)]
-    # print(network_id_list)
-    for id in network_id_list:
-        network_for_each_client_list.append(NETWORK_LIST[id])
-    # print(network_for_each_client_list)
-    for key in network_for_each_client_list:
-        lower_speed = NETWORK_DIC[key]['upload speed'][0]
-        upper_speed = NETWORK_DIC[key]['upload speed'][1]
-        runtime_speed_gen = get_truncated_normal(mean=(lower_speed+upper_speed)/2, sd=upper_speed/5, low=lower_speed, upp=upper_speed)
-        runtime_speed = runtime_speed_gen.rvs(random_state=rand_seed+1)
-        network_upload_speed_for_each_client_list.append(runtime_speed)
-
-        lower_speed = NETWORK_DIC[key]['download speed'][0]
-        upper_speed = NETWORK_DIC[key]['download speed'][1]
-        runtime_speed_gen = get_truncated_normal(mean=(lower_speed+upper_speed)/2, sd=upper_speed/5, low=lower_speed, upp=upper_speed)
-        runtime_speed = runtime_speed_gen.rvs(random_state=rand_seed+2)
-        network_download_speed_for_each_client_list.append(runtime_speed)
-
-        lower_latency = NETWORK_DIC[key]['latency'][0]
-        upper_latency = NETWORK_DIC[key]['latency'][1]
-        runtime_latency_gen = get_truncated_normal(mean=(lower_latency+upper_latency)/2, sd=upper_latency/5, low=lower_latency, upp=upper_latency)
-        runtime_latency = runtime_latency_gen.rvs(random_state=rand_seed+2)
-        network_latency_for_each_client_list.append(runtime_latency) 
-
-    
-    return network_upload_speed_for_each_client_list, network_download_speed_for_each_client_list, network_latency_for_each_client_list, network_id_list
 
 
 
@@ -159,6 +120,35 @@ def sample_runtime_app(rs):
     runtime_app = rs.choice(unique_runtime_app_list)
     return runtime_app, unique_perf_degrade_dic[runtime_app],unique_mem_avail_dic[runtime_app]
 
+def sample_networks(rs):
+    def get_truncated_normal(mean=0, sd=1, low=0, upp=10):
+        return truncnorm(
+            (low - mean) / sd, (upp - mean) / sd, loc=mean, scale=sd)
+    # generate network speed/latency for each client
+    # type of network and runtime speed/latency of network for each client is dynamic - different rand seed per epoch
+
+
+    
+    network = rs.choice(NETWORK_LIST)
+    
+    lower_speed = NETWORK_DIC[network]['upload speed'][0]
+    upper_speed = NETWORK_DIC[network]['upload speed'][1]
+    runtime_speed_gen = get_truncated_normal(mean=(lower_speed+upper_speed)/2, sd=upper_speed/5, low=lower_speed, upp=upper_speed)
+    upload_runtime_speed = runtime_speed_gen.rvs(random_state=rs)
+
+    lower_speed = NETWORK_DIC[network]['download speed'][0]
+    upper_speed = NETWORK_DIC[network]['download speed'][1]
+    runtime_speed_gen = get_truncated_normal(mean=(lower_speed+upper_speed)/2, sd=upper_speed/5, low=lower_speed, upp=upper_speed)
+    download_runtime_speed = runtime_speed_gen.rvs(random_state=rs)
+
+    lower_latency = NETWORK_DIC[network]['latency'][0]
+    upper_latency = NETWORK_DIC[network]['latency'][1]
+    runtime_latency_gen = get_truncated_normal(mean=(lower_latency+upper_latency)/2, sd=upper_latency/5, low=lower_latency, upp=upper_latency)
+    runtime_latency = runtime_latency_gen.rvs(random_state=rs) 
+
+    
+    return network, [download_runtime_speed,upload_runtime_speed], runtime_latency
+
 
     
 class model_summary():
@@ -179,7 +169,7 @@ class model_summary():
         self.inputsize = inputsize
         self.default_local_eps = default_local_eps
         if optimizer == 'adam':
-            self.param_mem_scale = 8
+            self.param_mem_scale = 5
         elif optimizer == 'sgd':
             if 'momentum' in opt_kwargs and opt_kwargs['momentum'] > 0:
                 self.param_mem_scale = 3
@@ -308,7 +298,7 @@ class model_summary():
 
         return module_name_list, flops_per_module, params_per_module, mem_per_module
     
-    def training_latency(self,module_list=None,batches=None,iters_per_input=1,performance=None,memory=None,eff_bandwidth=None,access_latency=None,network_bandwidth=None):
+    def training_latency(self,module_list=None,batches=None,iters_per_input=1,performance=None,memory=None,eff_bandwidth=None,access_latency=0.17,network_bandwidth=None,network_latency=0.0):
         """
         Calculate the training latency of the whole model with the model profile.
         module_list: a list of atom module names in self.module_lists, 
@@ -372,10 +362,10 @@ class model_summary():
 
             total_latency += batch_on_device_time
         
-        if network_bandwidth is not None:
-            # download and upload time
-            communication_time = self.data_Byte*total_params/network_bandwidth[0]+self.data_Byte*total_params/network_bandwidth[1]
-            total_latency += communication_time
+        # if network_bandwidth is not None:
+        #     # download and upload time
+        #     communication_time = self.data_Byte*total_params/network_bandwidth[0]+self.data_Byte*total_params/network_bandwidth[1]+2*network_latency
+        #     total_latency += communication_time
         
         return total_latency
         

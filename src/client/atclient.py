@@ -50,9 +50,10 @@ class AT_Client(ST_Client):
         
         
         model = copy.deepcopy(model) # avoid modifying global model
+        model.to(self.device)
         if self.local_states is not None:
             model = self.load_local_state_dict(model,self.local_states)
-        model.to(self.device)
+        
         
 
         trainloader = DataLoader(self.trainset,batch_size=local_bs,shuffle=True)
@@ -106,16 +107,19 @@ class AT_Client(ST_Client):
         self.latency = self.model_profile.training_latency(batches=self.batches,
                                                            iters_per_input=self.iters_per_input,
                                                            performance=self.avail_perf,
-                                                           memory=self.avail_mem)
+                                                           memory=self.avail_mem,
+                                                           network_bandwidth=self.network_speed,
+                                                           network_latency=self.network_latency)
         
         return model
         
     def adv_validate(self,model,testset=None,criterion=torch.nn.CrossEntropyLoss(),**kwargs):
         """ Returns the validation adversarial accuracy and adversarial loss."""
         model = copy.deepcopy(model) # avoid modifying global model
+        model.to(self.device)
         if self.local_states is not None:
             model = self.load_local_state_dict(model,self.local_states)
-        model.to(self.device)
+        
         model.eval()
 
         loss, total, correct = 0.0, 0.0, 0.0

@@ -7,7 +7,7 @@ import copy
 import numpy as np
 
 from utils.adversarial import Adv_Sample_Generator
-from hardware.sys_utils import sample_runtime_app,model_summary
+from hardware.sys_utils import sample_runtime_app,sample_networks,model_summary
 
 
 
@@ -73,9 +73,10 @@ class Module_Client(AT_Client):
             return loss
 
         model = copy.deepcopy(model) # avoid modifying global model
+        model.to(self.device)
         if self.local_states is not None:
             model = self.load_local_state_dict(model,self.local_states)
-        model.to(self.device)
+        
         model.eval()
 
         trainloader = DataLoader(self.feature_trainset,batch_size=128,shuffle=False)
@@ -144,10 +145,10 @@ class Module_Client(AT_Client):
 
         # model preparation
         model = copy.deepcopy(model) # avoid modifying global model
-        
+        model.to(self.device)
         if self.local_states is not None:
             model = self.load_local_state_dict(model,self.local_states)
-        model.to(self.device)
+        
 
         if stage_aux_model_name is not None:
             current_aux_model = copy.deepcopy(aux_models[stage_aux_model_name])
@@ -202,8 +203,8 @@ class Module_Client(AT_Client):
         else:
             panp = []
         # normalize the step size of the stage aux model
-        alr = lr/(1-psi) if len(prophet_module_list)>0 else lr
-        #alr = lr
+        #alr = lr/(1-psi) if len(prophet_module_list)>0 else lr
+        alr = lr
         if optimizer == 'sgd':
             opt = torch.optim.SGD([{'params':np,'lr':lr,'weight_decay':reg},
                                         {'params':anp,'lr':alr,'weight_decay':lamb},
@@ -261,8 +262,9 @@ class Module_Client(AT_Client):
                                                            batches=self.batches,
                                                            iters_per_input=self.iters_per_input,
                                                            performance=self.avail_perf,
-                                                           memory=self.avail_mem
-                                                           )
+                                                           memory=self.avail_mem,
+                                                           network_bandwidth=self.network_speed,
+                                                           network_latency=self.network_latency)
         
         return model,current_aux_model,future_aux_model
         
@@ -272,9 +274,10 @@ class Module_Client(AT_Client):
         """ Returns the validation accuracy and loss."""
         
         model = copy.deepcopy(model) # avoid modifying global model
+        model.to(self.device)
         if self.local_states is not None:
             model = self.load_local_state_dict(model,self.local_states)
-        model.to(self.device)
+        
         model.eval()
         
         if aux_module_name is not None:
@@ -311,9 +314,10 @@ class Module_Client(AT_Client):
         """ Returns the validation adversarial accuracy and adversarial loss."""
         
         model = copy.deepcopy(model) # avoid modifying global model
+        model.to(self.device)
         if self.local_states is not None:
             model = self.load_local_state_dict(model,self.local_states)
-        model.to(self.device)
+        
         model.eval()
 
         if aux_module_name is not None:
@@ -364,13 +368,18 @@ class Module_Client(AT_Client):
         self.avail_perf = max([self.performance*self.perf_degrade,self.reserved_performance])
         self.avail_mem = max([self.memory*self.mem_degrade,self.reserved_memory])
         
+        self.network,self.network_speed,self.network_latency = sample_networks(self.rs)
+
         if self.model_profile is not None:
-            self.est_latency = self.model_profile.training_latency(module_list=self.module_list,
-                                                                iters_per_input=self.iters_per_input,
-                                                                batches=self.batches,
-                                                                performance=self.avail_perf,
-                                                                memory=self.avail_mem)
+            self.est_latency = \
+                self.model_profile.training_latency(module_list=self.module_list,
+                                                    iters_per_input=self.iters_per_input,
+                                                    batches=self.batches,
+                                                    performance=self.avail_perf,
+                                                    memory=self.avail_mem,
+                                                    network_bandwidth=self.network_speed,
+                                                    network_latency=self.network_latency)
         else:
             self.est_latency = None
         # return the current availale performance, memory, and the training latency of the last round
-        return self.runtime_app, self.avail_perf, self.avail_mem, self.latency, self.est_latency
+        return self.runtime_app, self.avail_perf, self.avail_mem, self.network,self.network_speed,self.network_latency, self.latency, self.est_latency

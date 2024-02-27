@@ -105,7 +105,7 @@ def profile_model(model, inputsize):
 
 model = get_net('vgg16_bn','cifar',num_classes=10,adv_norm=True,modularization=True)
 inputsize = [64,3,32,32]
-ms = model_summary(model,inputsize,optimizer='sgd')
+ms = model_summary(model,inputsize,optimizer='adam')
 
 # model = get_net('resnet50','imagenet',num_classes=256,adv_norm=True,modularization=True)
 # inputsize = [64,3,224,224]

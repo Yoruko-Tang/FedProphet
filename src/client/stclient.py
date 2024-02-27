@@ -3,7 +3,7 @@ from torch.utils.data import DataLoader, Subset
 import torch.nn
 import copy
 import numpy as np
-from hardware.sys_utils import sample_runtime_app,model_summary
+from hardware.sys_utils import sample_runtime_app,sample_networks,model_summary
 
 class ST_Client():
     """
@@ -73,10 +73,10 @@ class ST_Client():
         
 
         model = copy.deepcopy(model) # avoid modifying global model
-        
+        model.to(self.device)
         if self.local_states is not None:
             model = self.load_local_state_dict(model,self.local_states)
-        model.to(self.device)
+        
 
         trainloader = DataLoader(self.trainset,batch_size=local_bs,shuffle=True)
 
@@ -118,16 +118,20 @@ class ST_Client():
         self.latency = self.model_profile.training_latency(batches=self.batches,
                                                            iters_per_input=self.iters_per_input,
                                                            performance=self.avail_perf,
-                                                           memory=self.avail_mem)
+                                                           memory=self.avail_mem,
+                                                           network_bandwidth=self.network_speed,
+                                                           network_latency=self.network_latency
+                                                           )
 
         return model
 
     def validate(self,model,testset=None,criterion=torch.nn.CrossEntropyLoss(),**kwargs):
         """ Returns the validation accuracy and loss."""
         model = copy.deepcopy(model) # avoid modifying global model
+        model.to(self.device)
         if self.local_states is not None:
             model = self.load_local_state_dict(model,self.local_states)
-        model.to(self.device)
+        
         model.eval()
 
         loss, total, correct = 0.0, 0.0, 0.0
@@ -155,16 +159,21 @@ class ST_Client():
         self.runtime_app,self.perf_degrade,self.mem_degrade=sample_runtime_app(self.rs)
         self.avail_perf = max([self.performance*self.perf_degrade,self.reserved_performance])
         self.avail_mem = max([self.memory*self.mem_degrade,self.reserved_memory])
+
+        self.network,self.network_speed,self.network_latency = sample_networks(self.rs)
         
         if self.model_profile is not None:
-            self.est_latency = self.model_profile.training_latency(batches=self.batches,
-                                                                iters_per_input=self.iters_per_input,
-                                                                performance=self.avail_perf,
-                                                                memory=self.avail_mem)
+            self.est_latency = \
+                self.model_profile.training_latency(batches=self.batches,
+                                                    iters_per_input=self.iters_per_input,
+                                                    performance=self.avail_perf,
+                                                    memory=self.avail_mem,
+                                                    network_bandwidth=self.network_speed,
+                                                    network_latency=self.network_latency)
         else:
             self.est_latency = None
         # return the current availale performance, memory, and the training latency of the last round
-        return self.runtime_app, self.avail_perf, self.avail_mem, self.latency, self.est_latency
+        return self.runtime_app, self.avail_perf, self.avail_mem, self.network,self.network_speed,self.network_latency, self.latency, self.est_latency
 
     @staticmethod
     def get_local_state_dict(model):

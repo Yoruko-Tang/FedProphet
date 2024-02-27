@@ -14,6 +14,9 @@ class Sys_Monitor():
         self.runtime_apps = []
         self.avail_perfs = []
         self.avail_mems = []
+        self.networks = []
+        self.network_speeds = []
+        self.network_latencies = []
         # training latency
         self.train_times = []
         self.round_times = []
@@ -40,15 +43,23 @@ class Sys_Monitor():
         runtime_app = [] # running apps of all clients
         avail_perf = [] # available performance of all clients
         avail_mem = []  # available memory of all clients
+        network = [] # network types of all clients
+        network_speed = [] # network bandwidths of all clients
+        network_latency = [] # network latencies of all clients
         train_times = [] # trainning latency of chosen clients in this round
         est_times = [] # estimated training time of the next round
         for n,c in enumerate(self.clients):
             # collect performance, memory and training latency
-            cruntime_app,cavail_perf,cavail_mem,clatency,cestlatency = c.get_runtime_sys_stat()
+            cruntime_app,cavail_perf,cavail_mem,\
+            cnetwork, cnetwork_speed,cnetwork_latency,\
+            clatency,cestlatency = c.get_runtime_sys_stat()
             
             runtime_app.append(cruntime_app)
             avail_perf.append(cavail_perf)
             avail_mem.append(cavail_mem)
+            network.append(cnetwork)
+            network_speed.append(cnetwork_speed)
+            network_latency.append(cnetwork_latency)
 
             if chosen_idxs is not None and n in chosen_idxs:
                 train_times.append(clatency)
@@ -70,6 +81,9 @@ class Sys_Monitor():
             self.runtime_apps.append(runtime_app)
             self.avail_perfs.append(avail_perf)
             self.avail_mems.append(avail_mem)
+            self.networks.append(network)
+            self.network_speeds.append(network_speed)
+            self.network_latencies.append(network_latency)
 
             self.train_times.append(train_times)
             self.round_times.append(round_time)
@@ -92,12 +106,16 @@ class Sys_Monitor():
                 with open(self.pkl_file,'wb') as sys_f:
                     pickle.dump([self.epochs,self.chosen_clients,self.chosen_devices,
                                 self.runtime_apps,self.avail_perfs,self.avail_mems,
+                                self.networks,self.network_speeds,self.network_latencies,
                                 self.train_times,self.round_times,self.total_times,self.estimate_times], sys_f)
 
         res = {"epoch":epoch,
                "runtime_apps":runtime_app,
                "available_perfs":avail_perf,
                "available_mems":avail_mem,
+               "network_types":network,
+               "network_bandwidths":network_speed,
+               "network_latency":network_latency,
                "train_times":train_times,
                "round_time":round_time,
                "total_time":total_time,
