@@ -297,9 +297,10 @@ class model_summary():
                 if batch_memory_req>memory: # the required memory exceeds the available memory
                     # we adopt load and offload method to train the module
                     # offload feature in forward and load feature in backward + load and offload parameters in forward and backward
-                    memory_access_size = 2*self.data_Byte*calibrated_factor*total_feature_size \
-                                        + 4*self.data_Byte*total_params
-                    memory_access_times = ceil(memory_access_size/memory) # 1x parameter + 1x feature in forward, and 3x parameter + 1x feature in backward
+                    memory_access_size = self.data_Byte*(2*calibrated_factor*total_feature_size + 4*total_params)
+                    forward_mem_req = self.data_Byte*(calibrated_factor*total_feature_size + self.data_Byte*total_params) # 1x parameter + 1x feature in forward
+                    backward_mem_req = self.data_Byte*(calibrated_factor*total_feature_size + self.param_mem_scale*self.data_Byte*total_params) # 3x parameter + 1x feature in backward
+                    memory_access_times = ceil(forward_mem_req/memory) + ceil(backward_mem_req/memory)
                     batch_memory_access_time = iters_per_input*(memory_access_size/eff_bandwidth+access_latency*memory_access_times)
                 else:# we do not need to offload the parameter and intermediate features
                     # load the input (MB) once for every iters_per_input

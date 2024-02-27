@@ -17,13 +17,14 @@ class AT_Client(ST_Client):
     """
     def __init__(self, dataset, data_idxs, sys_info=None,
                  model_profile:model_summary = None,
+                 init_local_state = None,
                  local_state_preserve = False, 
                  test_adv_method='pgd',test_adv_epsilon=0.0,test_adv_alpha=0.0,
                  test_adv_T=0,test_adv_norm='inf',test_adv_bound=[0.0,1.0],
                  device=torch.device('cpu'), 
                  verbose=False, random_seed=None, 
                  reserved_performance = 0, reserved_memory = 0, **kwargs):
-        super().__init__(dataset, data_idxs, sys_info, model_profile, local_state_preserve,
+        super().__init__(dataset, data_idxs, sys_info, model_profile, init_local_state, local_state_preserve,
                          device, verbose, random_seed, reserved_performance, 
                          reserved_memory, **kwargs)
         
@@ -49,9 +50,9 @@ class AT_Client(ST_Client):
         
         
         model = copy.deepcopy(model) # avoid modifying global model
-        model.to(self.device)
         if self.local_states is not None:
             model = self.load_local_state_dict(model,self.local_states)
+        model.to(self.device)
         
 
         trainloader = DataLoader(self.trainset,batch_size=local_bs,shuffle=True)
@@ -112,9 +113,9 @@ class AT_Client(ST_Client):
     def adv_validate(self,model,testset=None,criterion=torch.nn.CrossEntropyLoss(),**kwargs):
         """ Returns the validation adversarial accuracy and adversarial loss."""
         model = copy.deepcopy(model) # avoid modifying global model
-        model.to(self.device)
         if self.local_states is not None:
             model = self.load_local_state_dict(model,self.local_states)
+        model.to(self.device)
         model.eval()
 
         loss, total, correct = 0.0, 0.0, 0.0

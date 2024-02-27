@@ -85,6 +85,7 @@ if __name__ == '__main__':
             clients = [ST_Client(train_dataset,user_groups[i],
                                  sys_info=user_devices[i],
                                  model_profile=model_profile,
+                                 init_local_state = ST_Client.get_local_state_dict(global_model),
                                  local_state_preserve = True,
                                  device=device,verbose=args.verbose,
                                  random_seed=i+args.device_random_seed
@@ -106,6 +107,7 @@ if __name__ == '__main__':
             clients = [AT_Client(train_dataset,user_groups[i],
                                  sys_info=user_devices[i],
                                  model_profile=model_profile,
+                                 init_local_state = ST_Client.get_local_state_dict(global_model),
                                  local_state_preserve = True,
                                  test_adv_method=args.advt_method,
                                  test_adv_epsilon=args.advt_epsilon,
@@ -118,6 +120,7 @@ if __name__ == '__main__':
             clients = [Module_Client(train_dataset,user_groups[i],
                                      sys_info=user_devices[i],
                                      model_profile=model_profile,
+                                     init_local_state = ST_Client.get_local_state_dict(global_model),
                                      local_state_preserve = True,
                                      test_adv_method=args.advt_method,
                                      test_adv_epsilon=args.advt_epsilon,

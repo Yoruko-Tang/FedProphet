@@ -12,6 +12,7 @@ class ST_Client():
     """
     def __init__(self,dataset,data_idxs,sys_info=None,
                  model_profile:model_summary = None,
+                 init_local_state = None,
                  local_state_preserve = False,
                  device = torch.device('cpu'), 
                  verbose=False, random_seed=None, 
@@ -22,10 +23,14 @@ class ST_Client():
         self.model_profile = model_profile
 
         self.local_state_preserve = local_state_preserve
+        if local_state_preserve:
+            self.local_states = copy.deepcopy(init_local_state)
+        else:
+            self.local_states = None
         
         self.device = device
         self.final_local_loss = None
-        self.local_states = None
+        
         self.verbose = verbose
         self.rs = np.random.RandomState(random_seed)
 
@@ -68,11 +73,11 @@ class ST_Client():
         
 
         model = copy.deepcopy(model) # avoid modifying global model
-        model.to(self.device)
+        
         if self.local_states is not None:
             model = self.load_local_state_dict(model,self.local_states)
-        
-        
+        model.to(self.device)
+
         trainloader = DataLoader(self.trainset,batch_size=local_bs,shuffle=True)
 
         # Set optimizer for the local updates
@@ -120,9 +125,9 @@ class ST_Client():
     def validate(self,model,testset=None,criterion=torch.nn.CrossEntropyLoss(),**kwargs):
         """ Returns the validation accuracy and loss."""
         model = copy.deepcopy(model) # avoid modifying global model
-        model.to(self.device)
         if self.local_states is not None:
             model = self.load_local_state_dict(model,self.local_states)
+        model.to(self.device)
         model.eval()
 
         loss, total, correct = 0.0, 0.0, 0.0
@@ -161,8 +166,8 @@ class ST_Client():
         # return the current availale performance, memory, and the training latency of the last round
         return self.runtime_app, self.avail_perf, self.avail_mem, self.latency, self.est_latency
 
-    
-    def get_local_state_dict(self,model):
+    @staticmethod
+    def get_local_state_dict(model):
         sd = model.state_dict()
         for name in list(sd.keys()):
             # pop out the parameters except for bn layers
@@ -172,7 +177,8 @@ class ST_Client():
                 sd.pop(name)
         return sd
     
-    def load_local_state_dict(self,model,local_dict):
+    @staticmethod
+    def load_local_state_dict(model,local_dict):
         sd = model.state_dict()
         sd.update(local_dict)
         model.load_state_dict(sd)
