@@ -3,11 +3,25 @@ from numpy.random import RandomState
 from fvcore.nn import FlopCountAnalysis, parameter_count
 import torch
 from math import ceil
+from scipy.stats import truncnorm
+import random
 
 
 unique_runtime_app_list = ['idle', '1080p', '4k', 'inference', 'detection', 'web']
 unique_perf_degrade_dic = {'idle': 1, '1080p': 0.735, '4k': 0.459, 'inference': 0.524, 'detection': 0.167 , 'web': 0.231}
 unique_mem_avail_dic = {'idle': 1, '1080p': 0.5, '4k': 0.25, 'inference': 0.75, 'detection': 0.0625, 'web': 0.125}
+
+NETWORK_LIST = ['DSL', 'cable', '4G', '5G', 'wifi', 'fiber', 'satelite']
+# upload/download speed: Byte/s |  latency: s
+NETWORK_DIC = {'DSL': {'upload speed': (1e6/8,20e6/8), 'download speed': (3e6/8,145e6/8),'latency': (11e-3,40e-3)},
+               'cable': {'upload speed': (1e6/8,50e6/8), 'download speed': (25e6/8,1000e6/8), 'latency': (13e-3,27e-3)},
+               '4G': {'upload speed': (1e6/8,30e6/8), 'download speed': (9e6/8,60e6/8), 'latency': (30e-3,50e-3)},
+               '5G': {'upload speed': (24e6/8,58e6/8), 'download speed': (501e6/8,635e6/8), 'latency': (4e-3,10e-3)},
+               'wifi': {'upload speed': (1e6/8,50e6/8), 'download speed': (25e6/8,300e6/8), 'latency': (10e-3,50e-3)},
+               'fiber': {'upload speed': (250e6/8,1000e6/8), 'download speed': (30e6/8,5000e6/8), 'latency': (10e-3,12e-3)},
+               'satelite': {'upload speed': (3e6/8,5e6/8), 'download speed': (12e6/8,350e6/8), 'latency': (594e-3,624e-3)}}
+
+
 
 def get_devices(args,seed=None):
     """
@@ -55,6 +69,50 @@ def read_client_device_info(flsys_profile_info):
                 unique_client_device_dic[client_device_name].append(compact_line[2]) #GB
     
     return unique_client_device_dic
+
+def get_truncated_normal(mean=0, sd=1, low=0, upp=10):
+    return truncnorm(
+        (low - mean) / sd, (upp - mean) / sd, loc=mean, scale=sd)
+
+def sample_networks(num_users, rand_seed):
+    # generate network speed/latency for each client
+    # type of network and runtime speed/latency of network for each client is dynamic - different rand seed per epoch
+    num_network = len(NETWORK_LIST)
+    network_for_each_client_list = []
+    network_upload_speed_for_each_client_list = []
+    network_download_speed_for_each_client_list = []
+    network_latency_for_each_client_list = []
+
+    random.seed(rand_seed)
+    network_id_list = [random.randint(0,num_network-1) for x in range(num_users)]
+    # print(network_id_list)
+    for id in network_id_list:
+        network_for_each_client_list.append(NETWORK_LIST[id])
+    # print(network_for_each_client_list)
+    for key in network_for_each_client_list:
+        lower_speed = NETWORK_DIC[key]['upload speed'][0]
+        upper_speed = NETWORK_DIC[key]['upload speed'][1]
+        runtime_speed_gen = get_truncated_normal(mean=(lower_speed+upper_speed)/2, sd=upper_speed/5, low=lower_speed, upp=upper_speed)
+        runtime_speed = runtime_speed_gen.rvs(random_state=rand_seed+1)
+        network_upload_speed_for_each_client_list.append(runtime_speed)
+
+        lower_speed = NETWORK_DIC[key]['download speed'][0]
+        upper_speed = NETWORK_DIC[key]['download speed'][1]
+        runtime_speed_gen = get_truncated_normal(mean=(lower_speed+upper_speed)/2, sd=upper_speed/5, low=lower_speed, upp=upper_speed)
+        runtime_speed = runtime_speed_gen.rvs(random_state=rand_seed+2)
+        network_download_speed_for_each_client_list.append(runtime_speed)
+
+        lower_latency = NETWORK_DIC[key]['latency'][0]
+        upper_latency = NETWORK_DIC[key]['latency'][1]
+        runtime_latency_gen = get_truncated_normal(mean=(lower_latency+upper_latency)/2, sd=upper_latency/5, low=lower_latency, upp=upper_latency)
+        runtime_latency = runtime_latency_gen.rvs(random_state=rand_seed+2)
+        network_latency_for_each_client_list.append(runtime_latency) 
+
+    
+    return network_upload_speed_for_each_client_list, network_download_speed_for_each_client_list, network_latency_for_each_client_list, network_id_list
+
+
+
 
 def sample_devices(num_users,rs,device_dic,sys_scaling_factor):
     """
