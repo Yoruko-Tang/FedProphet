@@ -32,6 +32,7 @@ class base_scheduler():
         if self.round >= self.total_round:
             return False
         else:
+            print('\n | Global Training Round : {} |\n'.format(self.round))
             return True
 
 class base_AT_scheduler(base_scheduler):

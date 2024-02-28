@@ -49,7 +49,7 @@ class Avg_Server():
     def train(self):
         """conduct training of one communication round"""
         
-        print('\n | Global Training Round : {} |\n'.format(self.round))
+        # print('\n | Global Training Round : {} |\n'.format(self.round))
         
         
         

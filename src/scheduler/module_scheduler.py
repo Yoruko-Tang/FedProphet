@@ -169,7 +169,6 @@ class module_scheduler(base_AT_scheduler):
                 # stop training
                 return False
             # get into the next stage
-            print("=================Stage %d================="%(self.stage+1))
             self.stage_begin_round = epoch
             self.round = 0
             self.smooth_length = 0
@@ -210,7 +209,7 @@ class module_scheduler(base_AT_scheduler):
 
         
             self.stage += 1
-
+        print('\n | Global Training Round : {} |\t | Stage : {}\t Round : {} |\n'.format(self.round+self.stage_begin_round,self.stage,self.round))
         self.available_performance = np.array(sys_info["available_perfs"])
         self.available_memory = np.array(sys_info["available_mems"])
 
