@@ -86,6 +86,8 @@ def sample_devices(num_users,rs,device_dic,sys_scaling_factor):
     unique_perf_list = []
     unique_mem_list  = []
     mul_perf_mem_list = []
+
+    mem_decay_factor = random.uniform(0.1,0.5)
     
 
     for k in device_dic.keys():
@@ -108,7 +110,7 @@ def sample_devices(num_users,rs,device_dic,sys_scaling_factor):
     for id in device_id_list:
         client_device_name_list.append(unique_name_list[id])
         client_device_perf_list.append(unique_perf_list[id])
-        client_device_mem_list.append(unique_mem_list[id])
+        client_device_mem_list.append(unique_mem_list[id]*mem_decay_factor)
     
     return client_device_name_list, client_device_perf_list, client_device_mem_list
 
