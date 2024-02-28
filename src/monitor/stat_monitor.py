@@ -136,8 +136,11 @@ class ST_Stat_Monitor():
         
         res = {"epoch":epoch,
             "train_loss": local_losses,
+            "weighted_train_loss": weighted_local_loss,
             "val_acc": global_accs,
             "val_loss": global_losses,
+            "weighted_val_acc": weighted_global_acc,
+            "weighted_val_loss": weighted_global_loss,
             "test_acc": test_acc,
             "test_loss": test_loss}
         return res
@@ -165,59 +168,69 @@ class AT_Stat_Monitor(ST_Stat_Monitor):
             wf.write('\t'.join(columns) + '\n')
 
     def collect(self,global_model,adv_test=True,epoch=None,chosen_idxs=None,test_dataset=None,log=False,save=True,**validation_kwargs):
-        if not adv_test:
-            if log:
-                self.global_adv_accs.append(np.zeros(len(self.clients)))
-                self.global_adv_losses.append(np.zeros(len(self.clients)))
-
-                self.weighted_global_adv_accs.append(0)
-                self.weighted_global_adv_losses.append(0)
-
-                self.test_adv_accs.append(0)
-                self.test_adv_losses.append(None)
-            return super().collect(global_model,epoch,chosen_idxs,test_dataset,log,save,**validation_kwargs)
-
         res = super().collect(global_model,epoch,chosen_idxs,test_dataset,log,save=False,**validation_kwargs)
+        if not adv_test:
+            global_adv_accs = np.zeros(len(self.clients))
+            global_adv_losses = np.array([None]*len(self.clients))
+            weighted_global_adv_acc = 0
+            weighted_global_adv_loss = None
+            test_adv_acc = 0
+            test_adv_loss = None
+            # if log:
+            #     self.global_adv_accs.append(np.zeros(len(self.clients)))
+            #     self.global_adv_losses.append(np.zeros(len(self.clients)))
 
+            #     self.weighted_global_adv_accs.append(0)
+            #     self.weighted_global_adv_losses.append(0)
+
+            #     self.test_adv_accs.append(0)
+            #     self.test_adv_losses.append(None)
+            # return super().collect(global_model,epoch,chosen_idxs,test_dataset,log,save,**validation_kwargs)
 
         
-        # val acc and loss
-        global_adv_accs, global_adv_losses = [],[]
-        for n,c in enumerate(self.clients):
-            if isinstance(global_model,list):
-                # valid_param = dict(validation_kwargs,**global_model[n])
-                adv_acc,adv_loss = c.adv_validate(**global_model[n],**validation_kwargs)
-            else:
-                # valid_param = dict(validation_kwargs,**global_model)
-                adv_acc,adv_loss = c.adv_validate(**global_model,**validation_kwargs)
-            global_adv_accs.append(adv_acc)
-            global_adv_losses.append(adv_loss)
-        global_adv_accs = np.array(global_adv_accs)
-        global_adv_losses = np.array(global_adv_losses)
 
-        if test_dataset is not None:
-            if isinstance(global_model,list):
-                test_adv_accs,test_adv_losses = [],[]
-                for n in range(len(global_model)):
-                    # test_param = dict(validation_kwargs,**global_model[n])
-                    test_adv_acc_n,test_adv_loss_n = self.clients[n].adv_validate(testset=test_dataset,**global_model[n],**validation_kwargs)
-                    test_adv_accs.append(test_adv_acc_n)
-                    test_adv_losses.append(test_adv_loss_n)
-                test_adv_acc,test_adv_loss = np.mean(test_adv_accs),np.mean(test_adv_losses)
-                
-            else:
-                # test_param = dict(validation_kwargs,**global_model)
-                test_adv_acc,test_adv_loss = self.clients[0].adv_validate(testset=test_dataset,**global_model,**validation_kwargs)
+
         else:
-            test_adv_acc,test_adv_loss = 0,None
+            # val acc and loss
+            global_adv_accs, global_adv_losses = [],[]
+            for n,c in enumerate(self.clients):
+                if isinstance(global_model,list):
+                    # valid_param = dict(validation_kwargs,**global_model[n])
+                    adv_acc,adv_loss = c.adv_validate(**global_model[n],**validation_kwargs)
+                else:
+                    # valid_param = dict(validation_kwargs,**global_model)
+                    adv_acc,adv_loss = c.adv_validate(**global_model,**validation_kwargs)
+                global_adv_accs.append(adv_acc)
+                global_adv_losses.append(adv_loss)
+            global_adv_accs = np.array(global_adv_accs)
+            global_adv_losses = np.array(global_adv_losses)
 
-        # collect
-        weighted_global_adv_acc,weighted_global_adv_loss = np.sum(global_adv_accs*self.weights),np.sum(global_adv_losses*self.weights)
+            if test_dataset is not None:
+                if isinstance(global_model,list):
+                    test_adv_accs,test_adv_losses = [],[]
+                    for n in range(len(global_model)):
+                        # test_param = dict(validation_kwargs,**global_model[n])
+                        test_adv_acc_n,test_adv_loss_n = self.clients[n].adv_validate(testset=test_dataset,**global_model[n],**validation_kwargs)
+                        test_adv_accs.append(test_adv_acc_n)
+                        test_adv_losses.append(test_adv_loss_n)
+                    test_adv_acc,test_adv_loss = np.mean(test_adv_accs),np.mean(test_adv_losses)
+                    
+                else:
+                    # test_param = dict(validation_kwargs,**global_model)
+                    test_adv_acc,test_adv_loss = self.clients[0].adv_validate(testset=test_dataset,**global_model,**validation_kwargs)
+            else:
+                test_adv_acc,test_adv_loss = 0,None
+
+            # collect
+            weighted_global_adv_acc,weighted_global_adv_loss = np.sum(global_adv_accs*self.weights),np.sum(global_adv_losses*self.weights)
 
         res["val_adv_acc"] = global_adv_accs
         res["val_adv_loss"] = global_adv_losses
+        res["weighted_val_adv_acc"] = weighted_global_adv_acc
+        res["weighted_val_adv_loss"] = weighted_global_adv_loss
         res["test_adv_acc"] = test_adv_acc
         res["test_adv_loss"] = test_adv_loss
+        
 
         if log:
             self.global_adv_accs.append(global_adv_accs)

@@ -5,6 +5,7 @@ import torch.nn as nn
 from fvcore.nn import FlopCountAnalysis,parameter_count
 from datasets import dataset_to_datafamily
 from math import ceil
+import copy
 
 class module_scheduler(base_AT_scheduler):
     """
@@ -35,9 +36,12 @@ class module_scheduler(base_AT_scheduler):
         print("====> Module FLOPs: \n",self.module_flops_dict)
         print("====> Module Memory: \n", self.module_mem_dict)
 
-        self.total_round = args["epochs"]
         self.round_per_stage = ceil(self.total_round/len(self.partition_module_list))
         self.stage = 0
+        self.stage_begin_round = 0
+        self.best_weighted_acc = 0.0
+        self.smooth_length = 0
+
         print("=================Stage 1=================")
         self.clients = clients
         self.available_performance = np.array([c.avail_perf for c in self.clients])
@@ -52,6 +56,8 @@ class module_scheduler(base_AT_scheduler):
         self.mu = args["mu"]
         self.lamb = args["lamb"]
         self.psi = args["psi"]
+
+        
 
 
     def training_params(self, idx,chosen_idxs, **kwargs):
@@ -142,10 +148,39 @@ class module_scheduler(base_AT_scheduler):
         return args
 
     def stat_update(self, epoch, stat_info, sys_info, global_model, **kwargs):
-        super().stat_update(epoch%self.round_per_stage) # periodic lr/adv_train adjustment
-        new_stage = epoch//self.round_per_stage
-        if new_stage != self.stage: # update the adversarial training params
-            print("=================Stage %d================="%(new_stage+1))
+        if "weighted_val_adv_acc" in stat_info:
+            weighted_acc = stat_info["weighted_val_acc"] + stat_info["weighted_val_adv_acc"]
+        else:
+            weighted_acc = stat_info["weighted_val_acc"]
+        
+        if weighted_acc > self.best_weighted_acc:
+            self.best_weighted_acc = weighted_acc
+            self.smooth_length = 0
+            self.best_model = copy.deepcopy(global_model)
+            self.best_local_states = [copy.deepcopy(c.local_states) for c in self.clients]
+        else:
+            self.smooth_length += epoch-self.stage_begin_round-self.round
+        
+        self.round = epoch-self.stage_begin_round
+        # print(self.round, self.smooth_length)
+        
+        if self.round >= self.round_per_stage or self.smooth_length >= self.round_per_stage//10:
+            if self.stage == len(self.partition_module_list)-1:
+                # stop training
+                return False
+            # get into the next stage
+            print("=================Stage %d================="%(self.stage+1))
+            self.stage_begin_round = epoch
+            self.round = 0
+            self.smooth_length = 0
+            self.best_weighted_acc = 0.0
+
+            # recover to the best model before
+            global_model.update(self.best_model) 
+            for n,c in enumerate(self.clients):
+                c.local_states = self.best_local_states[n]
+
+            # forward local feature set
             current_module_list = self.module_dict[self.partition_module_list[self.stage]]
             new_adv_epsilons = []
             lowers = []
@@ -174,12 +209,13 @@ class module_scheduler(base_AT_scheduler):
             self.adv_bound = [0 if lower>=0 else -np.inf,0 if upper<=0 else np.inf]
 
         
-        self.stage = new_stage
+            self.stage += 1
 
         self.available_performance = np.array(sys_info["available_perfs"])
         self.available_memory = np.array(sys_info["available_mems"])
 
         # Todo: add adaptive adjustment of mu, lamb and psi
+        return True
         
 
     def model_partition(self,max_module_flops=None,max_module_mem=None,**kwargs):

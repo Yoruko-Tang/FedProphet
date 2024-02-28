@@ -61,43 +61,44 @@ class Avg_Server():
                                   server=self)
         
         #update the scheduler's information
-        self.scheduler.stat_update(epoch = self.round,
+        CTN = self.scheduler.stat_update(epoch = self.round,
                                    stat_info = self.stat_info,
                                    sys_info = self.sys_info,
                                    global_model = self.global_model)
         
-        # select clients
-        if self.train_frac is None:
-            self.idxs_users = np.arange(len(self.clients))
-        else:
-            m = max(int(self.train_frac * self.num_users), 1)
-            self.idxs_users = self.selector.select(m)
-        print("Chosen Clients:",self.idxs_users)
-        
-        
-        # train selected clients
-        self.global_model = self.train_idx(self.idxs_users)
-
-        if (self.round+1)%self.test_every == 0:
-            # collect each client's statistical information
-            monitor_params = self.scheduler.monitor_params()
-            if self.local_state_preserve:
-                model = [self.global_model]*len(self.clients)
+        if CTN:
+            # select clients
+            if self.train_frac is None:
+                self.idxs_users = np.arange(len(self.clients))
             else:
-                model = self.global_model
-            self.stat_info = self.stat_monitor.collect(model,
-                                                       epoch=self.round,
-                                                       chosen_idxs=self.idxs_users,
-                                                       test_dataset=self.test_dataset,
-                                                       log=True,
-                                                       **monitor_params)
-        # collect each client's systematic information
-        self.sys_info = self.sys_monitor.collect(epoch=self.round,
-                                                 chosen_idxs=self.idxs_users,
-                                                 log=True)
+                m = max(int(self.train_frac * self.num_users), 1)
+                self.idxs_users = self.selector.select(m)
+            print("Chosen Clients:",self.idxs_users)
+            
+            
+            # train selected clients
+            self.global_model.update(self.train_idx(self.idxs_users))
 
-        self.round += 1
-        return self.global_model
+            if (self.round+1)%self.test_every == 0:
+                # collect each client's statistical information
+                monitor_params = self.scheduler.monitor_params()
+                if self.local_state_preserve:
+                    model = [self.global_model]*len(self.clients)
+                else:
+                    model = self.global_model
+                self.stat_info = self.stat_monitor.collect(model,
+                                                        epoch=self.round,
+                                                        chosen_idxs=self.idxs_users,
+                                                        test_dataset=self.test_dataset,
+                                                        log=True,
+                                                        **monitor_params)
+            # collect each client's systematic information
+            self.sys_info = self.sys_monitor.collect(epoch=self.round,
+                                                    chosen_idxs=self.idxs_users,
+                                                    log=True)
+
+            self.round += 1
+        return CTN
 
     def train_idx(self,idxs_users):
         local_weights = np.array([None for _ in range(self.num_users)])

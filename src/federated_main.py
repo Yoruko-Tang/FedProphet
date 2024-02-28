@@ -235,8 +235,9 @@ if __name__ == '__main__':
 
         ## ==================================Start Training==================================
         for epoch in tqdm(range(args.epochs)):
-            server.train()
-                          
+            CTN = server.train()
+            if not CTN:
+                break      
 
         
         ## ==================================Final Results==================================

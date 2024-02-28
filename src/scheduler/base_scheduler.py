@@ -6,7 +6,7 @@ class base_scheduler():
     """
     def __init__(self,args):
         self.round = 0
-
+        self.total_round = args["epochs"]
         self.args = args
 
     def training_params(self,**kwargs):
@@ -29,6 +29,10 @@ class base_scheduler():
     
     def stat_update(self,epoch,**kwargs):
         self.round = epoch
+        if self.round >= self.total_round:
+            return False
+        else:
+            return True
 
 class base_AT_scheduler(base_scheduler):
     """

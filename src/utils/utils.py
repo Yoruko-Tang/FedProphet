@@ -23,6 +23,9 @@ def get_log_path(args):
         file_name = f"./save/{args.dataset}_{args.model_arch}_{args.epochs}_N[{args.num_users}]_{'all' if args.frac == 1.0 else args.strategy}[{args.frac}]_iid_sys[{args.sys_scaling_factor}]_E[{args.local_ep}]_B[{args.local_bs}]_lr[{args.lr}]"
     
     file_name = os.path.join(file_name,args.flalg)
+
+    if args.flalg == 'FedProphet':
+        file_name = os.path.join(file_name,"mu{}_lambda{}_psi{}".format(args.mu,args.lamb,args.psi))
     
     
     if not os.path.exists(file_name):
