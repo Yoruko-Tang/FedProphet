@@ -28,7 +28,7 @@ class Module_Client(AT_Client):
         self.trainset, self.testset = self.train_test(dataset, list(data_idxs))
         self.feature_trainset = self.trainset
         self.feature_testset = self.testset
-        self.dev_name,self.performance,self.memory=sys_info
+        self.dev_name,self.performance,self.memory,self.eff_bw=sys_info
         self.model_profile = model_profile
 
         self.local_state_preserve = local_state_preserve
@@ -270,6 +270,7 @@ class Module_Client(AT_Client):
                                                            iters_per_input=self.iters_per_input,
                                                            performance=self.avail_perf,
                                                            memory=self.avail_mem,
+                                                           eff_bandwidth=self.eff_bw,
                                                            network_bandwidth=self.network_speed,
                                                            network_latency=self.network_latency)
         
@@ -384,6 +385,7 @@ class Module_Client(AT_Client):
                                                     batches=self.batches,
                                                     performance=self.avail_perf,
                                                     memory=self.avail_mem,
+                                                    eff_bandwidth=self.eff_bw,
                                                     network_bandwidth=self.network_speed,
                                                     network_latency=self.network_latency)
         else:

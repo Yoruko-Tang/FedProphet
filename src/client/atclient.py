@@ -108,6 +108,7 @@ class AT_Client(ST_Client):
                                                            iters_per_input=self.iters_per_input,
                                                            performance=self.avail_perf,
                                                            memory=self.avail_mem,
+                                                           eff_bandwidth=self.eff_bw,
                                                            network_bandwidth=self.network_speed,
                                                            network_latency=self.network_latency)
         

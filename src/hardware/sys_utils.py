@@ -35,7 +35,7 @@ def get_devices(args,seed=None):
         = sample_devices(args.num_users,rs,unique_client_device_dic,
                          args.sys_scaling_factor)
     
-    user_devices = {i:(device_name_list[i],device_perf_list[i],device_mem_list[i], device_eff_bw_list) for i in range(args.num_users)}
+    user_devices = {i:(device_name_list[i],device_perf_list[i],device_mem_list[i], device_eff_bw_list[i]) for i in range(args.num_users)}
     return user_devices
     
 
@@ -366,6 +366,7 @@ class model_summary():
             # since the computation and memory access can be parallelized, 
             # we take the larger one as the final latency
             batch_on_device_time = batch_computation_time + batch_memory_access_time
+            # print(batch_computation_time,batch_memory_access_time)
 
             total_latency += batch_on_device_time
         
