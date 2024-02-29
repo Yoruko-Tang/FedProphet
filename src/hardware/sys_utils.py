@@ -65,8 +65,9 @@ def read_client_device_info(flsys_profile_info):
         client_device_name = compact_line[0]
         if client_device_name != 'Client':
             if client_device_name not in unique_client_device_dic.keys():
-                unique_client_device_dic[client_device_name] = [compact_line[1]] #GFLOPS
-                unique_client_device_dic[client_device_name].append(compact_line[2]) #GB
+                unique_client_device_dic[client_device_name] = [compact_line[1]] #FLOPS
+                unique_client_device_dic[client_device_name].append(compact_line[2]) #Bytes
+                unique_client_device_dic[client_device_name].append(compact_line[3]) #Bytes/s
     
     return unique_client_device_dic
 
