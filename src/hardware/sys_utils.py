@@ -65,8 +65,9 @@ def read_client_device_info(flsys_profile_info):
         client_device_name = compact_line[0]
         if client_device_name != 'Client':
             if client_device_name not in unique_client_device_dic.keys():
-                unique_client_device_dic[client_device_name] = [compact_line[1]] #GFLOPS
-                unique_client_device_dic[client_device_name].append(compact_line[2]) #GB
+                unique_client_device_dic[client_device_name] = [compact_line[1]] #FLOPS
+                unique_client_device_dic[client_device_name].append(compact_line[2]) #Bytes
+                unique_client_device_dic[client_device_name].append(compact_line[3]) #Bytes/s
     
     return unique_client_device_dic
 
@@ -86,6 +87,8 @@ def sample_devices(num_users,rs,device_dic,sys_scaling_factor):
     unique_perf_list = []
     unique_mem_list  = []
     mul_perf_mem_list = []
+
+    mem_decay_factor = random.uniform(0.1,0.5)
     
 
     for k in device_dic.keys():
@@ -108,7 +111,7 @@ def sample_devices(num_users,rs,device_dic,sys_scaling_factor):
     for id in device_id_list:
         client_device_name_list.append(unique_name_list[id])
         client_device_perf_list.append(unique_perf_list[id])
-        client_device_mem_list.append(unique_mem_list[id])
+        client_device_mem_list.append(unique_mem_list[id]*mem_decay_factor)
     
     return client_device_name_list, client_device_perf_list, client_device_mem_list
 
