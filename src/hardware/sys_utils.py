@@ -31,11 +31,11 @@ def get_devices(args,seed=None):
     """
     rs = RandomState(seed)
     unique_client_device_dic = read_client_device_info(args.flsys_profile_info)
-    device_name_list, device_perf_list, device_mem_list \
+    device_name_list, device_perf_list, device_mem_list, device_eff_bw_list\
         = sample_devices(args.num_users,rs,unique_client_device_dic,
                          args.sys_scaling_factor)
     
-    user_devices = {i:(device_name_list[i],device_perf_list[i],device_mem_list[i]) for i in range(args.num_users)}
+    user_devices = {i:(device_name_list[i],device_perf_list[i],device_mem_list[i], device_eff_bw_list) for i in range(args.num_users)}
     return user_devices
     
 
@@ -87,6 +87,7 @@ def sample_devices(num_users,rs,device_dic,sys_scaling_factor):
     unique_perf_list = []
     unique_mem_list  = []
     mul_perf_mem_list = []
+    unique_eff_bw_list = []
 
     mem_decay_factor = random.uniform(0.1,0.5)
     
@@ -96,14 +97,16 @@ def sample_devices(num_users,rs,device_dic,sys_scaling_factor):
         unique_perf_list.append(float(device_dic[k][0]))
         unique_mem_list.append(float(device_dic[k][1]))
         mul_perf_mem_list.append(float(device_dic[k][0])*float(device_dic[k][1]))
+        unique_eff_bw_list.append(float(device_dic[k][2]))
     
     scaled_mul_perf_mem_list = np.array([v ** sys_scaling_factor for v in mul_perf_mem_list])
     prob_list = scaled_mul_perf_mem_list/np.sum(scaled_mul_perf_mem_list)
 
 
     client_device_name_list = []
-    client_device_perf_list = [] # GFLOPS
-    client_device_mem_list  = [] # MB
+    client_device_perf_list = [] # FLOPS
+    client_device_mem_list  = [] # B
+    client_device_eff_bw_list = [] # B/s
 
 
     device_id_list = rs.choice(unique_id_list, p=prob_list, size=num_users)
@@ -112,8 +115,9 @@ def sample_devices(num_users,rs,device_dic,sys_scaling_factor):
         client_device_name_list.append(unique_name_list[id])
         client_device_perf_list.append(unique_perf_list[id])
         client_device_mem_list.append(unique_mem_list[id]*mem_decay_factor)
+        client_device_eff_bw_list.append(unique_eff_bw_list[id])
     
-    return client_device_name_list, client_device_perf_list, client_device_mem_list
+    return client_device_name_list, client_device_perf_list, client_device_mem_list, client_device_eff_bw_list
 
 
 def sample_runtime_app(rs):
