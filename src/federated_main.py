@@ -154,7 +154,8 @@ if __name__ == '__main__':
         elif args.flalg == "FedProphet":
             scheduler = module_scheduler(vars(args),
                                          model_profile=model_profile,
-                                         clients=clients)
+                                         clients=clients,
+                                         log_path=file_name)
         # Todo: Add schedulers for other baselines
         else:
             raise RuntimeError("FL optimizer {} has no registered scheduler!".format(args.flalg)) 

@@ -6,6 +6,9 @@ from fvcore.nn import FlopCountAnalysis,parameter_count
 from datasets import dataset_to_datafamily
 from math import ceil
 import copy
+import os.path as osp
+import os
+import pickle
 
 class module_scheduler(base_AT_scheduler):
     """
@@ -15,7 +18,7 @@ class module_scheduler(base_AT_scheduler):
     client the training modules according to their available resources.
     """
 
-    def __init__(self, args, model_profile, clients):
+    def __init__(self, args, model_profile, clients,log_path=None):
         super().__init__(args)
         self.model_profile = model_profile
         self.atom_list = self.model_profile.module_list
@@ -56,6 +59,17 @@ class module_scheduler(base_AT_scheduler):
         self.mu = args["mu"]
         self.lamb = args["lamb"]
         self.psi = args["psi"]
+
+        self.logs = []
+        self.log_path = log_path
+        if self.log_path is not None:
+            if not osp.exists(self.log_path):
+                os.makedirs(self.log_path)
+            self.tsv_file = osp.join(self.log_path, 'scheduler.log.tsv')
+            self.pkl_file = osp.join(self.log_path, 'scheduler.pkl')
+            with open(self.tsv_file, 'w') as wf:
+                columns = ['epoch', 'adv_epsilon', 'adv_alpha', 'adv_norm', 'adv_bound', 'mu','lamb','psi']
+                wf.write('\t'.join(columns) + '\n')
 
         
 
@@ -198,8 +212,8 @@ class module_scheduler(base_AT_scheduler):
                 new_adv_epsilons.append(max_adv_pert)
                 lowers.append(l)
                 uppers.append(u)
-            # take the largest perturbation as the new epsilon
-            self.adv_epsilon = max(new_adv_epsilons)
+            # take the largest/mean perturbation as the new epsilon
+            self.adv_epsilon = np.mean(new_adv_epsilons)
             self.adv_alpha = 2*self.adv_epsilon/self.args["adv_T"]
             self.adv_norm = 'l2'
             lower = min(lowers)
@@ -214,6 +228,22 @@ class module_scheduler(base_AT_scheduler):
         self.available_memory = np.array(sys_info["available_mems"])
 
         # Todo: add adaptive adjustment of mu, lamb and psi
+
+        self.logs.append({"adv_epsilon":self.adv_epsilon,
+                      "adv_alpha":self.adv_alpha,
+                      "adv_norm":self.adv_norm,
+                      "adv_bound":self.adv_bound,
+                      "mu":self.mu,
+                      "lamb":self.lamb,
+                      "psi":self.psi})
+        
+        log_column = [epoch,self.adv_epsilon,self.adv_alpha,self.adv_norm,self.adv_bound,self.mu,self.lamb,self.psi]
+        
+        with open(self.tsv_file, 'a') as af:
+            af.write('\t'.join([str(c) for c in log_column]) + '\n')
+        with open(self.pkl_file,'wb') as stat_f:
+            pickle.dump(self.logs, stat_f)
+            
         return True
         
 
