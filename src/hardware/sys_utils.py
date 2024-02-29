@@ -4,7 +4,7 @@ from fvcore.nn import FlopCountAnalysis, parameter_count
 import torch
 from math import ceil
 from scipy.stats import truncnorm
-import random
+import csv
 
 
 unique_runtime_app_list = ['idle', '1080p', '4k', 'inference', 'detection', 'web']
@@ -45,29 +45,40 @@ def read_client_device_info(flsys_profile_info):
     """
     arg: flsys_profile_info
 
-    return: unique_client_device_dic - {'client_device_name': GFLOPS, GB}
+    return: unique_client_device_dic - {'client_device_name': GFLOPS, GB, Eff_BW}
     """
 
     unique_client_device_dic = {}
-    file = open(flsys_profile_info, 'r')
+    with open(flsys_profile_info+".csv",'r',newline='') as f:
+        csv_reader = csv.reader(f)
+        for row in csv_reader:
+            client_device_name = row[0]
+            if client_device_name != 'Client':
+                if client_device_name not in unique_client_device_dic.keys():
+                    unique_client_device_dic[client_device_name] = row[1:] 
 
-    while True:
-        line = file.readline()
-        if not line: break
-        line = line.replace('\n', ' ').replace('\t', ' ')
-        splitline = line.split(" ")
-        splitline = splitline[:-1]
-        compact_line =[]
-        for item in splitline:
-            if item != '':
-                compact_line.append(item)
+    # file = open(flsys_profile_info, 'r')
+    # rows = []
+    # while True:
+    #     line = file.readline()
+    #     if not line: break
+    #     line = line.replace('\n', ' ').replace('\t', ' ')
+    #     splitline = line.split(" ")
+    #     splitline = splitline[:-1]
+    #     compact_line =[]
+    #     for item in splitline:
+    #         if item != '':
+    #             compact_line.append(item)
 
-        client_device_name = compact_line[0]
-        if client_device_name != 'Client':
-            if client_device_name not in unique_client_device_dic.keys():
-                unique_client_device_dic[client_device_name] = [compact_line[1]] #FLOPS
-                unique_client_device_dic[client_device_name].append(compact_line[2]) #Bytes
-                unique_client_device_dic[client_device_name].append(compact_line[3]) #Bytes/s
+    #     rows.append(compact_line)
+        # client_device_name = compact_line[0]
+        # if client_device_name != 'Client':
+        #     if client_device_name not in unique_client_device_dic.keys():
+        #         unique_client_device_dic[client_device_name] = [compact_line[1]] #FLOPS
+        #         unique_client_device_dic[client_device_name].append(compact_line[2]) #Bytes
+        #         unique_client_device_dic[client_device_name].append(compact_line[3]) #Bytes/s
+        
+
     
     return unique_client_device_dic
 
@@ -89,7 +100,6 @@ def sample_devices(num_users,rs,device_dic,sys_scaling_factor):
     mul_perf_mem_list = []
     unique_eff_bw_list = []
 
-    mem_decay_factor = random.uniform(0.1,0.5)
     
 
     for k in device_dic.keys():
@@ -114,7 +124,7 @@ def sample_devices(num_users,rs,device_dic,sys_scaling_factor):
     for id in device_id_list:
         client_device_name_list.append(unique_name_list[id])
         client_device_perf_list.append(unique_perf_list[id])
-        client_device_mem_list.append(unique_mem_list[id]*mem_decay_factor)
+        client_device_mem_list.append(unique_mem_list[id])
         client_device_eff_bw_list.append(unique_eff_bw_list[id])
     
     return client_device_name_list, client_device_perf_list, client_device_mem_list, client_device_eff_bw_list
@@ -125,7 +135,8 @@ def sample_runtime_app(rs):
     # runtime application for each client is dynamic - different random seed per epoch
 
     runtime_app = rs.choice(unique_runtime_app_list)
-    return runtime_app, unique_perf_degrade_dic[runtime_app],unique_mem_avail_dic[runtime_app]
+    mem_avai_factor = rs.uniform(0.0,0.3)
+    return runtime_app, unique_perf_degrade_dic[runtime_app],mem_avai_factor
 
 def sample_networks(rs):
     def get_truncated_normal(mean=0, sd=1, low=0, upp=10):

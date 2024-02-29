@@ -1,0 +1,11 @@
+Client,FLOPS(peak),Memory,EffBW
+respi5,1.2e11,4e9,125e6
+tx2,1.3e12,4e9,1.5e9
+KCU1500,2e11,2e9,2e9
+VC709,1.02e11,2e9,1.5e9
+gtx970,3.920e12,4e9,16e9
+quadro_m2200,2.122e12,4e9,1.5e9
+geforce_940,8.817e11,2e9,16e9
+geforce_750,1.11e12,1e9,16e9
+radeon_250,8.06e11,1e9,16e9
+geforce_1010,7.51e11,2e9,16e9
