@@ -164,7 +164,7 @@ class module_scheduler(base_AT_scheduler):
         self.round = epoch-self.stage_begin_round
         # print(self.round, self.smooth_length)
         
-        if self.round >= self.round_per_stage or self.smooth_length >= 0.2*self.round_per_stage:
+        if self.round >= self.round_per_stage or self.smooth_length >= 0.3*self.round_per_stage:
             if self.stage == len(self.partition_module_list)-1:
                 # stop training
                 return False
