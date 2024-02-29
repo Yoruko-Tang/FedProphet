@@ -164,7 +164,7 @@ class Module_Client(AT_Client):
         else:
             future_aux_model = None
 
-        def fedprophet_loss(model,input,label):
+        def fedprophet_loss(model,input,label,output_dict=None):
             output = model.module_forward(input,stage_module_list)
             if current_aux_model is not None:
                 final_output = current_aux_model(output)
@@ -173,6 +173,8 @@ class Module_Client(AT_Client):
             stage_task_loss = criterion(final_output,label)
             stage_cvx_loss = mu*torch.sum(torch.square(output))/(2*len(output))
             loss = stage_task_loss+stage_cvx_loss
+            if output_dict is not None:
+                output_dict.update({"stage_task_loss":stage_task_loss.item(),"stage_cvx_loss":stage_cvx_loss.item()})
             
             if len(prophet_module_list)>0:
                 prophet_output = model.module_forward(output,prophet_module_list)
@@ -184,6 +186,8 @@ class Module_Client(AT_Client):
                 prophet_cvx_loss = mu*torch.sum(torch.square(prophet_output))/(2*len(prophet_output))
                 prophet_loss = prophet_task_loss + prophet_cvx_loss
                 loss = loss*(1-psi)+prophet_loss*psi
+                if output_dict is not None:
+                    output_dict.update({"prophet_task_loss":prophet_task_loss.item(),"prophet_cvx_loss":prophet_cvx_loss.item()})
             return loss
 
         
@@ -237,8 +241,8 @@ class Module_Client(AT_Client):
                 
                 model.train()
                 model.zero_grad()
-
-                loss = fedprophet_loss(model,datas,labels)
+                output_losses = {}
+                loss = fedprophet_loss(model,datas,labels,output_losses)
                 loss.backward()
                 opt.step()
                 iters += 1
@@ -246,7 +250,10 @@ class Module_Client(AT_Client):
                     break
 
             if self.verbose:
-                print('Local Epoch : {}/{} |\tLoss: {:.4f}'.format(iters, local_ep, loss.item()))
+                com_out = 'Local Epoch : {}/{} \t| Loss: {:.4f}'.format(iters, local_ep, loss.item())
+                extra_out = ['{}: {:.4f}'.format(k,output_losses[k]) for k in output_losses.keys()]
+                extra_out = "\t| ".join(extra_out)
+                print(com_out + "\t| " + extra_out)
         
 
         
@@ -348,7 +355,7 @@ class Module_Client(AT_Client):
         for batch_idx, (datas, labels) in enumerate(self.testloader):
             datas, labels = datas.to(self.device), labels.to(self.device)
             adv_datas = adv_data_gen.attack_data(model,datas,labels)
-            outputs = model(adv_datas)
+            outputs = model.module_forward(adv_datas,module_list)
             if aux_model is not None:
                 outputs = aux_model(outputs)
             batch_loss = criterion(outputs, labels)

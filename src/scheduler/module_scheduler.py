@@ -164,7 +164,7 @@ class module_scheduler(base_AT_scheduler):
         self.round = epoch-self.stage_begin_round
         # print(self.round, self.smooth_length)
         
-        if self.round >= self.round_per_stage or self.smooth_length >= 0.3*self.round_per_stage:
+        if self.round >= self.round_per_stage or self.smooth_length >= 0.2*self.round_per_stage:
             if self.stage == len(self.partition_module_list)-1:
                 # stop training
                 return False
@@ -199,6 +199,8 @@ class module_scheduler(base_AT_scheduler):
                 lowers.append(l)
                 uppers.append(u)
             # take the largest perturbation as the new epsilon
+            print(new_adv_epsilons,max(new_adv_epsilons))
+            input()
             self.adv_epsilon = max(new_adv_epsilons)
             self.adv_alpha = 2*self.adv_epsilon/self.args["adv_T"]
             self.adv_norm = 'l2'
