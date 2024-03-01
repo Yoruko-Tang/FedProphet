@@ -34,8 +34,8 @@ class Sys_Monitor():
             self.tsv_file = osp.join(self.log_path, 'sys.log.tsv')
             self.pkl_file = osp.join(self.log_path, 'sys.pkl')
             with open(self.tsv_file, 'w') as wf:
-                columns = ['epoch', 'min_avail_perf (GFLOPS)', 'max_avail_perf (GFLOPS)', 
-                           'min_avail_mem (GB)', 'max_avail_mem (GB)', 
+                columns = ['epoch', 'min_avail_perf (FLOPS)', 'max_avail_perf (FLOPS)', 
+                           'min_avail_mem (Byte)', 'max_avail_mem (Byte)', 
                            'round_time (s)', 'total_time (s)']
                 wf.write('\t'.join(columns) + '\n')
         

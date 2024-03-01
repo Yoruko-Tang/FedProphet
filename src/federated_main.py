@@ -79,7 +79,8 @@ if __name__ == '__main__':
                                  model_profile=model_profile,
                                  local_state_preserve = False,
                                  device=device,verbose=args.verbose,
-                                 random_seed=i+args.device_random_seed
+                                 random_seed=i+args.device_random_seed,
+                                 reserved_memory=args.max_module_mem
                                  ) for i in range(args.num_users)]
         elif args.flalg == 'FedBN':
             clients = [ST_Client(train_dataset,user_groups[i],
@@ -88,7 +89,8 @@ if __name__ == '__main__':
                                  init_local_state = ST_Client.get_local_state_dict(global_model),
                                  local_state_preserve = True,
                                  device=device,verbose=args.verbose,
-                                 random_seed=i+args.device_random_seed
+                                 random_seed=i+args.device_random_seed,
+                                 reserved_memory=args.max_module_mem
                                  ) for i in range(args.num_users)]
         
         elif args.flalg == 'FedAvgAT':
@@ -101,7 +103,8 @@ if __name__ == '__main__':
                                  test_adv_alpha=args.advt_alpha,
                                  test_adv_T=args.advt_T,
                                  device=device,verbose=args.verbose,
-                                 random_seed=i+args.device_random_seed
+                                 random_seed=i+args.device_random_seed,
+                                 reserved_memory=args.max_module_mem
                                  ) for i in range(args.num_users)]
         elif args.flalg == 'FedBNAT':
             clients = [AT_Client(train_dataset,user_groups[i],
@@ -114,7 +117,8 @@ if __name__ == '__main__':
                                  test_adv_alpha=args.advt_alpha,
                                  test_adv_T=args.advt_T,
                                  device=device,verbose=args.verbose,
-                                 random_seed=i+args.device_random_seed
+                                 random_seed=i+args.device_random_seed,
+                                 reserved_memory=args.max_module_mem
                                  ) for i in range(args.num_users)]
         elif args.flalg == 'FedProphet':
             clients = [Module_Client(train_dataset,user_groups[i],

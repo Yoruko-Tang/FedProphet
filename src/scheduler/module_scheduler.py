@@ -45,7 +45,7 @@ class module_scheduler(base_AT_scheduler):
         self.best_weighted_acc = 0.0
         self.smooth_length = 0
 
-        print("=================Stage 1=================")
+        # print("=================Stage 1=================")
         self.clients = clients
         self.available_performance = np.array([c.avail_perf for c in self.clients])
         self.available_memory = np.array([c.avail_mem for c in self.clients])
@@ -162,6 +162,7 @@ class module_scheduler(base_AT_scheduler):
         return args
 
     def stat_update(self, epoch, stat_info, sys_info, global_model, **kwargs):
+        new_logs = {}
         if "weighted_val_adv_acc" in stat_info:
             weighted_acc = stat_info["weighted_val_acc"] + stat_info["weighted_val_adv_acc"]
         else:
@@ -199,7 +200,7 @@ class module_scheduler(base_AT_scheduler):
             lowers = []
             uppers = []
             for c in self.clients:
-                max_adv_pert,l,u \
+                adv_pert,l,u \
                     = c.forward_feature_set(global_model["model"],
                                             current_module_list,
                                             adv_train = self.args["adv_train"],
@@ -209,11 +210,13 @@ class module_scheduler(base_AT_scheduler):
                                             adv_T = self.args["adv_T"],
                                             adv_norm = self.adv_norm,
                                             adv_bound = self.adv_bound)
-                new_adv_epsilons.append(max_adv_pert)
+                new_adv_epsilons.append(adv_pert)
                 lowers.append(l)
                 uppers.append(u)
-            # take the largest/mean perturbation as the new epsilon
-            self.adv_epsilon = np.mean(new_adv_epsilons)
+            # take the largest/mean/median perturbation as the new epsilon
+            new_adv_epsilons = np.concatenate(new_adv_epsilons)
+            new_logs["adv_epsilons"] = new_adv_epsilons
+            self.adv_epsilon = np.median(new_adv_epsilons)
             self.adv_alpha = 2*self.adv_epsilon/self.args["adv_T"]
             self.adv_norm = 'l2'
             lower = min(lowers)
@@ -228,14 +231,14 @@ class module_scheduler(base_AT_scheduler):
         self.available_memory = np.array(sys_info["available_mems"])
 
         # Todo: add adaptive adjustment of mu, lamb and psi
-
-        self.logs.append({"adv_epsilon":self.adv_epsilon,
+        new_logs.update({"adv_epsilon":self.adv_epsilon,
                       "adv_alpha":self.adv_alpha,
                       "adv_norm":self.adv_norm,
                       "adv_bound":self.adv_bound,
                       "mu":self.mu,
                       "lamb":self.lamb,
                       "psi":self.psi})
+        self.logs.append(new_logs)
         
         log_column = [epoch,self.adv_epsilon,self.adv_alpha,self.adv_norm,self.adv_bound,self.mu,self.lamb,self.psi]
         
