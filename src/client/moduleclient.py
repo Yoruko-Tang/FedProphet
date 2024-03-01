@@ -97,7 +97,7 @@ class Module_Client(AT_Client):
                 adv_datas = adv_data_gen.attack_data(model,datas,new_feature)
                 new_adv_feature = model.module_forward(adv_datas,module_list)
                 adv_feature_pert = torch.norm(new_adv_feature-new_feature,p=2,dim=list(range(1,new_feature.dim())))
-                train_adv_feature_pert.append(adv_feature_pert.cpu().numpy())
+                train_adv_feature_pert.append(adv_feature_pert.detach().cpu().numpy())
             new_train_feature.append(new_feature.cpu())
             train_labels.append(labels.cpu())
         new_train_feature = torch.cat(new_train_feature,dim=0)
