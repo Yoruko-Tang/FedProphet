@@ -25,7 +25,7 @@ def get_log_path(args):
     file_name = os.path.join(file_name,args.flalg)
 
     if args.flalg == 'FedProphet':
-        file_name = os.path.join(file_name,"mu{}_lambda{}_psi{}".format(args.mu,args.lamb,args.psi))
+        file_name = os.path.join(file_name,"mu{}_lambda{}_psi{}_at{}".format(args.mu,args.lamb,args.psi,1 if args.adv_train else 0))
     
     
     if not os.path.exists(file_name):

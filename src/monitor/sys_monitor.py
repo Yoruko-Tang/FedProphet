@@ -19,8 +19,18 @@ class Sys_Monitor():
         self.network_latencies = []
         # training latency
         self.train_times = []
+        self.comp_times = []
+        self.mem_times = []
+        self.comm_times = []
         self.round_times = []
+        self.round_comp_times = []
+        self.round_mem_times = []
+        self.round_comm_times = []
+
         self.total_times = []
+        self.total_comp_times = []
+        self.total_mem_times = []
+        self.total_comm_times = []
 
         self.estimate_times = []
 
@@ -36,7 +46,10 @@ class Sys_Monitor():
             with open(self.tsv_file, 'w') as wf:
                 columns = ['epoch', 'min_avail_perf (FLOPS)', 'max_avail_perf (FLOPS)', 
                            'min_avail_mem (Byte)', 'max_avail_mem (Byte)', 
-                           'round_time (s)', 'total_time (s)']
+                           'round_time (s)', 'round_comp_time (s)', 
+                           'round_mem_time (s)', 'round_comm_time (s)', 
+                           'total_time (s)', 'total_comp_time (s)',
+                           'total_mem_time (s)', 'total_comm_time (s)']
                 wf.write('\t'.join(columns) + '\n')
         
     def collect(self,epoch=None,chosen_idxs=None,log=False,save=True,**kwargs):
@@ -47,6 +60,9 @@ class Sys_Monitor():
         network_speed = [] # network bandwidths of all clients
         network_latency = [] # network latencies of all clients
         train_times = [] # trainning latency of chosen clients in this round
+        comp_times = [] # computation times of chosen clients in this round
+        mem_times = [] # memory access times of chosen clients in this round
+        comm_times = [] # communication times of chosen clients in this round
         est_times = [] # estimated training time of the next round
         for n,c in enumerate(self.clients):
             # collect performance, memory and training latency
@@ -62,14 +78,23 @@ class Sys_Monitor():
             network_latency.append(cnetwork_latency)
 
             if chosen_idxs is not None and n in chosen_idxs:
-                train_times.append(clatency)
+                train_times.append(clatency["total"])
+                comp_times.append(clatency["computation"])
+                mem_times.append(clatency["memory"])
+                comm_times.append(clatency["communication"])
 
-            est_times.append(cestlatency)
+            est_times.append(cestlatency["total"])
 
         round_time = np.max(train_times) if len(train_times)>0 else 0
+        round_comp_time = np.max(comp_times) if len(train_times)>0 else 0
+        round_mem_time = np.max(mem_times) if len(train_times)>0 else 0
+        round_comm_time = np.max(comm_times) if len(train_times)>0 else 0
+        
         total_time = (self.total_times[-1] if len(self.total_times)>0 else 0)+round_time
-        
-        
+        total_comp_time = (self.total_comp_times[-1] if len(self.total_comp_times)>0 else 0)+round_comp_time
+        total_mem_time = (self.total_mem_times[-1] if len(self.total_mem_times)>0 else 0)+round_mem_time
+        total_comm_time = (self.total_comm_times[-1] if len(self.total_comm_times)>0 else 0)+round_comm_time
+
         if log:
             self.epochs.append(epoch)
             self.chosen_clients.append(chosen_idxs)
@@ -86,8 +111,18 @@ class Sys_Monitor():
             self.network_latencies.append(network_latency)
 
             self.train_times.append(train_times)
+            self.comp_times.append(comp_times)
+            self.mem_times.append(mem_times)
+            self.comm_times.append(comm_times)
             self.round_times.append(round_time)
+            self.round_comp_times.append(round_comp_time)
+            self.round_mem_times.append(round_mem_time)
+            self.round_comm_times.append(round_comm_time)
+
             self.total_times.append(total_time)
+            self.total_comp_times.append(total_comp_time)
+            self.total_mem_times.append(total_mem_time)
+            self.total_comm_times.append(total_comm_time)
 
             self.estimate_times.append(est_times)
 
@@ -97,7 +132,9 @@ class Sys_Monitor():
                 sys_column = [epoch,
                               np.min(avail_perf),np.max(avail_perf),
                               np.min(avail_mem),np.max(avail_mem),
-                              round_time,total_time]
+                              round_time,round_comp_time,round_mem_time,
+                              round_comm_time,total_time,total_comp_time,
+                              total_mem_time,total_comm_time]
             
                 
                 with open(self.tsv_file,'a') as af:
@@ -107,7 +144,11 @@ class Sys_Monitor():
                     pickle.dump([self.epochs,self.chosen_clients,self.chosen_devices,
                                 self.runtime_apps,self.avail_perfs,self.avail_mems,
                                 self.networks,self.network_speeds,self.network_latencies,
-                                self.train_times,self.round_times,self.total_times,self.estimate_times], sys_f)
+                                self.train_times,self.comp_times,self.mem_times,
+                                self.comm_times,self.round_times,self.round_comp_times,
+                                self.round_mem_times,self.round_comm_times,
+                                self.total_times,self.total_comp_times,self.total_mem_times,
+                                self.total_comm_times,self.estimate_times], sys_f)
 
         res = {"epoch":epoch,
                "runtime_apps":runtime_app,

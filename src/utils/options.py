@@ -185,9 +185,10 @@ def at_option(parser):
                         help = 'Kind of adversarial attack in test time')
     parser.add_argument('--advt_epsilon',type = float, default=8/255)
     parser.add_argument('--advt_alpha',type = float, default=2/255)
+    parser.add_argument('--advt_T', type = int, default=10)
     parser.add_argument('--advt_norm', type = str, default='inf')
     parser.add_argument('--advt_bound',type = float,nargs=2, default=[0.0,1.0])
-    parser.add_argument('--advt_T', type = int, default=10)
+
 
     return parser
 

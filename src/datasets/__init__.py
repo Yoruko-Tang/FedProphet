@@ -34,18 +34,12 @@ dataset_to_datafamily = {
 }
 
 datafamily_to_normalize = {
-    'mnist': {
-        'mean':(0.1307,),
-        'std':(0.3081,)
-    },
-    'cifar': {
-        'mean':(0.4914, 0.4822, 0.4465),
-        'std':(0.2023, 0.1994, 0.2010)
-    },
-    'imagenet': {
-        'mean':(0.485, 0.456, 0.406),
-        'std':(0.229, 0.224, 0.225)
-    }
+    'mnist': transforms.Normalize(mean=(0.1307,), 
+                                  std=(0.3081,)),
+    'cifar': transforms.Normalize(mean=(0.4914, 0.4822, 0.4465),
+                                  std=(0.2023, 0.1994, 0.2010)),
+    'imagenet': transforms.Normalize(mean=[0.485, 0.456, 0.406],
+                                     std=[0.229, 0.224, 0.225])
 }
 
 # Transforms

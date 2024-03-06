@@ -37,9 +37,7 @@ def get_net(modelname, modeltype, num_classes=1000,
 
     # add normalization layer to the adversarial training model
     if adv_norm:
-        norm_info = datafamily_to_normalize[modeltype]
-        mean,std = norm_info["mean"],norm_info["std"]
-        normalization_layer = Normalize(mean,std)
+        normalization_layer = datafamily_to_normalize[modeltype]
         model = eval('models.{}.add_normalization'.format(models.modelname_to_modelfamily(modelname)))(model,normalization_layer)
     
     # modularize the model such that the model can enter and exit at any layers
@@ -48,17 +46,6 @@ def get_net(modelname, modeltype, num_classes=1000,
     return model
     
 
-
-class Normalize(nn.Module):
-    def __init__(self,mean,std):
-        super(Normalize, self).__init__()
-        self.mean = torch.tensor(mean).reshape([1,-1,1,1])
-        self.std = torch.tensor(std).reshape([1,-1,1,1])
-    
-    def forward(self,x):
-        self.mean = self.mean.to(x)
-        self.std = self.std.to(x)
-        return (x-self.mean)/self.std
 
 class DualBatchNorm2d(nn.BatchNorm2d):
     def __init__(self, num_features, eps=0.00001, momentum=0.1, affine=True, track_running_stats=True):

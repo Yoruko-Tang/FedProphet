@@ -102,6 +102,8 @@ if __name__ == '__main__':
                                  test_adv_epsilon=args.advt_epsilon,
                                  test_adv_alpha=args.advt_alpha,
                                  test_adv_T=args.advt_T,
+                                 test_adv_norm = args.advt_norm,
+                                 test_adv_bound = args.advt_bound,
                                  device=device,verbose=args.verbose,
                                  random_seed=i+args.device_random_seed,
                                  reserved_memory=args.max_module_mem
@@ -116,6 +118,8 @@ if __name__ == '__main__':
                                  test_adv_epsilon=args.advt_epsilon,
                                  test_adv_alpha=args.advt_alpha,
                                  test_adv_T=args.advt_T,
+                                 test_adv_norm = args.advt_norm,
+                                 test_adv_bound = args.advt_bound,
                                  device=device,verbose=args.verbose,
                                  random_seed=i+args.device_random_seed,
                                  reserved_memory=args.max_module_mem
@@ -130,6 +134,8 @@ if __name__ == '__main__':
                                      test_adv_epsilon=args.advt_epsilon,
                                      test_adv_alpha=args.advt_alpha,
                                      test_adv_T=args.advt_T,
+                                     test_adv_norm = args.advt_norm,
+                                     test_adv_bound = args.advt_bound,
                                      device=device,verbose=args.verbose,
                                      random_seed=i+args.device_random_seed,
                                      reserved_memory=args.max_module_mem

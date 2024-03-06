@@ -27,7 +27,7 @@ class Module_Client(AT_Client):
 
         self.trainset, self.testset = self.train_test(dataset, list(data_idxs))
         self.feature_trainset = self.trainset
-        self.feature_testset = self.testset
+        # self.feature_testset = self.testset
         self.dev_name,self.performance,self.memory,self.eff_bw=sys_info
         self.model_profile = model_profile
 
@@ -80,7 +80,7 @@ class Module_Client(AT_Client):
         model.eval()
 
         trainloader = DataLoader(self.feature_trainset,batch_size=128,shuffle=False)
-        testloader = DataLoader(self.feature_testset,batch_size=128, shuffle=False)
+        # testloader = DataLoader(self.feature_testset,batch_size=128, shuffle=False)
 
         new_train_feature,new_test_feature = [],[]
         train_labels,test_labels = [],[]
@@ -105,25 +105,25 @@ class Module_Client(AT_Client):
         smallest_value = torch.min(new_train_feature).item()
         largest_value = torch.max(new_train_feature).item()
 
-        for datas,labels in testloader:
-            datas = datas.to(self.device)
-            new_feature = model.module_forward(datas,module_list)
-            new_feature = new_feature.detach()
-            # if adv_train:
-            #     adv_datas = adv_data_gen.attack_data(model,datas,new_feature)
-            #     new_adv_feature = model.module_forward(adv_datas,module_list)
-            #     adv_feature_pert = torch.norm(new_adv_feature-new_feature,p=2,dim=list(range(1,new_feature.dim()))).max()
-            #     test_adv_feature_pert.append(adv_feature_pert.item())
-            new_test_feature.append(new_feature.cpu())
-            test_labels.append(labels.cpu())
-        new_test_feature = torch.cat(new_test_feature,dim=0)
-        test_labels = torch.cat(test_labels,dim=0)
+        # for datas,labels in testloader:
+        #     datas = datas.to(self.device)
+        #     new_feature = model.module_forward(datas,module_list)
+        #     new_feature = new_feature.detach()
+        #     # if adv_train:
+        #     #     adv_datas = adv_data_gen.attack_data(model,datas,new_feature)
+        #     #     new_adv_feature = model.module_forward(adv_datas,module_list)
+        #     #     adv_feature_pert = torch.norm(new_adv_feature-new_feature,p=2,dim=list(range(1,new_feature.dim()))).max()
+        #     #     test_adv_feature_pert.append(adv_feature_pert.item())
+        #     new_test_feature.append(new_feature.cpu())
+        #     test_labels.append(labels.cpu())
+        # new_test_feature = torch.cat(new_test_feature,dim=0)
+        # test_labels = torch.cat(test_labels,dim=0)
 
         
             
 
         self.feature_trainset = TensorDataset(new_train_feature,train_labels)
-        self.feature_testset = TensorDataset(new_test_feature,test_labels)
+        # self.feature_testset = TensorDataset(new_test_feature,test_labels)
         if adv_train:
             train_adv_feature_pert = np.concatenate(train_adv_feature_pert)
             # max_test_adv_feature_pert = max(test_adv_feature_pert)
@@ -167,30 +167,40 @@ class Module_Client(AT_Client):
             output = model.module_forward(input,stage_module_list)
             if current_aux_model is not None:
                 final_output = current_aux_model(output)
+                stage_task_loss = criterion(final_output,label)
                 stage_cvx_loss = mu*torch.sum(torch.square(output))/(2*len(output))
+                if output_dict is not None:
+                    output_dict.update({"stage_task_loss":stage_task_loss.item(),"stage_cvx_loss":stage_cvx_loss.item()})
             else:
                 final_output = output
+                stage_task_loss = criterion(final_output,label)
                 stage_cvx_loss = 0
-            stage_task_loss = criterion(final_output,label)
+                if output_dict is not None:
+                    output_dict.update({"stage_task_loss":stage_task_loss.item(),"stage_cvx_loss":0})
+            
             
             loss = stage_task_loss+stage_cvx_loss
-            if output_dict is not None:
-                output_dict.update({"stage_task_loss":stage_task_loss.item(),"stage_cvx_loss":stage_cvx_loss.item()})
+            
             
             if len(prophet_module_list)>0:
                 prophet_output = model.module_forward(output,prophet_module_list)
                 if future_aux_model is not None:
                     prophet_final_output = future_aux_model(prophet_output)
+                    prophet_task_loss = criterion(prophet_final_output,label)
                     prophet_cvx_loss = mu*torch.sum(torch.square(prophet_output))/(2*len(prophet_output))
+                    if output_dict is not None:
+                        output_dict.update({"prophet_task_loss":prophet_task_loss.item(),"prophet_cvx_loss":prophet_cvx_loss.item()})
                 else:
                     prophet_final_output = prophet_output
+                    prophet_task_loss = criterion(prophet_final_output,label)
                     prophet_cvx_loss = 0
-                prophet_task_loss = criterion(prophet_final_output,label)
+                    if output_dict is not None:
+                        output_dict.update({"prophet_task_loss":prophet_task_loss.item(),"prophet_cvx_loss":0})
+                
                 
                 prophet_loss = prophet_task_loss + prophet_cvx_loss
                 loss = loss*(1-psi)+prophet_loss*psi
-                if output_dict is not None:
-                    output_dict.update({"prophet_task_loss":prophet_task_loss.item(),"prophet_cvx_loss":prophet_cvx_loss.item()})
+                
             return loss
 
         

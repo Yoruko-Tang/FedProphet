@@ -14,9 +14,8 @@ def iid(dataset, num_users,rs):
     num_items = int(len(dataset)//num_users)
     dict_users, all_idxs = {}, list(range(len(dataset)))
     for i in range(num_users):
-        dict_users[i] = set(rs.choice(all_idxs, num_items,
-                                             replace=False))
-        all_idxs = list(set(all_idxs) - dict_users[i])
+        dict_users[i] = rs.choice(all_idxs, num_items, replace=False)
+        all_idxs = list(set(all_idxs) - set(dict_users[i]))
     return dict_users
 
 

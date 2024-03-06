@@ -18,8 +18,9 @@ def get_dataset(args,seed=None):
     if datasets.dataset_to_datafamily[args.dataset] in ['mnist','cifar','imagenet']: # CV datasets
         dataset = datasets.__dict__[args.dataset]
         modelfamily = datasets.dataset_to_datafamily[args.dataset]
-        train_transform = datasets.datafamily_to_transforms[modelfamily]['adv_train' if args.adv_train else 'train']
-        test_transform = datasets.datafamily_to_transforms[modelfamily]['adv_test' if args.adv_test else 'test']
+        adv = (args.adv_train or args.adv_test)
+        train_transform = datasets.datafamily_to_transforms[modelfamily]['adv_train' if adv else 'train']
+        test_transform = datasets.datafamily_to_transforms[modelfamily]['adv_test' if adv else 'test']
         train_dataset = dataset(train=True, transform=train_transform,download=True)
         test_dataset = dataset(train=False, transform=test_transform,download=True)
         args.num_classes = len(train_dataset.classes)

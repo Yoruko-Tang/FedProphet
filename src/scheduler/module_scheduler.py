@@ -217,7 +217,7 @@ class module_scheduler(base_AT_scheduler):
             new_adv_epsilons = np.concatenate(new_adv_epsilons)
             new_logs["adv_epsilons"] = new_adv_epsilons
             self.adv_epsilon = np.median(new_adv_epsilons)
-            self.adv_alpha = 2*self.adv_epsilon/self.args["adv_T"]
+            self.adv_alpha = 2.5*self.adv_epsilon/self.args["adv_T"]
             self.adv_norm = 'l2'
             lower = min(lowers)
             upper = max(uppers)

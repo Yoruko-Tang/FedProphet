@@ -331,6 +331,8 @@ class model_summary():
         # ...
 
         total_latency = 0
+        total_comp_latency = 0
+        total_mem_latency = 0
         
         if module_list == None:
             module_list = ['total']
@@ -376,17 +378,21 @@ class model_summary():
 
             # since the computation and memory access can be parallelized, 
             # we take the larger one as the final latency
-            batch_on_device_time = batch_computation_time + batch_memory_access_time
-            # print(batch_computation_time,batch_memory_access_time)
-
-            total_latency += batch_on_device_time
+            # batch_on_device_time = batch_computation_time + batch_memory_access_time
+            total_comp_latency += batch_computation_time
+            total_mem_latency += batch_memory_access_time
         
-        # if network_bandwidth is not None:
-        #     # download and upload time
-        #     communication_time = self.data_Byte*total_params/network_bandwidth[0]+self.data_Byte*total_params/network_bandwidth[1]+2*network_latency
-        #     total_latency += communication_time
         
-        return total_latency
+        if network_bandwidth is not None:
+            # download and upload time
+            communication_time = self.data_Byte*total_params/network_bandwidth[0]+self.data_Byte*total_params/network_bandwidth[1]+2*network_latency
+        else:
+            communication_time = 0
+        
+        # we do not consider communication time right now
+        total_latency = total_comp_latency + total_mem_latency #+ communication_time
+        
+        return {"total":total_latency,"computation":total_comp_latency,"memory":total_mem_latency,"communication":communication_time}
         
 
             
