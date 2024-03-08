@@ -38,6 +38,7 @@ class module_scheduler(base_AT_scheduler):
         print("====> Model Partitions: \n",self.partition_module_list)
         print("====> Module FLOPs: \n",self.module_flops_dict)
         print("====> Module Memory: \n", self.module_mem_dict)
+        #print(self.auxiliary_model_dict)
 
         self.round_per_stage = ceil(self.total_round/len(self.partition_module_list))
         self.stage = 0
@@ -163,23 +164,25 @@ class module_scheduler(base_AT_scheduler):
 
     def stat_update(self, epoch, stat_info, sys_info, global_model, **kwargs):
         new_logs = {}
-        if "weighted_val_adv_acc" in stat_info:
-            weighted_acc = stat_info["weighted_val_acc"] + stat_info["weighted_val_adv_acc"]
-        else:
-            weighted_acc = stat_info["weighted_val_acc"]
         
-        if weighted_acc > self.best_weighted_acc:
-            self.best_weighted_acc = weighted_acc
-            self.smooth_length = 0
-            self.best_model = copy.deepcopy(global_model)
-            self.best_local_states = [copy.deepcopy(c.local_states) for c in self.clients]
-        else:
-            self.smooth_length += epoch-self.stage_begin_round-self.round
+        if not self.args["adv_train"] or self.round >= self.args["adv_warmup"]:
+            weighted_acc = stat_info["weighted_val_acc"] \
+                + (stat_info["weighted_val_adv_acc"] if "weighted_val_adv_acc" in stat_info else 0)
+            if weighted_acc > self.best_weighted_acc:
+                self.best_weighted_acc = weighted_acc
+                self.smooth_length = 0
+                self.best_model = copy.deepcopy(global_model)
+                self.best_local_states = [copy.deepcopy(c.local_states) for c in self.clients]
+            else:
+                self.smooth_length += epoch-self.stage_begin_round-self.round
+    
+        
+        
         
         self.round = epoch-self.stage_begin_round
         # print(self.round, self.smooth_length)
         
-        if self.round >= self.round_per_stage or self.smooth_length >= 0.3*self.round_per_stage:
+        if self.round >= self.round_per_stage or self.smooth_length >= 0.1*self.round_per_stage:
             if self.stage == len(self.partition_module_list)-1:
                 # stop training
                 return False
@@ -214,16 +217,23 @@ class module_scheduler(base_AT_scheduler):
                 lowers.append(l)
                 uppers.append(u)
             # take the largest/mean/median perturbation as the new epsilon
-            new_adv_epsilons = np.concatenate(new_adv_epsilons)
-            new_logs["adv_epsilons"] = new_adv_epsilons
-            self.adv_epsilon = np.median(new_adv_epsilons)
-            self.adv_alpha = 2.5*self.adv_epsilon/self.args["adv_T"]
-            self.adv_norm = 'l2'
-            lower = min(lowers)
-            upper = max(uppers)
-            # usually end with relu, with bound [0.0,np.inf]
-            self.adv_bound = [0 if lower>=0 else -np.inf,0 if upper<=0 else np.inf]
-
+            
+            if self.args["adv_train"]:
+                new_adv_epsilons = np.concatenate(new_adv_epsilons)
+                
+                self.adv_epsilon = np.quantile(new_adv_epsilons,0.25)
+                self.adv_alpha = 2.5*self.adv_epsilon/self.args["adv_T"]
+                self.adv_norm = 'l2'
+                lower = min(lowers)
+                upper = max(uppers)
+                # usually end with relu, with bound [0.0,np.inf]
+                self.adv_bound = [0 if lower>=0 else -np.inf,0 if upper<=0 else np.inf]
+                new_logs["adv_epsilons"] = new_adv_epsilons
+                new_logs.update({"adv_epsilons":new_adv_epsilons,
+                                 "adv_epsilon":self.adv_epsilon,
+                                 "adv_alpha":self.adv_alpha,
+                                 "adv_norm":self.adv_norm,
+                                 "adv_bound":self.adv_bound})
         
             self.stage += 1
         print('\n | Global Training Round : {} |\t | Stage : {}\t Round : {} |\n'.format(self.round+self.stage_begin_round,self.stage,self.round))
@@ -231,13 +241,9 @@ class module_scheduler(base_AT_scheduler):
         self.available_memory = np.array(sys_info["available_mems"])
 
         # Todo: add adaptive adjustment of mu, lamb and psi
-        new_logs.update({"adv_epsilon":self.adv_epsilon,
-                      "adv_alpha":self.adv_alpha,
-                      "adv_norm":self.adv_norm,
-                      "adv_bound":self.adv_bound,
-                      "mu":self.mu,
-                      "lamb":self.lamb,
-                      "psi":self.psi})
+        new_logs.update({"mu":self.mu,
+                        "lamb":self.lamb,
+                        "psi":self.psi})
         self.logs.append(new_logs)
         
         log_column = [epoch,self.adv_epsilon,self.adv_alpha,self.adv_norm,self.adv_bound,self.mu,self.lamb,self.psi]
@@ -293,13 +299,16 @@ class module_scheduler(base_AT_scheduler):
             auxiliary_in_fea = np.prod(output_size[1:])
             auxiliary_input = torch.rand(output_size)
 
-            if self.datafamily == 'imagenet' and len(output_size)>2 and output_size[-1]>=7:
+            if len(output_size)>2:
+                output_width = ceil(np.sqrt(self.num_classes/output_size[1]))
                 # if the output is too large, we conduct avgpool first
-                auxiliary_model = nn.Sequential(nn.AvgPool2d(7),nn.Flatten(),nn.Linear(auxiliary_in_fea//49,self.num_classes))
-            elif self.datafamily == 'cifar' and len(output_size)>2 and output_size[-1]>=4:
-                auxiliary_model = nn.Sequential(nn.AvgPool2d(4),nn.Flatten(),nn.Linear(auxiliary_in_fea//16,self.num_classes))
+                if output_size[2] > output_width:
+                    auxiliary_model = nn.Sequential(nn.AdaptiveAvgPool2d((output_width,output_width)),nn.Flatten(),nn.Linear(output_size[1]*output_width**2,self.num_classes))
+                else:
+                    auxiliary_model = nn.Sequential(nn.Flatten(),nn.Linear(auxiliary_in_fea,self.num_classes))
+            
             else:
-                auxiliary_model = nn.Sequential(nn.Flatten(),nn.Linear(auxiliary_in_fea,self.num_classes))
+                auxiliary_model = nn.Sequential(nn.Linear(auxiliary_in_fea,self.num_classes))
             
             aux_flops = FlopCountAnalysis(auxiliary_model,auxiliary_input)
             aux_flops.unsupported_ops_warnings(False)

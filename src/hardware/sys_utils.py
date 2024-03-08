@@ -135,7 +135,7 @@ def sample_runtime_app(rs):
     # runtime application for each client is dynamic - different random seed per epoch
 
     runtime_app = rs.choice(unique_runtime_app_list)
-    mem_avai_factor = rs.uniform(0.0,0.3)
+    mem_avai_factor = rs.uniform(0.0,0.1)
     return runtime_app, unique_perf_degrade_dic[runtime_app],mem_avai_factor
 
 def sample_networks(rs):

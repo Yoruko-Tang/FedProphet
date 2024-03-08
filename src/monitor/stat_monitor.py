@@ -120,11 +120,17 @@ class ST_Stat_Monitor():
                         af.write('\t'.join([str(c) for c in test_column]) + '\n')
                 
                 with open(self.pkl_file,'wb') as stat_f:
-                    pickle.dump([self.weights,self.epochs,self.chosen_clients, 
-                                self.local_losses,self.weighted_local_losses,
-                                self.global_accs,self.global_losses,
-                                self.weighted_global_accs,self.weighted_global_losses,
-                                self.test_accs,self.test_losses], stat_f)
+                    pickle.dump({"weights":self.weights,
+                                "epoch":self.epochs,
+                                "chosen_clients":self.chosen_clients, 
+                                "train_loss":self.local_losses,
+                                "weighted_train_loss":self.weighted_local_losses,
+                                "val_acc":self.global_accs,
+                                "val_loss":self.global_losses,
+                                "weighted_val_acc":self.weighted_global_accs, 
+                                "weighted_val_loss":self.weighted_global_losses,
+                                "test_acc":self.test_accs,
+                                "test_loss":self.test_losses}, stat_f)
                 # store the model if it attains the highest validation loss
                 if np.argmax(self.weighted_global_accs) == len(self.weighted_global_accs)-1:
                     torch.save([global_model,[c.local_states for c in self.clients]],self.pt_file)
@@ -256,13 +262,23 @@ class AT_Stat_Monitor(ST_Stat_Monitor):
                         af.write('\t'.join([str(c) for c in test_column]) + '\n')
                 
                 with open(self.pkl_file,'wb') as stat_f:
-                    pickle.dump([self.weights,self.epochs,self.chosen_clients, 
-                                self.local_losses,self.weighted_local_losses,
-                                self.global_accs,self.global_losses,
-                                self.weighted_global_accs,self.weighted_global_losses,
-                                self.global_adv_accs,self.global_adv_losses,
-                                self.weighted_global_adv_accs,self.weighted_global_adv_losses,
-                                self.test_accs,self.test_losses,self.test_adv_accs,self.test_adv_losses], stat_f)
+                    pickle.dump({"weights":self.weights,
+                                "epoch":self.epochs,
+                                "chosen_clients":self.chosen_clients, 
+                                "train_loss":self.local_losses,
+                                "weighted_train_loss":self.weighted_local_losses,
+                                "val_acc":self.global_accs,
+                                "val_loss":self.global_losses,
+                                "weighted_val_acc":self.weighted_global_accs, 
+                                "weighted_val_loss":self.weighted_global_losses,
+                                "val_adv_acc":self.global_adv_accs,
+                                "val_adv_loss":self.global_adv_losses,
+                                "weighted_val_adv_acc":self.weighted_global_adv_accs,
+                                "weighted_val_adv_loss":self.weighted_global_adv_losses,
+                                "test_acc":self.test_accs,
+                                "test_loss":self.test_losses,
+                                "test_adv_acc":self.test_adv_accs,
+                                "test_adv_loss":self.test_adv_losses}, stat_f)
                 # store the model if it attains the highest validation loss
                 weighted_global_clean_adv_accs = np.array(self.weighted_global_accs) + np.array(self.weighted_global_adv_accs)
                 if np.argmax(weighted_global_clean_adv_accs) == len(weighted_global_clean_adv_accs)-1:

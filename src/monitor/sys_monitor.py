@@ -85,10 +85,17 @@ class Sys_Monitor():
 
             est_times.append(cestlatency["total"])
 
-        round_time = np.max(train_times) if len(train_times)>0 else 0
-        round_comp_time = np.max(comp_times) if len(train_times)>0 else 0
-        round_mem_time = np.max(mem_times) if len(train_times)>0 else 0
-        round_comm_time = np.max(comm_times) if len(train_times)>0 else 0
+        if len(train_times) > 0:
+            max_round_idx = np.argmax(train_times)
+            round_time = train_times[max_round_idx]
+            round_comp_time = comp_times[max_round_idx]
+            round_mem_time = mem_times[max_round_idx]
+            round_comm_time = comm_times[max_round_idx]
+        else:
+            round_time = 0
+            round_comp_time = 0
+            round_mem_time = 0
+            round_comm_time = 0
         
         total_time = (self.total_times[-1] if len(self.total_times)>0 else 0)+round_time
         total_comp_time = (self.total_comp_times[-1] if len(self.total_comp_times)>0 else 0)+round_comp_time
@@ -141,14 +148,28 @@ class Sys_Monitor():
                     af.write('\t'.join([str(c) for c in sys_column]) + '\n')
 
                 with open(self.pkl_file,'wb') as sys_f:
-                    pickle.dump([self.epochs,self.chosen_clients,self.chosen_devices,
-                                self.runtime_apps,self.avail_perfs,self.avail_mems,
-                                self.networks,self.network_speeds,self.network_latencies,
-                                self.train_times,self.comp_times,self.mem_times,
-                                self.comm_times,self.round_times,self.round_comp_times,
-                                self.round_mem_times,self.round_comm_times,
-                                self.total_times,self.total_comp_times,self.total_mem_times,
-                                self.total_comm_times,self.estimate_times], sys_f)
+                    pickle.dump({"epoch":self.epochs,
+                                 "chosen_clients":self.chosen_clients,
+                                 "chosen_devices":self.chosen_devices,
+                                 "runtime_apps":self.runtime_apps,
+                                 "avail_perfs":self.avail_perfs,
+                                 "avail_mems":self.avail_mems,
+                                 "networks":self.networks,
+                                 "network_speeds":self.network_speeds,
+                                 "network_latencies":self.network_latencies,
+                                 "train_times":self.train_times,
+                                 "comp_times":self.comp_times,
+                                 "mem_acc_times":self.mem_times,
+                                 "comm_times":self.comm_times,
+                                 "round_time":self.round_times,
+                                 "round_comp_time":self.round_comp_times,
+                                 "round_mem_acc_time":self.round_mem_times,
+                                 "round_comm_time":self.round_comm_times,
+                                 "total_time":self.total_times,
+                                 "total_comp_time":self.total_comp_times,
+                                 "total_mem_acc_time":self.total_mem_times,
+                                 "total_comm_time":self.total_comm_times,
+                                 "estimate_times":self.estimate_times}, sys_f)
 
         res = {"epoch":epoch,
                "runtime_apps":runtime_app,
