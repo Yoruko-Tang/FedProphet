@@ -5,7 +5,7 @@ KCU1500,2e11,2e9,2e9
 VC709,1.02e11,2e9,1.5e9
 radeon_hd_6870,2.72e12,1e9,16e9
 quadro_m2200,2.122e12,4e9,1.5e9
-geforce_940,8.817e11,2e9,16e9
+a12_gpu,4.88e11,4e9,1.5e9
 geforce_750,1.11e12,1e9,16e9
 grid_k240q,2.289e12,1e9,16e9
-geforce_1010,7.51e11,2e9,16e9
+radeon_rx_6300m,3.686e12,2e9,16e9
