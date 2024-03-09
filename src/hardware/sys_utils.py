@@ -135,7 +135,7 @@ def sample_runtime_app(rs):
     # runtime application for each client is dynamic - different random seed per epoch
 
     runtime_app = rs.choice(unique_runtime_app_list)
-    mem_avai_factor = rs.uniform(0.0,0.1)
+    mem_avai_factor = rs.uniform(0.0,0.2)
     return runtime_app, unique_perf_degrade_dic[runtime_app],mem_avai_factor
 
 def sample_networks(rs):
@@ -366,8 +366,8 @@ class model_summary():
                     # we adopt load and offload method to train the module
                     # offload feature in forward and load feature in backward + load and offload parameters in forward and backward
                     memory_access_size = self.data_Byte*(2*calibrated_factor*total_feature_size + 4*total_params)
-                    forward_mem_req = self.data_Byte*(calibrated_factor*total_feature_size + self.data_Byte*total_params) # 1x parameter + 1x feature in forward
-                    backward_mem_req = self.data_Byte*(calibrated_factor*total_feature_size + self.param_mem_scale*self.data_Byte*total_params) # 3x parameter + 1x feature in backward
+                    forward_mem_req = self.data_Byte*(calibrated_factor*total_feature_size + total_params) # 1x parameter + 1x feature in forward
+                    backward_mem_req = self.data_Byte*(calibrated_factor*total_feature_size + self.param_mem_scale*total_params) # 3x parameter + 1x feature in backward
                     memory_access_times = ceil(forward_mem_req/memory) + ceil(backward_mem_req/memory)
                     batch_memory_access_time = iters_per_input*(memory_access_size/eff_bandwidth+access_latency*memory_access_times)
                 else:# we do not need to offload the parameter and intermediate features

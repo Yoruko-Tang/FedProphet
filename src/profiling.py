@@ -108,7 +108,7 @@ def profile_model(model, inputsize):
 
 
 model = get_net('resnet50','imagenet',num_classes=256,adv_norm=True,modularization=True)
-inputsize = [64,3,224,224]
+inputsize = [32,3,224,224]
 # ms = model_summary(model,inputsize,optimizer='adam')
 ms = model_summary(model,inputsize,optimizer='sgd',momentum=0.9)
 

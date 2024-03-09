@@ -19,7 +19,7 @@ This is a implementation of FedProphet.
 
 1. FedBN
 ```shell
-python3 src/federated_main.py --gpu=0 --dataset=CIFAR10 --model_arch=vgg16_bn --pretrained --flalg=FedBN --max_module_mem=6.4e7 --epochs=300 --num_user=100 --frac=0.1 --strategy=rand --local_ep=30 --local_bs=64 --optimizer=sgd --lr=0.01 --lr_decay=0.993 --momentum=0.9 --iid=0 --alpha=1.0  --flsys_profile_info=./src/hardware/flsys_profile_info_low --device_random_seed=717 --sys_scaling_factor=0.0 --verbose --seed 1 2 3
+python3 src/federated_main.py --gpu=0 --dataset=CIFAR10 --model_arch=vgg16_bn --pretrained --flalg=FedBN --max_module_mem=6.4e7 --epochs=300 --num_user=100 --frac=0.1 --strategy=rand --local_ep=30 --local_bs=64 --optimizer=sgd --lr=0.01 --lr_decay=0.993 --momentum=0.9 --iid=0 --shards_per_client=2 --skew=0.2  --flsys_profile_info=./src/hardware/flsys_profile_info_low --device_random_seed=717 --sys_scaling_factor=0.0 --verbose --seed 1 2 3
 ```
 
 2. FedBNAT
