@@ -7,7 +7,7 @@ import copy
 import numpy as np
 
 from utils.adversarial import Adv_Sample_Generator
-from hardware.sys_utils import model_summary
+from hardware.sys_utils import sample_runtime_app,sample_networks,model_summary
 
 
 
@@ -35,7 +35,8 @@ class AT_Client(ST_Client):
         self.test_adv_norm = test_adv_norm
         self.test_adv_bound = test_adv_bound
         
-        self.iters_per_input = test_adv_T+1
+        self.adv_iters = 0
+        self.adv_ratio = 0.0
 
         
     def train(self,model,local_ep,local_bs,lr,optimizer='sgd',
@@ -79,10 +80,12 @@ class AT_Client(ST_Client):
                 self.batches.append(list(datas.shape))
                 datas, labels = datas.to(self.device), labels.to(self.device)
                 if adv_train:
-                    self.iters_per_input = adv_T+1
+                    self.adv_iters = adv_T
+                    self.adv_ratio = adv_ratio
                     datas = adv_data_gen.attack_data(model,datas,labels,adv_ratio)
                 else:
-                    self.iters_per_input = 1
+                    self.adv_iters = 0
+                    self.adv_ratio = 0.0
                 
                 model.train()
                 model.zero_grad()
@@ -105,12 +108,13 @@ class AT_Client(ST_Client):
         if model_profile is not None:
             self.model_profile = model_profile
         self.latency = self.model_profile.training_latency(batches=self.batches,
-                                                           iters_per_input=self.iters_per_input,
                                                            performance=self.avail_perf,
                                                            memory=self.avail_mem,
                                                            eff_bandwidth=self.eff_bw,
                                                            network_bandwidth=self.network_speed,
-                                                           network_latency=self.network_latency)
+                                                           network_latency=self.network_latency,
+                                                           adv_iters = self.adv_iters,
+                                                           adv_ratio = self.adv_ratio)
         
         return model
         
@@ -151,3 +155,25 @@ class AT_Client(ST_Client):
 
         accuracy = correct/total
         return accuracy, loss/(batch_idx+1)
+    
+    def get_runtime_sys_stat(self):
+        self.runtime_app,self.perf_degrade,self.mem_degrade=sample_runtime_app(self.rs)
+        self.avail_perf = max([self.performance*self.perf_degrade,self.reserved_performance])
+        self.avail_mem = max([self.memory*self.mem_degrade,self.reserved_memory])
+
+        self.network,self.network_speed,self.network_latency = sample_networks(self.rs)
+        
+        if self.model_profile is not None:
+            self.est_latency = \
+                self.model_profile.training_latency(batches=self.batches,
+                                                    performance=self.avail_perf,
+                                                    memory=self.avail_mem,
+                                                    eff_bandwidth=self.eff_bw,
+                                                    network_bandwidth=self.network_speed,
+                                                    network_latency=self.network_latency,
+                                                    adv_iters=self.adv_iters,
+                                                    adv_ratio=self.adv_ratio)
+        else:
+            self.est_latency = None
+        # return the current availale performance, memory, and the training latency of the last round
+        return self.runtime_app, self.avail_perf, self.avail_mem, self.network,self.network_speed,self.network_latency, self.latency, self.est_latency

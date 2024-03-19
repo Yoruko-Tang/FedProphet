@@ -47,19 +47,19 @@ class base_AT_scheduler(base_scheduler):
 
     def training_params(self,**kwargs):
         args = super().training_params()
-        adv_train = self.args["adv_train"]
         if self.round < self.args["adv_warmup"]:
-            adv_train = False
-        
-        args["adv_train"] = adv_train
+            args["adv_train"] = False
+            #args["lr"] = self.args["lr"] # do not decay the lr until adv_warmup
 
         
         return args
     
     def monitor_params(self,**kwargs):
-        adv_test = self.args["adv_test"]
+        
         if self.round < self.args["adv_warmup"]:
             adv_test = False
+        else:
+            adv_test = self.args["adv_test"]
 
         return {"adv_test":adv_test}
     

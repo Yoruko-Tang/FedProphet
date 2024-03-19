@@ -44,6 +44,11 @@ class module_scheduler(base_AT_scheduler):
         self.stage = 0
         self.stage_begin_round = 0
         self.best_weighted_acc = 0.0
+        self.best_clean_adv_ratio = None
+        self.last_stage_clean_adv_ratio = None
+        self.clean_adv_ratios = []
+
+        
         self.smooth_length = 0
 
         # print("=================Stage 1=================")
@@ -56,6 +61,8 @@ class module_scheduler(base_AT_scheduler):
         self.adv_alpha = args["adv_alpha"]
         self.adv_norm = args["adv_norm"]
         self.adv_bound = args["adv_bound"]
+        self.alpha = 1.0
+        self.best_alpha = self.alpha
 
         self.mu = args["mu"]
         self.lamb = args["lamb"]
@@ -69,7 +76,7 @@ class module_scheduler(base_AT_scheduler):
             self.tsv_file = osp.join(self.log_path, 'scheduler.log.tsv')
             self.pkl_file = osp.join(self.log_path, 'scheduler.pkl')
             with open(self.tsv_file, 'w') as wf:
-                columns = ['epoch', 'adv_epsilon', 'adv_alpha', 'adv_norm', 'adv_bound', 'mu','lamb','psi']
+                columns = ['epoch', 'adv_epsilon', 'adv_alpha', 'adv_norm', 'adv_bound', 'mu','lamb','psi','best_weighted_acc','last_clean_adv_ratio']
                 wf.write('\t'.join(columns) + '\n')
 
         
@@ -141,8 +148,8 @@ class module_scheduler(base_AT_scheduler):
         args["psi"] = self.psi
 
         # adversarial training configuration
-        args["adv_epsilon"] = self.adv_epsilon
-        args["adv_alpha"] = self.adv_alpha
+        args["adv_epsilon"] = self.adv_epsilon*self.alpha
+        args["adv_alpha"] = self.adv_alpha*self.alpha
         args["adv_norm"] = self.adv_norm
         args["adv_bound"] = self.adv_bound
 
@@ -164,33 +171,61 @@ class module_scheduler(base_AT_scheduler):
 
     def stat_update(self, epoch, stat_info, sys_info, global_model, **kwargs):
         new_logs = {}
+
+        # update systematic information
+        self.available_performance = np.array(sys_info["available_perfs"])
+        self.available_memory = np.array(sys_info["available_mems"])
         
+        # update statistical information
         if not self.args["adv_train"] or self.round >= self.args["adv_warmup"]:
-            weighted_acc = stat_info["weighted_val_acc"] \
-                + (stat_info["weighted_val_adv_acc"] if "weighted_val_adv_acc" in stat_info else 0)
+            if "weighted_val_adv_acc" in stat_info:
+                weighted_acc = stat_info["weighted_val_acc"] + stat_info["weighted_val_adv_acc"]
+                clean_adv_ratio = stat_info["weighted_val_acc"]/stat_info["weighted_val_adv_acc"]
+                self.clean_adv_ratios.append(clean_adv_ratio)
+            else:
+                weighted_acc = stat_info["weighted_val_acc"]
+                clean_adv_ratio = None
+            
+            
             if weighted_acc > self.best_weighted_acc:
                 self.best_weighted_acc = weighted_acc
                 self.smooth_length = 0
                 self.best_model = copy.deepcopy(global_model)
                 self.best_local_states = [copy.deepcopy(c.local_states) for c in self.clients]
+                self.best_clean_adv_ratio = clean_adv_ratio
+                self.best_alpha = self.alpha
             else:
                 self.smooth_length += epoch-self.stage_begin_round-self.round
+        
+        # adaptive adjustment of alpha
+        if self.args["adapt_eps"] and self.last_stage_clean_adv_ratio is not None:
+            if len(self.clean_adv_ratios) > 0 and len(self.clean_adv_ratios)%int(0.1*self.round_per_stage) == 0:
+                screen_length = min([5,len(self.clean_adv_ratios)])
+                if np.mean(self.clean_adv_ratios[-screen_length:]) > 1.1*self.last_stage_clean_adv_ratio: # the adv acc is too low
+                    self.alpha = self.alpha + 0.1 # increase the epsilon
+                    self.smooth_length = 0 # clear the smooth length for adjusting alpha
+                    self.best_weighted_acc = 0
+                elif np.mean(self.clean_adv_ratios[-screen_length:]) < 0.9*self.last_stage_clean_adv_ratio: # the clean acc is too low
+                    self.alpha = max([0.1,self.alpha-0.1]) # decrease the epsilon
+                    self.smooth_length = 0 # clear the smooth length for adjusting alpha
+                    self.best_weighted_acc = 0
     
         
-        
-        
         self.round = epoch-self.stage_begin_round
-        # print(self.round, self.smooth_length)
-        
-        if self.round >= self.round_per_stage or self.smooth_length >= 0.1*self.round_per_stage:
+        if self.round >= self.round_per_stage or self.smooth_length >= int(0.1*self.round_per_stage): 
+            # move to the next stage
             if self.stage == len(self.partition_module_list)-1:
                 # stop training
                 return False
-            # get into the next stage
+            
             self.stage_begin_round = epoch
             self.round = 0
             self.smooth_length = 0
             self.best_weighted_acc = 0.0
+            self.last_stage_clean_adv_ratio = self.best_clean_adv_ratio
+            self.best_clean_adv_ratio = None
+            self.clean_adv_ratios = []
+            
 
             # recover to the best model before
             global_model.update(self.best_model) 
@@ -208,8 +243,8 @@ class module_scheduler(base_AT_scheduler):
                                             current_module_list,
                                             adv_train = self.args["adv_train"],
                                             adv_method = self.args["adv_method"],
-                                            adv_epsilon = self.adv_epsilon,
-                                            adv_alpha = self.adv_alpha,
+                                            adv_epsilon = self.adv_epsilon*self.best_alpha,
+                                            adv_alpha = self.adv_alpha*self.best_alpha,
                                             adv_T = self.args["adv_T"],
                                             adv_norm = self.adv_norm,
                                             adv_bound = self.adv_bound)
@@ -220,15 +255,18 @@ class module_scheduler(base_AT_scheduler):
             
             if self.args["adv_train"]:
                 new_adv_epsilons = np.concatenate(new_adv_epsilons)
-                
-                self.adv_epsilon = np.quantile(new_adv_epsilons,0.25)
+                self.adv_epsilon = np.mean(new_adv_epsilons)
+                if self.args["int_adv_norm"] == 'inf': # transfer the l2 norm to linf norm
+                    self.adv_epsilon = np.sqrt(self.adv_epsilon**2/np.prod(self.atom_output_dict[current_module_list[-1]][1:]))
                 self.adv_alpha = 2.5*self.adv_epsilon/self.args["adv_T"]
-                self.adv_norm = 'l2'
+                self.adv_norm = self.args["int_adv_norm"]
                 lower = min(lowers)
                 upper = max(uppers)
                 # usually end with relu, with bound [0.0,np.inf]
                 self.adv_bound = [0 if lower>=0 else -np.inf,0 if upper<=0 else np.inf]
-                new_logs["adv_epsilons"] = new_adv_epsilons
+                self.alpha = self.args["eps_quantile"]
+                self.best_alpha = self.alpha
+
                 new_logs.update({"adv_epsilons":new_adv_epsilons,
                                  "adv_epsilon":self.adv_epsilon,
                                  "adv_alpha":self.adv_alpha,
@@ -236,17 +274,20 @@ class module_scheduler(base_AT_scheduler):
                                  "adv_bound":self.adv_bound})
         
             self.stage += 1
+        
+        
         print('\n | Global Training Round : {} |\t | Stage : {}\t Round : {} |\n'.format(self.round+self.stage_begin_round,self.stage,self.round))
-        self.available_performance = np.array(sys_info["available_perfs"])
-        self.available_memory = np.array(sys_info["available_mems"])
+        
 
-        # Todo: add adaptive adjustment of mu, lamb and psi
+        # log
         new_logs.update({"mu":self.mu,
                         "lamb":self.lamb,
-                        "psi":self.psi})
+                        "psi":self.psi,
+                        "alpha":self.alpha,
+                        "best_acc":self.best_weighted_acc})
         self.logs.append(new_logs)
         
-        log_column = [epoch,self.adv_epsilon,self.adv_alpha,self.adv_norm,self.adv_bound,self.mu,self.lamb,self.psi]
+        log_column = [epoch,self.adv_epsilon*self.alpha,self.adv_alpha*self.alpha,self.adv_norm,self.adv_bound,self.mu,self.lamb,self.psi,self.best_weighted_acc,self.last_stage_clean_adv_ratio]
         
         with open(self.tsv_file, 'a') as af:
             af.write('\t'.join([str(c) for c in log_column]) + '\n')

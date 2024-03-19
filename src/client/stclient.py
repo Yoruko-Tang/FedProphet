@@ -37,7 +37,6 @@ class ST_Client():
         self.reserved_performance = reserved_performance
         self.reserved_memory = reserved_memory
         
-        self.iters_per_input = 1
 
         self.batches = None
         self.latency = None
@@ -116,7 +115,6 @@ class ST_Client():
             self.model_profile = model_profile
         
         self.latency = self.model_profile.training_latency(batches=self.batches,
-                                                           iters_per_input=self.iters_per_input,
                                                            performance=self.avail_perf,
                                                            memory=self.avail_mem,
                                                            eff_bandwidth=self.eff_bw,
@@ -166,7 +164,6 @@ class ST_Client():
         if self.model_profile is not None:
             self.est_latency = \
                 self.model_profile.training_latency(batches=self.batches,
-                                                    iters_per_input=self.iters_per_input,
                                                     performance=self.avail_perf,
                                                     memory=self.avail_mem,
                                                     eff_bandwidth=self.eff_bw,

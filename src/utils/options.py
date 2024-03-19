@@ -200,6 +200,9 @@ def fedprophet_option(parser):
     parser.add_argument('--mu',type = float,default=0.0, help='mu in fedprophet')
     parser.add_argument('--lamb',type = float,default=0.0, help='lambda in fedprophet')
     parser.add_argument('--psi',type = float,default=0.0, help='psi in fedprophet')
+    parser.add_argument('--eps_quantile',type = float,default=0.1, help='quantile for choosing the epsilon')
+    parser.add_argument('--adapt_eps',action = 'store_true',default=False,help = "adaptively adjust the eps_quantile during training")
+    parser.add_argument('--int_adv_norm', type = str, choices=['inf','l2'],default='l2')
     
     return parser
 

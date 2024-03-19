@@ -316,7 +316,10 @@ class model_summary():
 
         return module_name_list, flops_per_module, params_per_module, mem_per_module
     
-    def training_latency(self,module_list=None,batches=None,iters_per_input=1,performance=None,memory=None,eff_bandwidth=None,access_latency=0.17,network_bandwidth=None,network_latency=0.0):
+    def training_latency(self,module_list=None,batches=None,performance=None,
+                         memory=None,eff_bandwidth=None,access_latency=0.17,
+                         network_bandwidth=None,network_latency=0.0,
+                         adv_iters=0,adv_ratio=1.0):
         """
         Calculate the training latency of the whole model with the model profile.
         module_list: a list of atom module names in self.module_lists, 
@@ -327,8 +330,6 @@ class model_summary():
         If network_bandwidth is not None, then the server-device communication latency will be counted.
         """
 
-        # To do: network latency emulation ...
-        # ...
 
         total_latency = 0
         total_comp_latency = 0
@@ -358,27 +359,39 @@ class model_summary():
             batch_flops_req = calibrated_factor*flops_req
 
             # forward + backward computation (performance in GFLOPs)
-            batch_computation_time = 2*iters_per_input*batch_flops_req/performance if performance is not None else 0
+            batch_computation_time = 2*batch_flops_req/performance if performance is not None else 0
 
-            batch_memory_access_time = 0
             if memory is not None and eff_bandwidth is not None and access_latency is not None:
                 if batch_memory_req>memory: # the required memory exceeds the available memory
                     # we adopt load and offload method to train the module
                     # offload feature in forward and load feature in backward + load and offload parameters in forward and backward
                     memory_access_size = self.data_Byte*(2*calibrated_factor*total_feature_size + 4*total_params)
                     forward_mem_req = self.data_Byte*(calibrated_factor*total_feature_size + total_params) # 1x parameter + 1x feature in forward
-                    backward_mem_req = self.data_Byte*(calibrated_factor*total_feature_size + self.param_mem_scale*total_params) # 3x parameter + 1x feature in backward
+                    backward_mem_req = batch_memory_req
                     memory_access_times = ceil(forward_mem_req/memory) + ceil(backward_mem_req/memory)
-                    batch_memory_access_time = iters_per_input*(memory_access_size/eff_bandwidth+access_latency*memory_access_times)
+                    batch_memory_access_time = memory_access_size/eff_bandwidth+access_latency*memory_access_times
                 else:# we do not need to offload the parameter and intermediate features
                     # load the input (MB) once for every iters_per_input
                     batch_memory_access_time = self.data_Byte*int(np.prod(batch))/eff_bandwidth+access_latency
                     if n == 0: # only load the parameter (MB) at the beginning
                         batch_memory_access_time += self.data_Byte*total_params/eff_bandwidth
+            if adv_iters>0:# adversarial training part
+                batch_computation_time += 2*batch_flops_req*adv_iters*adv_ratio/performance if performance is not None else 0
+                # adversarial training only requires 1xparam+1xfeature+1xinputsize memory
+                adv_batch_memory_req = self.data_Byte*adv_ratio*(calibrated_factor*total_feature_size+np.prod(batch)) \
+                                        + self.data_Byte*total_params
+                if memory is not None and eff_bandwidth is not None and access_latency is not None:
+                    if adv_batch_memory_req>memory: # the required memory exceeds the available memory
+                        # we adopt load and offload method to train the module
+                        # offload feature in forward and load feature in backward + load and offload parameters in forward and backward
+                        adv_memory_access_size = self.data_Byte*(2*calibrated_factor*adv_ratio*total_feature_size + 4*total_params)
+                        adv_forward_mem_req = self.data_Byte*(calibrated_factor*adv_ratio*total_feature_size + total_params) # 1x parameter + 1x feature in forward
+                        adv_backward_mem_req = adv_batch_memory_req
+                        adv_memory_access_times = ceil(adv_forward_mem_req/memory) + ceil(adv_backward_mem_req/memory)
+                        batch_memory_access_time += adv_iters*(adv_memory_access_size/eff_bandwidth+access_latency*adv_memory_access_times)
 
-            # since the computation and memory access can be parallelized, 
-            # we take the larger one as the final latency
-            # batch_on_device_time = batch_computation_time + batch_memory_access_time
+
+
             total_comp_latency += batch_computation_time
             total_mem_latency += batch_memory_access_time
         

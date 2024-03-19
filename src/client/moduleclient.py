@@ -45,7 +45,8 @@ class Module_Client(AT_Client):
         self.reserved_performance = reserved_performance
         self.reserved_memory = reserved_memory
         
-        self.iters_per_input = test_adv_T+1
+        self.adv_iters= 0
+        self.adv_ratio = 0.0
 
         self.batches = None
         self.latency = None
@@ -81,6 +82,7 @@ class Module_Client(AT_Client):
 
         trainloader = DataLoader(self.feature_trainset,batch_size=128,shuffle=False)
         # testloader = DataLoader(self.feature_testset,batch_size=128, shuffle=False)
+        #trainloader = DataLoader(self.trainset,batch_size=128,shuffle=False)
 
         new_train_feature,new_test_feature = [],[]
         train_labels,test_labels = [],[]
@@ -96,7 +98,10 @@ class Module_Client(AT_Client):
             if adv_train:
                 adv_datas = adv_data_gen.attack_data(model,datas,new_feature)
                 new_adv_feature = model.module_forward(adv_datas,module_list)
-                adv_feature_pert = torch.norm(new_adv_feature-new_feature,p=2,dim=list(range(1,new_feature.dim())))
+                #delta_norm = float('inf') if adv_norm == 'inf' else 2
+                adv_feature_pert = torch.norm(new_adv_feature-new_feature,
+                                              p=2,
+                                              dim=list(range(1,new_feature.dim())))
                 train_adv_feature_pert.append(adv_feature_pert.detach().cpu().numpy())
             new_train_feature.append(new_feature.cpu())
             train_labels.append(labels.cpu())
@@ -247,10 +252,12 @@ class Module_Client(AT_Client):
                 self.batches.append(list(datas.shape))
                 datas, labels = datas.to(self.device), labels.to(self.device)
                 if adv_train:
-                    self.iters_per_input = adv_T+1
+                    self.adv_iters = adv_T
+                    self.adv_ratio = adv_ratio
                     datas = adv_data_gen.attack_data(model,datas,labels,adv_ratio)
                 else:
-                    self.iters_per_input = 1
+                    self.adv_iters = 0
+                    self.adv_ratio = 0.0
                 
                 model.train()
                 model.zero_grad()
@@ -280,12 +287,13 @@ class Module_Client(AT_Client):
         self.module_list = stage_module_list + prophet_module_list
         self.latency = self.model_profile.training_latency(module_list=self.module_list,
                                                            batches=self.batches,
-                                                           iters_per_input=self.iters_per_input,
                                                            performance=self.avail_perf,
                                                            memory=self.avail_mem,
                                                            eff_bandwidth=self.eff_bw,
                                                            network_bandwidth=self.network_speed,
-                                                           network_latency=self.network_latency)
+                                                           network_latency=self.network_latency,
+                                                           adv_iters = self.adv_iters,
+                                                           adv_ratio = self.adv_ratio)
         
         return model,current_aux_model,future_aux_model
         
@@ -394,13 +402,14 @@ class Module_Client(AT_Client):
         if self.model_profile is not None:
             self.est_latency = \
                 self.model_profile.training_latency(module_list=self.module_list,
-                                                    iters_per_input=self.iters_per_input,
                                                     batches=self.batches,
                                                     performance=self.avail_perf,
                                                     memory=self.avail_mem,
                                                     eff_bandwidth=self.eff_bw,
                                                     network_bandwidth=self.network_speed,
-                                                    network_latency=self.network_latency)
+                                                    network_latency=self.network_latency,
+                                                    adv_iters=self.adv_iters,
+                                                    adv_ratio=self.adv_ratio)
         else:
             self.est_latency = None
         # return the current availale performance, memory, and the training latency of the last round
