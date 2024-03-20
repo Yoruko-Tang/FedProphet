@@ -45,7 +45,7 @@ class module_scheduler(base_AT_scheduler):
         self.stage_begin_round = 0
         self.best_weighted_acc = 0.0
         self.best_clean_adv_ratio = None
-        self.last_stage_clean_adv_ratio = None
+        self.first_stage_clean_adv_ratio = None
         self.clean_adv_ratios = []
 
         
@@ -76,7 +76,7 @@ class module_scheduler(base_AT_scheduler):
             self.tsv_file = osp.join(self.log_path, 'scheduler.log.tsv')
             self.pkl_file = osp.join(self.log_path, 'scheduler.pkl')
             with open(self.tsv_file, 'w') as wf:
-                columns = ['epoch', 'adv_epsilon', 'adv_alpha', 'adv_norm', 'adv_bound', 'mu','lamb','psi','best_weighted_acc','last_clean_adv_ratio']
+                columns = ['epoch', 'adv_epsilon', 'adv_alpha', 'adv_norm', 'adv_bound', 'mu','lamb','psi','best_weighted_acc','best_clean_adv_ratio']
                 wf.write('\t'.join(columns) + '\n')
 
         
@@ -153,6 +153,10 @@ class module_scheduler(base_AT_scheduler):
         args["adv_norm"] = self.adv_norm
         args["adv_bound"] = self.adv_bound
 
+        if self.args["stage_lr_decay"] is not None:
+            args["lr"] *= self.args["stage_lr_decay"]**self.stage
+
+
         return args
     
     def monitor_params(self, **kwargs):
@@ -198,14 +202,14 @@ class module_scheduler(base_AT_scheduler):
                 self.smooth_length += epoch-self.stage_begin_round-self.round
         
         # adaptive adjustment of alpha
-        if self.args["adapt_eps"] and self.last_stage_clean_adv_ratio is not None:
+        if self.args["adapt_eps"] and self.first_stage_clean_adv_ratio is not None:
             if len(self.clean_adv_ratios) > 0 and len(self.clean_adv_ratios)%int(0.1*self.round_per_stage) == 0:
                 screen_length = min([5,len(self.clean_adv_ratios)])
-                if np.mean(self.clean_adv_ratios[-screen_length:]) > 1.1*self.last_stage_clean_adv_ratio: # the adv acc is too low
+                if np.mean(self.clean_adv_ratios[-screen_length:]) > 1.1*self.first_stage_clean_adv_ratio: # the adv acc is too low
                     self.alpha = self.alpha + 0.1 # increase the epsilon
                     self.smooth_length = 0 # clear the smooth length for adjusting alpha
                     self.best_weighted_acc = 0
-                elif np.mean(self.clean_adv_ratios[-screen_length:]) < 0.9*self.last_stage_clean_adv_ratio: # the clean acc is too low
+                elif np.mean(self.clean_adv_ratios[-screen_length:]) < 0.9*self.first_stage_clean_adv_ratio: # the clean acc is too low
                     self.alpha = max([0.1,self.alpha-0.1]) # decrease the epsilon
                     self.smooth_length = 0 # clear the smooth length for adjusting alpha
                     self.best_weighted_acc = 0
@@ -222,7 +226,8 @@ class module_scheduler(base_AT_scheduler):
             self.round = 0
             self.smooth_length = 0
             self.best_weighted_acc = 0.0
-            self.last_stage_clean_adv_ratio = self.best_clean_adv_ratio
+            if self.stage == 0:
+                self.first_stage_clean_adv_ratio = self.best_clean_adv_ratio
             self.best_clean_adv_ratio = None
             self.clean_adv_ratios = []
             
@@ -287,7 +292,7 @@ class module_scheduler(base_AT_scheduler):
                         "best_acc":self.best_weighted_acc})
         self.logs.append(new_logs)
         
-        log_column = [epoch,self.adv_epsilon*self.alpha,self.adv_alpha*self.alpha,self.adv_norm,self.adv_bound,self.mu,self.lamb,self.psi,self.best_weighted_acc,self.last_stage_clean_adv_ratio]
+        log_column = [epoch,self.adv_epsilon*self.alpha,self.adv_alpha*self.alpha,self.adv_norm,self.adv_bound,self.mu,self.lamb,self.psi,self.best_weighted_acc,self.best_clean_adv_ratio]
         
         with open(self.tsv_file, 'a') as af:
             af.write('\t'.join([str(c) for c in log_column]) + '\n')

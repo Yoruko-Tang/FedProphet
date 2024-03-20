@@ -137,3 +137,10 @@ def set_feature_layer(model):
             feature_layer_list.append(n.replace('.weight',''))
     model.feature_layer_list = feature_layer_list
     return model
+
+def set_representation_layer(model):
+    """
+    Set the representation layer for FedET 
+    """
+    model.rep_layers = ["classifier.4.weight","classifier.4.bias"]
+    return model

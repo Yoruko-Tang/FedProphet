@@ -123,4 +123,11 @@ def set_feature_layer(model):
     model.feature_layer_list = feature_layer_list
     return model
 
+def set_representation_layer(model):
+    """
+    Set the representation layer for FedET 
+    """
+    model.rep_layers = ["classifier.6.weight","classifier.6.bias"]
+    return model
+    
 

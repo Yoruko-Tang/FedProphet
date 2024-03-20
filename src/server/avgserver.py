@@ -104,7 +104,7 @@ class Avg_Server():
         local_weights = np.array([None for _ in range(self.num_users)])
         for idx in idxs_users:
             training_hyperparameters = self.scheduler.training_params(idx=idx,chosen_idxs=idxs_users)
-            local_model = self.clients[idx].train(**self.global_model,**training_hyperparameters)
+            local_model = self.clients[idx].train(self.global_model["model"],**training_hyperparameters)
             if isinstance(local_model,list):
                 local_model = local_model[0]
             local_model.to(self.device) # return the local model to the server's device

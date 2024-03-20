@@ -33,6 +33,8 @@ def get_net(modelname, modeltype, num_classes=1000,
     model = eval('models.{}.adapt'.format(models.modelname_to_modelfamily(modelname)))(model,modeltype,num_classes)
     # add list of feature layers for memory tracking
     model = eval('models.{}.set_feature_layer'.format(models.modelname_to_modelfamily(modelname)))(model)
+    # add representation layers for FedET
+    model = eval('models.{}.set_representation_layer'.format(models.modelname_to_modelfamily(modelname)))(model)
 
 
     # add normalization layer to the adversarial training model
