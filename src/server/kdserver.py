@@ -5,7 +5,7 @@ import numpy as np
 import copy
 from server.avgserver import Avg_Server
 
-class ET_Server(Avg_Server):
+class FedET_Server(Avg_Server):
     """
     This is the server that uses knowledge distillation for aggregation, e.g., FedET and FedDF
     """
@@ -14,27 +14,16 @@ class ET_Server(Avg_Server):
                  local_state_preserve=False, device=torch.device('cpu'), test_every=1, 
                  public_dataset=None, dist_iters=128, dist_lr=5e-3, dist_batch_size=64,
                  diver_lamb=0.05, **kwargs):
-        self.device = device
-        global_model.to(device)
+        super().__init__(global_model, clients, selector, scheduler, 
+                        stat_monitor, sys_monitor, frac, weights, 
+                        test_dataset, local_state_preserve, 
+                        device, test_every)
+        
         for m in edge_models:
             m.to(device)
-        self.global_model = {"model":global_model,
-                             "edge_models":edge_models}
+        self.global_model["edge_models"] = edge_models
 
-        self.clients = clients
-        self.num_users = len(self.clients)
-        self.train_frac = frac
-        if weights is not None:
-            self.weights = weights
-        else:
-            self.weights = np.ones(self.num_users)/self.num_users
-        self.test_dataset = test_dataset
-        self.local_state_preserve = local_state_preserve
-
-        self.selector = selector
-        self.scheduler = scheduler
-        self.stat_monitor = stat_monitor
-        self.sys_monitor = sys_monitor
+        
 
         self.public_dataset = public_dataset
         self.tau_s = dist_iters
@@ -43,37 +32,32 @@ class ET_Server(Avg_Server):
         self.lamb_s = diver_lamb
 
         
-        self.round = 0
-        self.idxs_users = None
-        self.test_every = test_every
+        
 
         # collect the init loss and training latency
         
-        self.stat_info = self.val(self.global_model)
-        self.sys_info = self.sys_monitor.collect()
+        # self.stat_info = self.val(self.global_model)
+        # self.sys_info = self.sys_monitor.collect()
         
     def train_idx(self,idxs_users):
-        local_weights = np.array([None for _ in range(self.num_users)])
-        local_model_group = np.array([None for _ in range(self.num_users)])
+        local_models = np.array([None for _ in range(self.num_users)])
+        local_training_params = np.array([None for _ in range(self.num_users)])
         for idx in idxs_users:
             training_hyperparameters = self.scheduler.training_params(idx=idx,chosen_idxs=idxs_users)
             group = training_hyperparameters["model_group"]
             local_model = self.clients[idx].train(self.global_model["edge_models"][group],**training_hyperparameters)
-            if isinstance(local_model,list):
-                local_model = local_model[0]
-            local_model.to(self.device) # return the local model to the server's device
-            local_weights[idx] = copy.deepcopy(local_model.state_dict())
-            local_model_group[idx] = group
+            local_models[idx] = local_model
+            local_training_params[idx] = training_hyperparameters
             
-        global_model,edge_models = self.aggregate(weights = local_weights,
-                                                  init_server_model = self.global_model["model"],
-                                                  init_edge_models = self.global_model["edge_models"],
-                                                  model_groups = )
+        global_model = self.aggregate(local_models = local_models,
+                                      training_hyperparameters = local_training_params,
+                                      **self.global_model)
         
         
-        return {"model":global_model,"edge_models":edge_models}
+        return global_model
+        
 
-    def aggregate(self, weights, init_server_model, init_edge_models, model_groups, **kwargs):
+    def aggregate(self,local_models,model,edge_models,training_hyperparameters=None,**kwargs):
         
         # generate KD dataset
         transfer_loader = DataLoader(self.public_dataset,batch_size=self.b_s,shuffle=False)
@@ -83,14 +67,21 @@ class ET_Server(Avg_Server):
         preds = []
         pred_variance = []
 
-        edge_model_sd = [[] for _ in range(len(init_edge_models))]
-        for n,w in enumerate(weights): # calculate logits from edge devices
-            if w is not None:
-                group = model_groups[n]
-                edge_model_sd[group].append(w)
-                local_model = copy.deepcopy(init_edge_models[group])
+        # Step 1: initialize the last layer of the server model as the average of edge models
+        edge_model_sd = [[] for _ in range(len(edge_models))]
+        rep_weight = 0.0
+        rep_bias = 0.0
+        weight_count = 0
+        for n,local_model in enumerate(local_models): # calculate logits from edge devices
+            if local_model is not None:
+                group = training_hyperparameters[n]["model_group"]
                 local_model.to(self.device)
-                local_model.load_state_dict(w)
+                w = local_model.state_dict()
+                edge_model_sd[group].append(w)
+                rep_layers = local_model.rep_layers
+                rep_weight += w[rep_layers[0]]
+                rep_bias += w[rep_layers[1]]
+                weight_count += 1
                 local_model.eval()
 
                 client_preds = []
@@ -107,7 +98,14 @@ class ET_Server(Avg_Server):
                 sampled = True
                 preds.append(torch.cat(client_preds))
                 pred_variance.append(torch.cat(client_pred_variance))
-            
+        
+        rep_weight /= weight_count
+        rep_bias /= weight_count
+        server_model = copy.deepcopy(model)
+        server_model_sd = server_model.state_dict()
+        server_model_sd[server_model.rep_layers[0]]=rep_weight
+        server_model_sd[server_model.rep_layers[1]]=rep_bias
+        server_model.load_state_dict(server_model_sd)
         # generate consensus label
         pred_variance = torch.vstack(pred_variance)# CxB
         pred_weights = pred_variance/torch.sum(pred_variance,dim=0,keepdim=True)
@@ -121,7 +119,7 @@ class ET_Server(Avg_Server):
         div_mask  = []
         for p in preds:
             l = torch.argmax(p,dim=1)
-            div_mask.append(1-torch.eq(l,consensus_label).int())
+            div_mask.append(1-torch.eq(l,labels).int())
         div_mask = torch.vstack(div_mask)# CxB
         div_variance = div_mask*pred_variance
         div_weights = div_variance/torch.sum(div_variance,dim=0,keepdim=True)
@@ -133,24 +131,6 @@ class ET_Server(Avg_Server):
 
         KD_dataset = TensorDataset(samples,labels,div_logits)
 
-        # Step 1: initialize the last layer of the server model as the average of edge models
-        rep_weight = 0.0
-        rep_bias = 0.0
-        weight_count = 0
-        for n,w in enumerate(weights):
-            if w is not None:
-                group = model_groups[n]
-                rep_layers = init_edge_models[group].rep_layers
-                rep_weight += w[rep_layers[0]]
-                rep_bias += w[rep_layers[1]]
-                weight_count += 1
-        rep_weight /= weight_count
-        rep_bias /= weight_count
-        server_model = copy.deepcopy(init_server_model)
-        server_model_sd = server_model.state_dict()
-        server_model_sd[server_model.rep_layers[0]]=rep_weight
-        server_model_sd[server_model.rep_layers[1]]=rep_bias
-        server_model.load_state_dict(server_model_sd)
 
         # Step 2: Train the server model with Ensemble loss
         KD_loader = DataLoader(KD_dataset,batch_size=self.b_s,shuffle=True)
@@ -179,9 +159,9 @@ class ET_Server(Avg_Server):
             print("Server Iters : {}/{}|\tLoss : {:.4f}".format(iters,self.tau_s,loss.item()))
 
         # Step 3: Update Edge Models
-        edge_models = []
+        new_edge_models = []
         for g,group_weights in enumerate(edge_model_sd):
-            edge_model = copy.deepcopy(init_edge_models[g])
+            edge_model = copy.deepcopy(edge_models[g])
             w0 = edge_model.state_dict()
             for p in w0:
                 w = 0
@@ -192,11 +172,12 @@ class ET_Server(Avg_Server):
             w0[edge_model.rep_layers[0]] = copy.deepcopy(server_model.state_dict()[server_model.rep_layer[0]])
             w0[edge_model.rep_layers[1]] = copy.deepcopy(server_model.state_dict()[server_model.rep_layer[1]])
             edge_model.load_state_dict(w0)
-            edge_models.append(edge_model)
+            new_edge_models.append(edge_model)
         
-        return server_model,edge_models
+        return {"model":server_model,"edge_models":new_edge_models}
 
-
+class FedDF_Server(FedET_Server):
+    pass
             
 
 

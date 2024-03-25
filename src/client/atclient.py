@@ -7,7 +7,7 @@ import copy
 import numpy as np
 
 from utils.adversarial import Adv_Sample_Generator
-from hardware.sys_utils import sample_runtime_app,sample_networks,model_summary
+from hardware.sys_utils import model_summary
 
 
 
@@ -107,14 +107,12 @@ class AT_Client(ST_Client):
         # calculate training latency
         if model_profile is not None:
             self.model_profile = model_profile
-        self.latency = self.model_profile.training_latency(batches=self.batches,
-                                                           performance=self.avail_perf,
+        self.latency = self.model_profile.training_latency(performance=self.avail_perf,
                                                            memory=self.avail_mem,
                                                            eff_bandwidth=self.eff_bw,
                                                            network_bandwidth=self.network_speed,
-                                                           network_latency=self.network_latency,
-                                                           adv_iters = self.adv_iters,
-                                                           adv_ratio = self.adv_ratio)
+                                                           network_latency=self.network_lag,
+                                                           **self.__dict__)
         
         return model
         
@@ -156,24 +154,22 @@ class AT_Client(ST_Client):
         accuracy = correct/total
         return accuracy, loss/(batch_idx+1)
     
-    def get_runtime_sys_stat(self):
-        self.runtime_app,self.perf_degrade,self.mem_degrade=sample_runtime_app(self.rs)
-        self.avail_perf = max([self.performance*self.perf_degrade,self.reserved_performance])
-        self.avail_mem = max([self.memory*self.mem_degrade,self.reserved_memory])
+    # def get_runtime_sys_stat(self):
+    #     self.runtime_app,self.perf_degrade,self.mem_degrade=sample_runtime_app(self.rs)
+    #     self.avail_perf = max([self.performance*self.perf_degrade,self.reserved_performance])
+    #     self.avail_mem = max([self.memory*self.mem_degrade,self.reserved_memory])
 
-        self.network,self.network_speed,self.network_latency = sample_networks(self.rs)
+    #     self.network,self.network_speed,self.network_latency = sample_networks(self.rs)
         
-        if self.model_profile is not None:
-            self.est_latency = \
-                self.model_profile.training_latency(batches=self.batches,
-                                                    performance=self.avail_perf,
-                                                    memory=self.avail_mem,
-                                                    eff_bandwidth=self.eff_bw,
-                                                    network_bandwidth=self.network_speed,
-                                                    network_latency=self.network_latency,
-                                                    adv_iters=self.adv_iters,
-                                                    adv_ratio=self.adv_ratio)
-        else:
-            self.est_latency = None
-        # return the current availale performance, memory, and the training latency of the last round
-        return self.runtime_app, self.avail_perf, self.avail_mem, self.network,self.network_speed,self.network_latency, self.latency, self.est_latency
+    #     if self.model_profile is not None:
+    #         self.est_latency = \
+    #             self.model_profile.training_latency(performance=self.avail_perf,
+    #                                                 memory=self.avail_mem,
+    #                                                 eff_bandwidth=self.eff_bw,
+    #                                                 network_bandwidth=self.network_speed,
+    #                                                 network_latency=self.network_lag,
+    #                                                 **self.__dict__)
+        # else:
+        #     self.est_latency = None
+        # # return the current availale performance, memory, and the training latency of the last round
+        # return self.runtime_app, self.avail_perf, self.avail_mem, self.network,self.network_speed,self.network_latency, self.latency, self.est_latency

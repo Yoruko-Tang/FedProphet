@@ -57,41 +57,41 @@ from client import *
 # print(parameter_count(model))
 # print("----------------------------------------------")
 
-def profile_model(model, inputsize):
-    x = torch.rand(inputsize)
+# def profile_model(model, inputsize):
+#     x = torch.rand(inputsize)
 
-    flops = FlopCountAnalysis(model,x)
-    _flops_per_module = flops.by_module()
-    _params_per_module = parameter_count(model)
-    flops_per_module = {}
-    params_per_module = {}
-    dot_count = 0
-    for key in _flops_per_module.keys():
-        for c in key:
-            if c == '.':
-                dot_count += 1
-        if (dot_count == 0 and 'layer' not in key and 'classifier' not in key and 'features' not in key) \
-            or (dot_count == 1 and 'weight' not in key and 'bias' not in key):
-            flops_per_module[key] = _flops_per_module[key]
-            params_per_module[key] = _params_per_module[key]
-        dot_count = 0
+#     flops = FlopCountAnalysis(model,x)
+#     _flops_per_module = flops.by_module()
+#     _params_per_module = parameter_count(model)
+#     flops_per_module = {}
+#     params_per_module = {}
+#     dot_count = 0
+#     for key in _flops_per_module.keys():
+#         for c in key:
+#             if c == '.':
+#                 dot_count += 1
+#         if (dot_count == 0 and 'layer' not in key and 'classifier' not in key and 'features' not in key) \
+#             or (dot_count == 1 and 'weight' not in key and 'bias' not in key):
+#             flops_per_module[key] = _flops_per_module[key]
+#             params_per_module[key] = _params_per_module[key]
+#         dot_count = 0
 
-    flops_per_module['total'] = flops_per_module.pop('')
-    params_per_module['total'] = params_per_module.pop('')
+#     flops_per_module['total'] = flops_per_module.pop('')
+#     params_per_module['total'] = params_per_module.pop('')
 
-    def validate(dic):
-        sum = 0
-        for key in dic:
-            if key != 'total':
-                sum += dic[key]
-        assert sum == dic['total'], "Wrong profiling data!"
+#     def validate(dic):
+#         sum = 0
+#         for key in dic:
+#             if key != 'total':
+#                 sum += dic[key]
+#         assert sum == dic['total'], "Wrong profiling data!"
     
-    validate(flops_per_module)
-    validate(params_per_module)
-    layer_name_list = []
-    for k in flops_per_module.keys():
-        if k != 'normalize' and k != 'total':
-            layer_name_list.append(k)
+#     validate(flops_per_module)
+#     validate(params_per_module)
+#     layer_name_list = []
+#     for k in flops_per_module.keys():
+#         if k != 'normalize' and k != 'total':
+#             layer_name_list.append(k)
             
 
     # print(flops_per_module)
@@ -99,16 +99,19 @@ def profile_model(model, inputsize):
 
     # print(len(flops_per_module))
     # print(len(params_per_module))
-    return layer_name_list, flops_per_module, params_per_module
+    # return layer_name_list, flops_per_module, params_per_module
     
 
 
-# model = get_net('vgg16_bn','cifar',num_classes=10,adv_norm=True,modularization=True)
-# inputsize = [64,3,32,32]
+#model = get_net('vgg16_bn','cifar',num_classes=10,adv_norm=True,modularization=True)
+model = get_net('vgg16_bn','cifar',num_classes=10,adv_norm=True,modularization=True,norm_type='LN')
+print(model.state_dict().keys())
+inputsize = [64,3,32,32]
 
 
-model = get_net('resnet50','imagenet',num_classes=256,adv_norm=True,modularization=True)
-inputsize = [32,3,224,224]
+# model = get_net('resnet50','imagenet',num_classes=256,adv_norm=True,modularization=False,norm_type='LN')
+# print(model)
+# inputsize = [32,3,224,224]
 # ms = model_summary(model,inputsize,optimizer='adam')
 ms = model_summary(model,inputsize,optimizer='sgd',momentum=0.9)
 

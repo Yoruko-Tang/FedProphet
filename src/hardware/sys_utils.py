@@ -316,10 +316,11 @@ class model_summary():
 
         return module_name_list, flops_per_module, params_per_module, mem_per_module
     
-    def training_latency(self,module_list=None,batches=None,performance=None,
-                         memory=None,eff_bandwidth=None,access_latency=0.17,
+    def training_latency(self,performance=None,memory=None,
+                         eff_bandwidth=None,access_latency=0.17,
                          network_bandwidth=None,network_latency=0.0,
-                         adv_iters=0,adv_ratio=1.0):
+                         batches=None,adv_iters=0,adv_ratio=1.0,
+                         module_list=None,**kwargs):
         """
         Calculate the training latency of the whole model with the model profile.
         module_list: a list of atom module names in self.module_lists, 

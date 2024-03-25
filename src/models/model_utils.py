@@ -18,7 +18,8 @@ from datasets import datafamily_to_normalize
 
 
 def get_net(modelname, modeltype, num_classes=1000, 
-            pretrained=False, adv_norm=False, modularization=False):
+            pretrained=False, norm_type = "BN", 
+            adv_norm=False, modularization=False):
     """
     modelname: must be exactly the same as the classes in torchvision.models
     e.g., vgg11, vgg16
@@ -31,6 +32,9 @@ def get_net(modelname, modeltype, num_classes=1000,
     model = eval('models.{}'.format(modelname))(weights="DEFAULT" if pretrained else None)
     # adapt to the specified num_classes
     model = eval('models.{}.adapt'.format(models.modelname_to_modelfamily(modelname)))(model,modeltype,num_classes)
+    # replace norm layer
+    if norm_type != "BN":
+        model = eval('models.{}.replace_norm'.format(models.modelname_to_modelfamily(modelname)))(model,modeltype,norm_type)
     # add list of feature layers for memory tracking
     model = eval('models.{}.set_feature_layer'.format(models.modelname_to_modelfamily(modelname)))(model)
     # add representation layers for FedET

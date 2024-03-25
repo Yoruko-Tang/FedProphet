@@ -39,6 +39,12 @@ class Adv_Sample_Generator():
 
 
     def attack_data(self,model,data,label,ratio=1.0):
+        if ratio < 1.0:
+            origin_data = data.clone()
+            perturb_idx = np.random.choice(range(len(data)),int(ratio*len(data)),replace = False)
+            data = data[perturb_idx]
+            label = label[perturb_idx]
+
         if self.attack_method in ['PGD','FGSM_RS']:# randomly start
             if self.norm == 'inf':
                 delta = ((torch.rand(data.shape)*2-1)*self.epsilon).to(data)
@@ -69,12 +75,11 @@ class Adv_Sample_Generator():
             
         delta = delta.detach()
         if ratio<1.0:
-            
-            perturb_idx = np.random.choice(range(len(data)),int(ratio*len(data)),replace = False)
-            mask = torch.zeros_like(data).to(data)
-            mask[perturb_idx]=1.0
-            delta = delta*mask
-        return data+delta
+            mask = torch.zeros_like(origin_data)
+            mask[perturb_idx] = delta
+            return origin_data + mask
+        else:
+            return data + delta
 
 
 

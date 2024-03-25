@@ -63,6 +63,7 @@ if __name__ == '__main__':
                                modeltype = dataset_to_datafamily[args.dataset],
                                num_classes = args.num_classes,
                                pretrained = args.pretrained,
+                               norm_type = args.norm,
                                adv_norm = (args.adv_train or args.adv_test),
                                modularization = (args.flalg == "FedProphet"))
         print(global_model)
@@ -71,16 +72,31 @@ if __name__ == '__main__':
                                       default_local_eps=args.local_ep,
                                       **vars(args))
         
+        if args.flalg in ['FedET','FedETAT']:# generate small edge models
+            edge_models = []
+            for m in args.edge_model_archs:
+                edge_models.append(get_net(modelname = m,
+                                    modeltype = dataset_to_datafamily[args.dataset],
+                                    num_classes = args.num_classes,
+                                    pretrained = args.pretrained,
+                                    adv_norm = (args.adv_train or args.adv_test)))
+            print(edge_models)
+            edge_model_profiles = []
+            for mod in edge_models:
+                edge_model_profiles.append(model_summary(model = deepcopy(mod),
+                                            inputsize=[args.local_bs]+list(train_dataset[0][0].shape),
+                                            default_local_eps=args.local_ep,
+                                            **vars(args)))
 
         ## ==================================Build Clients==================================
-        if args.flalg == 'FedAvg':
+        if args.flalg in ['FedAvg','FedET']:
             clients = [ST_Client(train_dataset,user_groups[i],
                                  sys_info=user_devices[i],
                                  model_profile=model_profile,
                                  local_state_preserve = False,
                                  device=device,verbose=args.verbose,
                                  random_seed=i+args.device_random_seed,
-                                 reserved_memory=args.max_module_mem
+                                 reserved_memory=args.reserved_mem
                                  ) for i in range(args.num_users)]
         elif args.flalg == 'FedBN':
             clients = [ST_Client(train_dataset,user_groups[i],
@@ -90,10 +106,10 @@ if __name__ == '__main__':
                                  local_state_preserve = True,
                                  device=device,verbose=args.verbose,
                                  random_seed=i+args.device_random_seed,
-                                 reserved_memory=args.max_module_mem
+                                 reserved_memory=args.reserved_mem
                                  ) for i in range(args.num_users)]
         
-        elif args.flalg == 'FedAvgAT':
+        elif args.flalg in ['FedAvgAT','FedETAT']:
             clients = [AT_Client(train_dataset,user_groups[i],
                                  sys_info=user_devices[i],
                                  model_profile=model_profile,
@@ -106,7 +122,7 @@ if __name__ == '__main__':
                                  test_adv_bound = args.advt_bound,
                                  device=device,verbose=args.verbose,
                                  random_seed=i+args.device_random_seed,
-                                 reserved_memory=args.max_module_mem
+                                 reserved_memory=args.reserved_mem
                                  ) for i in range(args.num_users)]
         elif args.flalg == 'FedBNAT':
             clients = [AT_Client(train_dataset,user_groups[i],
@@ -122,14 +138,14 @@ if __name__ == '__main__':
                                  test_adv_bound = args.advt_bound,
                                  device=device,verbose=args.verbose,
                                  random_seed=i+args.device_random_seed,
-                                 reserved_memory=args.max_module_mem
+                                 reserved_memory=args.reserved_mem
                                  ) for i in range(args.num_users)]
         elif args.flalg == 'FedProphet':
             clients = [Module_Client(train_dataset,user_groups[i],
                                      sys_info=user_devices[i],
                                      model_profile=model_profile,
                                      init_local_state = ST_Client.get_local_state_dict(global_model),
-                                     local_state_preserve = True,
+                                     local_state_preserve = (args.norm == 'BN'),
                                      test_adv_method=args.advt_method,
                                      test_adv_epsilon=args.advt_epsilon,
                                      test_adv_alpha=args.advt_alpha,
@@ -138,7 +154,7 @@ if __name__ == '__main__':
                                      test_adv_bound = args.advt_bound,
                                      device=device,verbose=args.verbose,
                                      random_seed=i+args.device_random_seed,
-                                     reserved_memory=args.max_module_mem
+                                     reserved_memory=args.reserved_mem
                                      ) for i in range(args.num_users)]
         # Todo: add other types of clients
         else:
@@ -166,6 +182,9 @@ if __name__ == '__main__':
                                          model_profile=model_profile,
                                          clients=clients,
                                          log_path=file_name)
+        elif args.flalg in ["FedET","FedETAT"]:
+            scheduler = kd_scheduler(vars(args),
+                                     model_profiles=edge_model_profiles)
         # Todo: Add schedulers for other baselines
         else:
             raise RuntimeError("FL optimizer {} has no registered scheduler!".format(args.flalg)) 
@@ -225,8 +244,6 @@ if __name__ == '__main__':
                                 sys_monitor=sys_monitor,
                                 frac=args.frac,
                                 weights=weights,
-                                #test_dataset=test_dataset,
-                                #local_state_preserve=True,
                                 device=device,
                                 test_every = args.test_every)
         elif args.flalg == "FedProphet":
@@ -238,12 +255,32 @@ if __name__ == '__main__':
                                            sys_monitor=sys_monitor,
                                            frac=args.frac,
                                            weights=weights,
-                                           #test_dataset=test_dataset,
-                                           #local_state_preserve=True,
+                                           test_dataset=None if args.norm == 'BN' else test_dataset,
+                                           local_state_preserve=(args.norm == 'BN'),
                                            device=device,
                                            test_every = args.test_every)
+        elif args.flalg in ["FedET","FedETAT"]:
+            server = FedET_Server(global_model=global_model,
+                                edge_models = edge_models,
+                                clients = clients,
+                                selector = selector,
+                                scheduler = scheduler,
+                                stat_monitor=stat_monitor,
+                                sys_monitor=sys_monitor,
+                                frac=args.frac,
+                                weights=weights,
+                                test_dataset=test_dataset,
+                                local_state_preserve=False,
+                                device=device,
+                                test_every = args.test_every,
+                                public_dataset = test_dataset,
+                                dist_iters = args.dist_iters,
+                                dist_lr = args.dist_lr,
+                                dist_batch_size = args.dist_batch_size,
+                                diver_lamb = args.diver_lamb)
 
-
+        server.monitor() # initialize the stat_info and sys_info at the beginning
+        
         ## ==================================Start Training==================================
         for epoch in tqdm(range(args.epochs)):
             CTN = server.train()

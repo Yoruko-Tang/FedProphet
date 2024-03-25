@@ -31,8 +31,8 @@ class module_scheduler(base_AT_scheduler):
 
         self.partition_module_list,self.module_dict,self.auxiliary_model_dict,\
         self.module_flops_dict,self.module_mem_dict,self.auxiliary_model_flops_dict, \
-        self.auxiliary_model_mem_dict = self.model_partition(args["max_module_flops"],
-                                                            args["max_module_mem"])
+        self.auxiliary_model_mem_dict = self.model_partition(args["reserved_flops"],
+                                                            args["reserved_mem"])
         
         print(f"====> Partitioned Model into {len(self.partition_module_list)} Modules.")
         print("====> Model Partitions: \n",self.partition_module_list)
@@ -96,6 +96,7 @@ class module_scheduler(base_AT_scheduler):
         # the allowed time is the time of finishing training 
         # the current module with the smallest available performance
         allowed_flops = avail_perf/min(self.available_performance[chosen_idxs])*self.module_flops_dict[stage_module]
+        #allowed_flops = np.inf
         cum_flops = self.module_flops_dict[stage_module]
         cum_mem = self.module_mem_dict[stage_module]
 
@@ -183,7 +184,7 @@ class module_scheduler(base_AT_scheduler):
         # update statistical information
         if not self.args["adv_train"] or self.round >= self.args["adv_warmup"]:
             if "weighted_val_adv_acc" in stat_info:
-                weighted_acc = stat_info["weighted_val_acc"] + stat_info["weighted_val_adv_acc"]
+                weighted_acc = 0.4*stat_info["weighted_val_acc"] + 0.6*stat_info["weighted_val_adv_acc"]
                 clean_adv_ratio = stat_info["weighted_val_acc"]/stat_info["weighted_val_adv_acc"]
                 self.clean_adv_ratios.append(clean_adv_ratio)
             else:

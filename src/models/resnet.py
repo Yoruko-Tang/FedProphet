@@ -27,6 +27,49 @@ def add_normalization(model,normalization_layer):
     model.forward = types.MethodType(forward,model)
     return model
 
+def replace_norm(model,modeltype, norm='LN'):
+    # register inputsize hook
+    def in_feature_hook(module,fea_in,fea_out):
+        module.input_size = fea_in[0].size()
+        return None
+    for n,m in model.named_modules():
+        if isinstance(m,nn.BatchNorm2d):
+            m.register_forward_hook(in_feature_hook)
+    
+    if modeltype == 'imagenet':
+        input_size = [1,3,224,224]
+    elif modeltype == 'cifar':
+        input_size = [1,3,32,32]
+    data = torch.rand(input_size)
+    model(data)
+
+    for n,m in model.named_modules():
+        if isinstance(m,nn.BatchNorm2d):
+            if norm == 'LN':
+                norm_layer = nn.LayerNorm(m.input_size[1:])
+            elif norm == 'GN':
+                norm_layer = nn.GroupNorm(4,m.input_size[1])
+            elif norm == 'IN':
+                norm_layer == nn.InstanceNorm2d(m.input_size[1])
+            elif norm == 'BN':
+                pass
+            else: # remove the normalization
+                norm_layer = nn.Identity()
+            
+            layer_name = n.split(".")[0]
+            if "bn" in layer_name:
+                setattr(model,n,norm_layer)
+            else:
+                block_idx = int(n.split(".")[1])
+                block = getattr(model,layer_name)[block_idx]
+                block_mod_name = n.split(".")[2]
+                if "downsample" in block_mod_name:
+                    bn_idx = int(n.split(".")[3])
+                    block.downsample[bn_idx] = norm_layer
+                else:
+                    setattr(block,block_mod_name,norm_layer)
+    return model
+
 def modularization(model):
     """
     Make the model into cascaded modules.

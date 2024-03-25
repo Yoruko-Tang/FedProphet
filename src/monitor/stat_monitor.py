@@ -280,7 +280,7 @@ class AT_Stat_Monitor(ST_Stat_Monitor):
                                 "test_adv_acc":self.test_adv_accs,
                                 "test_adv_loss":self.test_adv_losses}, stat_f)
                 # store the model if it attains the highest validation loss
-                weighted_global_clean_adv_accs = np.array(self.weighted_global_accs) + np.array(self.weighted_global_adv_accs)
+                weighted_global_clean_adv_accs = 0.4*np.array(self.weighted_global_accs) + 0.6*np.array(self.weighted_global_adv_accs)
                 if np.argmax(weighted_global_clean_adv_accs) == len(weighted_global_clean_adv_accs)-1:
                     torch.save([global_model,[c.local_states for c in self.clients]],self.pt_file)
                     model_info = {"round":epoch,

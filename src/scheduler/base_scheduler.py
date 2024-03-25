@@ -48,7 +48,9 @@ class base_AT_scheduler(base_scheduler):
     def training_params(self,**kwargs):
         args = super().training_params()
         if self.round < self.args["adv_warmup"]:
-            args["adv_train"] = False
+            args["adv_ratio"] = self.args["warmup_adv_ratio"]
+            if args["adv_ratio"] == 0:
+                args["adv_train"] = False
             #args["lr"] = self.args["lr"] # do not decay the lr until adv_warmup
 
         

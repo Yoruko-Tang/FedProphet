@@ -19,7 +19,7 @@ class ST_Client():
                  reserved_performance = 0, reserved_memory = 0, 
                  **kwargs):
         self.trainset, self.testset = self.train_test(dataset, list(data_idxs))
-        self.dev_name,self.performance,self.memory,self.eff_bw=sys_info
+        self.dev_name,self.peak_performance,self.peak_memory,self.eff_bw=sys_info
         self.model_profile = model_profile
 
         self.local_state_preserve = local_state_preserve
@@ -37,10 +37,16 @@ class ST_Client():
         self.reserved_performance = reserved_performance
         self.reserved_memory = reserved_memory
         
-
+        # runtime statics
         self.batches = None
-        self.latency = None
-        self.get_runtime_sys_stat()
+        self.runtime_app = None
+        self.avail_perf = None 
+        self.avail_mem = None 
+        self.network = None
+        self.network_speed = None
+        self.network_lag = None 
+        self.latency = None 
+        self.est_latency = None
         
         
         
@@ -114,13 +120,12 @@ class ST_Client():
         if model_profile is not None:
             self.model_profile = model_profile
         
-        self.latency = self.model_profile.training_latency(batches=self.batches,
-                                                           performance=self.avail_perf,
+        self.latency = self.model_profile.training_latency(performance=self.avail_perf,
                                                            memory=self.avail_mem,
                                                            eff_bandwidth=self.eff_bw,
                                                            network_bandwidth=self.network_speed,
-                                                           network_latency=self.network_latency
-                                                           )
+                                                           network_latency=self.network_lag,
+                                                           **self.__dict__)
 
         return model
 
@@ -156,23 +161,23 @@ class ST_Client():
     
     def get_runtime_sys_stat(self):
         self.runtime_app,self.perf_degrade,self.mem_degrade=sample_runtime_app(self.rs)
-        self.avail_perf = max([self.performance*self.perf_degrade,self.reserved_performance])
-        self.avail_mem = max([self.memory*self.mem_degrade,self.reserved_memory])
+        self.avail_perf = max([self.peak_performance*self.perf_degrade,self.reserved_performance])
+        self.avail_mem = max([self.peak_memory*self.mem_degrade,self.reserved_memory])
 
-        self.network,self.network_speed,self.network_latency = sample_networks(self.rs)
+        self.network,self.network_speed,self.network_lag = sample_networks(self.rs)
         
         if self.model_profile is not None:
             self.est_latency = \
-                self.model_profile.training_latency(batches=self.batches,
-                                                    performance=self.avail_perf,
+                self.model_profile.training_latency(performance=self.avail_perf,
                                                     memory=self.avail_mem,
                                                     eff_bandwidth=self.eff_bw,
                                                     network_bandwidth=self.network_speed,
-                                                    network_latency=self.network_latency)
+                                                    network_latency=self.network_lag,
+                                                    **self.__dict__)
         else:
             self.est_latency = None
         # return the current availale performance, memory, and the training latency of the last round
-        return self.runtime_app, self.avail_perf, self.avail_mem, self.network,self.network_speed,self.network_latency, self.latency, self.est_latency
+        return self.runtime_app, self.avail_perf, self.avail_mem, self.network,self.network_speed,self.network_lag, self.latency, self.est_latency
 
     @staticmethod
     def get_local_state_dict(model):

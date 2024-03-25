@@ -24,42 +24,16 @@ class Module_Client(AT_Client):
                  device=torch.device('cpu'), 
                  verbose=False, random_seed=None, 
                  reserved_performance = 0, reserved_memory = 0, **kwargs):
-
-        self.trainset, self.testset = self.train_test(dataset, list(data_idxs))
+        super().__init__(dataset, data_idxs, sys_info, model_profile, 
+                         init_local_state, local_state_preserve,
+                         test_adv_method,test_adv_epsilon,test_adv_alpha,
+                         test_adv_T,test_adv_norm,test_adv_bound,
+                         device, verbose, random_seed, reserved_performance, 
+                         reserved_memory,**kwargs)
+        
         self.feature_trainset = self.trainset
         # self.feature_testset = self.testset
-        self.dev_name,self.performance,self.memory,self.eff_bw=sys_info
-        self.model_profile = model_profile
-
-        self.local_state_preserve = local_state_preserve
-        if local_state_preserve:
-            self.local_states = copy.deepcopy(init_local_state)
-        else:
-            self.local_states = None
-        
-        self.device = device
-        self.final_local_loss = None
-        self.verbose = verbose
-        self.rs = np.random.RandomState(random_seed)
-
-        self.reserved_performance = reserved_performance
-        self.reserved_memory = reserved_memory
-        
-        self.adv_iters= 0
-        self.adv_ratio = 0.0
-
-        self.batches = None
-        self.latency = None
         self.module_list = None
-        self.get_runtime_sys_stat()
-
-        self.test_adv_method = test_adv_method
-        self.test_adv_epsilon = test_adv_epsilon
-        self.test_adv_alpha = test_adv_alpha
-        self.test_adv_T = test_adv_T
-        self.test_adv_norm = test_adv_norm
-        self.test_adv_bound = test_adv_bound
- 
         
         
     def forward_feature_set(self,model,module_list,adv_train=True,
@@ -285,15 +259,12 @@ class Module_Client(AT_Client):
         if model_profile is not None:
             self.model_profile = model_profile
         self.module_list = stage_module_list + prophet_module_list
-        self.latency = self.model_profile.training_latency(module_list=self.module_list,
-                                                           batches=self.batches,
-                                                           performance=self.avail_perf,
+        self.latency = self.model_profile.training_latency(performance=self.avail_perf,
                                                            memory=self.avail_mem,
                                                            eff_bandwidth=self.eff_bw,
                                                            network_bandwidth=self.network_speed,
-                                                           network_latency=self.network_latency,
-                                                           adv_iters = self.adv_iters,
-                                                           adv_ratio = self.adv_ratio)
+                                                           network_latency=self.network_lag,
+                                                           **self.__dict__)
         
         return model,current_aux_model,future_aux_model
         
@@ -392,25 +363,25 @@ class Module_Client(AT_Client):
         accuracy = correct/total
         return accuracy, loss/(batch_idx+1)
     
-    def get_runtime_sys_stat(self):
-        self.runtime_app,self.perf_degrade,self.mem_degrade=sample_runtime_app(self.rs)
-        self.avail_perf = max([self.performance*self.perf_degrade,self.reserved_performance])
-        self.avail_mem = max([self.memory*self.mem_degrade,self.reserved_memory])
+    # def get_runtime_sys_stat(self):
+    #     self.runtime_app,self.perf_degrade,self.mem_degrade=sample_runtime_app(self.rs)
+    #     self.avail_perf = max([self.performance*self.perf_degrade,self.reserved_performance])
+    #     self.avail_mem = max([self.memory*self.mem_degrade,self.reserved_memory])
         
-        self.network,self.network_speed,self.network_latency = sample_networks(self.rs)
+    #     self.network,self.network_speed,self.network_latency = sample_networks(self.rs)
 
-        if self.model_profile is not None:
-            self.est_latency = \
-                self.model_profile.training_latency(module_list=self.module_list,
-                                                    batches=self.batches,
-                                                    performance=self.avail_perf,
-                                                    memory=self.avail_mem,
-                                                    eff_bandwidth=self.eff_bw,
-                                                    network_bandwidth=self.network_speed,
-                                                    network_latency=self.network_latency,
-                                                    adv_iters=self.adv_iters,
-                                                    adv_ratio=self.adv_ratio)
-        else:
-            self.est_latency = None
-        # return the current availale performance, memory, and the training latency of the last round
-        return self.runtime_app, self.avail_perf, self.avail_mem, self.network,self.network_speed,self.network_latency, self.latency, self.est_latency
+    #     if self.model_profile is not None:
+    #         self.est_latency = \
+    #             self.model_profile.training_latency(module_list=self.module_list,
+    #                                                 batches=self.batches,
+    #                                                 performance=self.avail_perf,
+    #                                                 memory=self.avail_mem,
+    #                                                 eff_bandwidth=self.eff_bw,
+    #                                                 network_bandwidth=self.network_speed,
+    #                                                 network_latency=self.network_latency,
+    #                                                 adv_iters=self.adv_iters,
+    #                                                 adv_ratio=self.adv_ratio)
+    #     else:
+    #         self.est_latency = None
+    #     # return the current availale performance, memory, and the training latency of the last round
+    #     return self.runtime_app, self.avail_perf, self.avail_mem, self.network,self.network_speed,self.network_latency, self.latency, self.est_latency

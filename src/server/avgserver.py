@@ -39,9 +39,8 @@ class Avg_Server():
         self.test_every = test_every
 
         # collect the init loss and training latency
-        
-        self.stat_info = self.val(self.global_model)
-        self.sys_info = self.sys_monitor.collect()
+        # self.stat_info = self.val(self.global_model)
+        # self.sys_info = self.sys_monitor.collect()
 
 
 
@@ -78,66 +77,74 @@ class Avg_Server():
             
             # train selected clients
             self.global_model.update(self.train_idx(self.idxs_users))
-
-            if (self.round+1)%self.test_every == 0:
-                # collect each client's statistical information
-                monitor_params = self.scheduler.monitor_params()
-                if self.local_state_preserve:
-                    model = [self.global_model]*len(self.clients)
-                else:
-                    model = self.global_model
-                self.stat_info = self.stat_monitor.collect(model,
-                                                        epoch=self.round,
-                                                        chosen_idxs=self.idxs_users,
-                                                        test_dataset=self.test_dataset,
-                                                        log=True,
-                                                        **monitor_params)
-            # collect each client's systematic information
-            self.sys_info = self.sys_monitor.collect(epoch=self.round,
-                                                    chosen_idxs=self.idxs_users,
-                                                    log=True)
+            
+            # collect statistical and systematic information
+            self.monitor(chosen_idxs=self.idxs_users,log=True)
 
             self.round += 1
         return CTN
 
     def train_idx(self,idxs_users):
-        local_weights = np.array([None for _ in range(self.num_users)])
+        local_models = np.array([None for _ in range(self.num_users)])
+        local_training_params = np.array([None for _ in range(self.num_users)])
         for idx in idxs_users:
             training_hyperparameters = self.scheduler.training_params(idx=idx,chosen_idxs=idxs_users)
-            local_model = self.clients[idx].train(self.global_model["model"],**training_hyperparameters)
-            if isinstance(local_model,list):
-                local_model = local_model[0]
-            local_model.to(self.device) # return the local model to the server's device
-            local_weights[idx] = copy.deepcopy(local_model.state_dict())
+            local_model = self.clients[idx].train(**self.global_model,**training_hyperparameters)
+            # if isinstance(local_model,list):
+            #     local_model = local_model[0]
+            # local_model.to(self.device) # return the local model to the server's device
+            local_models[idx] = local_model
+            local_training_params[idx] = training_hyperparameters
             
-        global_model = self.aggregate(weights = local_weights,
-                                      init_model = self.global_model["model"])
+        global_model = self.aggregate(local_models = local_models,
+                                      training_hyperparameters = local_training_params,
+                                      **self.global_model)
         
         
-        return {"model":global_model}
+        return global_model
     
-    def aggregate(self,weights,init_model,**kwargs):
+    def aggregate(self,local_models,model,training_hyperparameters=None,**kwargs):
         """
         weighted average of all updated weights
         The average is conducted in a parameter-by-parameter fashion, 
         and the weights are normalized respectively.
         """
-        model = copy.deepcopy(init_model)
+        model = copy.deepcopy(model)
         w0 = model.state_dict()
         for p in w0.keys():
             weights_sum = 0.0
             w = 0
-            for n,lw in enumerate(weights):
-                if lw is not None and p in lw:
-                    weights_sum += self.weights[n]
-                    w += self.weights[n]*lw[p]
+            for n,lm in enumerate(local_models):
+                if lm is not None:
+                    if isinstance(lm,list):
+                        lm[0].to(self.device)
+                        lw = lm[0].state_dict()
+                    else:
+                        lm.to(self.device)
+                        lw = lm.state_dict()
+                    if p in lw:
+                        weights_sum += self.weights[n]
+                        w += self.weights[n]*lw[p]
             if weights_sum > 0:
                 w0[p] = w/weights_sum
         model.load_state_dict(w0)
-        return model
+        return {"model":model}
 
-    def val(self,model):
+    def val(self,model,chosen_idxs = None, log=False):
         monitor_params = self.scheduler.monitor_params()
         if self.local_state_preserve:
             model = [model]*len(self.clients)
-        return self.stat_monitor.collect(model,test_dataset=self.test_dataset,**monitor_params)
+        return self.stat_monitor.collect(model,epoch=self.round,
+                                        chosen_idxs=chosen_idxs,
+                                        test_dataset=self.test_dataset,
+                                        log=log,**monitor_params)
+    
+    def monitor(self,chosen_idxs = None,log=False):
+        if self.round%self.test_every == 0:
+            self.stat_info = self.val(self.global_model,
+                                    chosen_idxs=chosen_idxs,
+                                    log=log)
+        self.sys_info = self.sys_monitor.collect(epoch=self.round,
+                                                 chosen_idxs=chosen_idxs,
+                                                 log=log)
+        return self.stat_info,self.sys_info
