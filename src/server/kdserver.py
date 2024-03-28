@@ -4,21 +4,22 @@ from torch.utils.data import DataLoader,TensorDataset,StackDataset
 import numpy as np
 import copy
 from server.avgserver import Avg_Server
+from client import ST_Client
 
 class FedDF_Server(Avg_Server):
     def __init__(self, global_model, edge_models, clients, selector, scheduler, 
-                 stat_monitor, sys_monitor, frac=None, weights=None, test_dataset=None, 
-                 local_state_preserve=False, device=torch.device('cpu'), test_every=1, 
+                 stat_monitor, sys_monitor, frac=None, weights=None, 
+                 test_dataset=None, device=torch.device('cpu'), test_every=1, 
                  public_dataset=None, dist_iters=128, dist_lr=5e-3, dist_batch_size=64,
                 **kwargs):
         super().__init__(global_model, clients, selector, scheduler, 
                         stat_monitor, sys_monitor, frac, weights, 
-                        test_dataset, local_state_preserve, 
-                        device, test_every)
+                        test_dataset, device, test_every)
         
         for m in edge_models:
             m.to(device)
         self.global_model["edge_models"] = edge_models
+        self.edge_model_sds = [ST_Client.get_local_state_dict(m) for m in edge_models]
 
         self.public_dataset = public_dataset
         self.tau_s = dist_iters
@@ -55,12 +56,13 @@ class FedDF_Server(Avg_Server):
         new_edge_models = []
         for group,logits in enumerate(logit_group):
             if len(logits) > 0:
-                group_model = super().aggregate(edge_local_model[group],edge_models[group])
+                group_model = super().aggregate(edge_local_model[group],edge_models[group])["model"]
+                group_model = ST_Client.load_local_state_dict(group_model,self.edge_model_sds[group])
                 avg_logits = 0
                 for l in logits:
                     avg_logits += l
                 avg_logits /= len(logits)
-                avg_labels = torch.softmax(avg_logits,dim=1)
+                avg_labels = F.log_softmax(avg_logits,dim=1)
 
                 label_dataset = TensorDataset(avg_labels)
                 KD_dataset = StackDataset(self.public_dataset,label_dataset)
@@ -73,13 +75,15 @@ class FedDF_Server(Avg_Server):
 
                 group_model.train()
                 iters = 0
-                print("=============Training Server Model=================")
+                print("=============Training Edge Model #%d================="%group)
                 while iters < self.tau_s:
-                    for (samples,_),labels in KD_loader:
+                    for (samples,_),(labels,) in KD_loader:
                         samples,labels = samples.to(self.device),labels.to(self.device)
                         group_model.zero_grad()
                         output = group_model(samples)
-                        loss = F.kl_div(F.log_softmax(output,dim=1),labels)
+                        loss = F.kl_div(F.log_softmax(output,dim=1),
+                                        labels,reduction='batchmean',
+                                        log_target=True)
                         loss.backward()
                         optimizer.step()
                         iters+=1
@@ -102,13 +106,12 @@ class FedET_Server(FedDF_Server):
     """
     def __init__(self, global_model, edge_models, clients, selector, scheduler, 
                  stat_monitor, sys_monitor, frac=None, weights=None, test_dataset=None, 
-                 local_state_preserve=False, device=torch.device('cpu'), test_every=1, 
+                 device=torch.device('cpu'), test_every=1, 
                  public_dataset=None, dist_iters=128, dist_lr=5e-3, dist_batch_size=64,
                  diver_lamb=0.05, **kwargs):
         super().__init__(global_model, edge_models, clients, selector, scheduler, 
                         stat_monitor, sys_monitor, frac, weights, 
-                        test_dataset, local_state_preserve, 
-                        device, test_every,public_dataset, 
+                        test_dataset,device, test_every,public_dataset, 
                         dist_iters, dist_lr, dist_batch_size)
         
         self.lamb_s = diver_lamb
@@ -162,7 +165,7 @@ class FedET_Server(FedDF_Server):
             server_model.load_state_dict(server_model_sd)
             # generate consensus label
             pred_variance = torch.vstack(pred_variance)# CxB
-            pred_weights = pred_variance/torch.sum(pred_variance,dim=0,keepdim=True)
+            pred_weights = pred_variance/(torch.sum(pred_variance,dim=0,keepdim=True)+1e-6)
             logit = 0
             for i in range(len(preds)):
                 logit += pred_weights[i].reshape([-1,1])*preds[i] # Bxd
@@ -176,7 +179,7 @@ class FedET_Server(FedDF_Server):
                 div_mask.append(1-torch.eq(l,labels).int()) # B
             div_mask = torch.vstack(div_mask)# CxB
             div_variance = div_mask*pred_variance # only reserve the variance with different labels
-            div_weights = div_variance/torch.sum(div_variance,dim=0,keepdim=True)
+            div_weights = div_variance/(torch.sum(div_variance,dim=0,keepdim=True)+1e-6)
             div_logit = 0
             for i in range(len(preds)):
                 div_logit += div_weights[i].reshape([-1,1])*preds[i] # Bxd
@@ -203,7 +206,9 @@ class FedET_Server(FedDF_Server):
                 server_model.zero_grad()
                 output = server_model(samples)
                 ce_loss = F.cross_entropy(output,labels)
-                kl_loss = F.kl_div(F.log_softmax(output,dim=1),F.softmax(div_logits,dim=1),reduction='batchmean')
+                kl_loss = F.kl_div(F.log_softmax(output,dim=1),
+                                   F.log_softmax(div_logits,dim=1),
+                                   reduction='batchmean',log_target=True)
                 loss = ce_loss + self.lamb_s*kl_loss
                 loss.backward()
                 optimizer.step()

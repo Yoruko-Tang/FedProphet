@@ -237,7 +237,6 @@ if __name__ == '__main__':
                                 frac=args.frac,
                                 weights=weights,
                                 test_dataset=test_dataset,
-                                local_state_preserve=False,
                                 device=device,
                                 test_every = args.test_every)
         elif args.flalg in ["FedBN"]:
@@ -249,6 +248,7 @@ if __name__ == '__main__':
                                 sys_monitor=sys_monitor,
                                 frac=args.frac,
                                 weights=weights,
+                                test_dataset=None,
                                 device=device,
                                 test_every = args.test_every)
         elif args.flalg == "FedProphet":
@@ -261,7 +261,6 @@ if __name__ == '__main__':
                                            frac=args.frac,
                                            weights=weights,
                                            test_dataset=None if args.norm == 'BN' else test_dataset,
-                                           local_state_preserve=(args.norm == 'BN'),
                                            device=device,
                                            test_every = args.test_every)
         elif args.flalg == "FedDF":
@@ -274,8 +273,7 @@ if __name__ == '__main__':
                                 sys_monitor=sys_monitor,
                                 frac=args.frac,
                                 weights=weights,
-                                test_dataset=test_dataset,
-                                local_state_preserve=False,
+                                test_dataset=None,
                                 device=device,
                                 test_every = args.test_every,
                                 public_dataset = public_dataset,
@@ -292,8 +290,7 @@ if __name__ == '__main__':
                                 sys_monitor=sys_monitor,
                                 frac=args.frac,
                                 weights=weights,
-                                test_dataset=test_dataset,
-                                local_state_preserve=False,
+                                test_dataset=None,
                                 device=device,
                                 test_every = args.test_every,
                                 public_dataset = public_dataset,

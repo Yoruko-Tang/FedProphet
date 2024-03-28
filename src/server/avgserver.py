@@ -5,7 +5,7 @@ import torch
 class Avg_Server():
     def __init__(self,global_model,clients,selector,scheduler,
                  stat_monitor,sys_monitor,frac=None,
-                 weights=None,test_dataset=None,local_state_preserve = False,
+                 weights=None,test_dataset=None,
                  device=torch.device('cpu'),test_every=1,**kwargs):
         """
         Avg_Server: Average all parameters among updated models
@@ -25,8 +25,8 @@ class Avg_Server():
             self.weights = weights
         else:
             self.weights = np.ones(self.num_users)/self.num_users
+        
         self.test_dataset = test_dataset
-        self.local_state_preserve = local_state_preserve
 
         self.selector = selector
         self.scheduler = scheduler
@@ -132,8 +132,7 @@ class Avg_Server():
 
     def val(self,model,chosen_idxs = None, log=False):
         monitor_params = self.scheduler.monitor_params()
-        if self.local_state_preserve:
-            model = [model]*len(self.clients)
+
         return self.stat_monitor.collect(model,epoch=self.round,
                                         chosen_idxs=chosen_idxs,
                                         test_dataset=self.test_dataset,
