@@ -150,7 +150,7 @@ if __name__ == '__main__':
                                 sys_info=user_devices[i],
                                 model_profile=edge_model_profiles[0],
                                 init_local_state = [ST_Client.get_local_state_dict(mod) for mod in edge_models],
-                                local_state_preserve = (args.norm == 'BN'),
+                                local_state_preserve = (args.norm == 'BN' and args.flalg == 'FedET'),
                                 test_adv_method=args.advt_method,
                                 test_adv_epsilon=args.advt_epsilon,
                                 test_adv_alpha=args.advt_alpha,

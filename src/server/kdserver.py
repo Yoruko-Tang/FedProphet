@@ -33,7 +33,7 @@ class FedDF_Server(Avg_Server):
 
         # Step 1: generate the logits of each group of model
         edge_local_model = [[None]*self.num_users for _ in range(len(edge_models))]
-        logit_group = [[] for _ in range(len(edge_models))]
+        logits = []
         with torch.no_grad():
             for n,local_model in enumerate(local_models): # calculate logits from edge devices
                 if local_model is not None:
@@ -50,50 +50,50 @@ class FedDF_Server(Avg_Server):
                         pred = local_model(data).cpu()
                         client_preds.append(pred)
 
-                    logit_group[group].append(torch.cat(client_preds))
+                    logits.append(torch.cat(client_preds))
+            avg_logits = 0
+            for l in logits:
+                avg_logits += l
+            avg_logits /= len(logits)
+            avg_logits = F.log_softmax(avg_logits,dim=1)
+
+            label_dataset = TensorDataset(avg_logits)
+            KD_dataset = StackDataset(self.public_dataset,label_dataset)
+            KD_loader = DataLoader(KD_dataset,batch_size=self.b_s,shuffle=True)
+
                 
         # Step 2: Train the server model with Ensemble loss
         new_edge_models = []
-        for group,logits in enumerate(logit_group):
-            if len(logits) > 0:
-                group_model = super().aggregate(edge_local_model[group],edge_models[group])["model"]
-                group_model = ST_Client.load_local_state_dict(group_model,self.edge_model_sds[group])
-                avg_logits = 0
-                for l in logits:
-                    avg_logits += l
-                avg_logits /= len(logits)
-                avg_labels = F.log_softmax(avg_logits,dim=1)
-
-                label_dataset = TensorDataset(avg_labels)
-                KD_dataset = StackDataset(self.public_dataset,label_dataset)
-                KD_loader = DataLoader(KD_dataset,batch_size=self.b_s,shuffle=True)
-
-                group_model.to(self.device)
+        for group in range(len(edge_local_model)):
             
-                optimizer = torch.optim.SGD(group_model.parameters(),
-                                            lr=self.lr_s)
+            group_model = super().aggregate(edge_local_model[group],edge_models[group])["model"]
+            group_model = ST_Client.load_local_state_dict(group_model,self.edge_model_sds[group])
+            
+            group_model.to(self.device)
+        
+            optimizer = torch.optim.SGD(group_model.parameters(),
+                                        lr=self.lr_s)
 
-                group_model.train()
-                iters = 0
-                print("=============Training Edge Model #%d================="%group)
-                while iters < self.tau_s:
-                    for (samples,_),(labels,) in KD_loader:
-                        samples,labels = samples.to(self.device),labels.to(self.device)
-                        group_model.zero_grad()
-                        output = group_model(samples)
-                        loss = F.kl_div(F.log_softmax(output,dim=1),
-                                        labels,reduction='batchmean',
-                                        log_target=True)
-                        loss.backward()
-                        optimizer.step()
-                        iters+=1
-                        if iters == self.tau_s:
-                            break
-                        if iters%10 == 0:
-                            print("Server Iters : {}/{}|\tLoss : {:.4f}".format(iters,self.tau_s,loss.item()))
-                new_edge_models.append(group_model)
-            else:
-                new_edge_models.append(edge_models[group])
+            group_model.train()
+            iters = 0
+            print("=============Training Edge Model #%d================="%group)
+            while iters < self.tau_s:
+                for (samples,_),(labels,) in KD_loader:
+                    samples,labels = samples.to(self.device),labels.to(self.device)
+                    group_model.zero_grad()
+                    output = group_model(samples)
+                    loss = F.kl_div(F.log_softmax(output,dim=1),
+                                    labels,reduction='batchmean',
+                                    log_target=True)
+                    loss.backward()
+                    optimizer.step()
+                    iters+=1
+                    if iters == self.tau_s:
+                        break
+                    if iters%10 == 0:
+                        print("Server Iters : {}/{}|\tLoss : {:.4f}".format(iters,self.tau_s,loss.item()))
+            new_edge_models.append(group_model)
+            
 
         
         
