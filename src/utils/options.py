@@ -220,6 +220,7 @@ def fedprophet_option(parser):
 
 def kd_option(parser):
     # FedET and FedDF Args
+    parser.add_argument('--edge_model_archs',type=str,nargs="+",help="The edge model architectures")
     parser.add_argument('--public_dataset_size',type=int,default=5000,help="number of data in the public set")
     parser.add_argument('--dist_iters',type=int,default=128,help="number of distillation iterations")
     parser.add_argument('--dist_lr',type=float,default=5e-3,help="learning rate for distillation")

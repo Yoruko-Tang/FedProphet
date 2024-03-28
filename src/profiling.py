@@ -104,7 +104,7 @@ from client import *
 
 
 #model = get_net('vgg16_bn','cifar',num_classes=10,adv_norm=True,modularization=True)
-model = get_net('vgg16_bn','cifar',num_classes=10,adv_norm=True,modularization=True,norm_type='LN')
+model = get_net('vgg13_bn','cifar',num_classes=10,adv_norm=True,modularization=True,norm_type='BN')
 print(model.state_dict().keys())
 inputsize = [64,3,32,32]
 

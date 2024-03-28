@@ -24,9 +24,6 @@ def get_net(modelname, modeltype, num_classes=1000,
     modelname: must be exactly the same as the classes in torchvision.models
     e.g., vgg11, vgg16
     """
-    # assert "vgg" in modelname or 'resnet' in modelname, "Only support VGG and ResNet for pretrained model currently"
-    if pretrained:
-        assert modeltype in ["imagenet","cifar"], "Only support imagenet-like or cifar-like datasets with pretrained model currently"
     
     # get pretrained model
     model = eval('models.{}'.format(modelname))(weights="DEFAULT" if pretrained else None)

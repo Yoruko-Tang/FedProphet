@@ -36,16 +36,54 @@ class LeNet5(nn.Module):
         x = self.classifier(x)
 
         return x
+    
+class CNN6(nn.Module):
+    """
+    CNN model for CIFAR-like dataset only
+    """
+    def __init__(self):
+        super().__init__()
+        features = []
+        conv1 = nn.Conv2d(3, 64, 3, padding=1)
+        conv2 = nn.Conv2d(64, 64, 3,padding=1)
+        conv3 = nn.Conv2d(64, 128, 3, padding=1)
+        conv4 = nn.Conv2d(128, 128, 3,padding=1)
+        features += [conv1,nn.BatchNorm2d(64),nn.ReLU(inplace=True),nn.MaxPool2d(kernel_size=2,stride=2)] # 16x16x64
+        features += [conv2,nn.BatchNorm2d(64),nn.ReLU(inplace=True),nn.MaxPool2d(kernel_size=2,stride=2)] # 8x8x64
+        features += [conv3,nn.BatchNorm2d(128),nn.ReLU(inplace=True),nn.MaxPool2d(kernel_size=2,stride=2)] # 4x4x128
+        features += [conv4,nn.BatchNorm2d(128),nn.ReLU(inplace=True),nn.MaxPool2d(kernel_size=2,stride=2)] # 2x2x128
+        self.features = nn.Sequential(*features)
+        classifier = []
+        fc1   = nn.Linear(2*2*128, 512)
+        fc2   = nn.Linear(512, 10)
+        classifier += [fc1,nn.ReLU(inplace=True)]
+        classifier += [fc2]
+
+        self.classifier = nn.Sequential(*classifier)
+
+    def forward(self, x):
+        '''
+        One forward pass through the network.
+        
+        Args:
+            x: input
+        '''
+        x = self.features(x)
+        x = torch.flatten(x,1)
+        x = self.classifier(x)
+
+        return x
 
 def lenet5(**kwargs):
     return LeNet5()
+
+def cnn6(**kwargs):
+    return CNN6()
 
 def adapt(model,modeltype,num_classes):
     """
     Adapt the network with given modeltype and number of classes
     """
-    #if num_classes!=1000: # reinitialize the last layer
-    assert modeltype == 'mnist', "LeNet5 can only be applied on MNIST-like datasets!"
     in_feat = model.classifier[-1].in_features
     model.classifier[-1] = nn.Linear(in_feat, num_classes)
     model.output_size = num_classes
@@ -142,5 +180,6 @@ def set_representation_layer(model):
     """
     Set the representation layer for FedET 
     """
-    model.rep_layers = ["classifier.4.weight","classifier.4.bias"]
+    model.rep_layers = ["classifier.%d.weight"%(len(model.classifier)-1),
+                        "classifier.%d.bias"%(len(model.classifier)-1)]
     return model

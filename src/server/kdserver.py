@@ -33,23 +33,23 @@ class FedDF_Server(Avg_Server):
         # Step 1: generate the logits of each group of model
         edge_local_model = [[None]*self.num_users for _ in range(len(edge_models))]
         logit_group = [[] for _ in range(len(edge_models))]
+        with torch.no_grad():
+            for n,local_model in enumerate(local_models): # calculate logits from edge devices
+                if local_model is not None:
+                    group = training_hyperparameters[n]["model_idx"]
+                    
 
-        for n,local_model in enumerate(local_models): # calculate logits from edge devices
-            if local_model is not None:
-                group = training_hyperparameters[n]["model_idx"]
-                
+                    edge_local_model[group][n] = copy.deepcopy(local_model)
+                    
+                    local_model.to(self.device)
+                    client_preds = []
+                    
+                    for data,_ in transfer_loader: # ignore the original labels
+                        data = data.to(self.device)
+                        pred = local_model(data).cpu()
+                        client_preds.append(pred)
 
-                edge_local_model[group][n] = copy.deepcopy(local_model)
-                
-                local_model.to(self.device)
-                client_preds = []
-                
-                for data,_ in transfer_loader: # ignore the original labels
-                    data = data.to(self.device)
-                    pred = local_model(data).detach()
-                    client_preds.append(pred)
-
-                logit_group[group].append(torch.cat(client_preds))
+                    logit_group[group].append(torch.cat(client_preds))
                 
         # Step 2: Train the server model with Ensemble loss
         new_edge_models = []
@@ -79,13 +79,14 @@ class FedDF_Server(Avg_Server):
                         samples,labels = samples.to(self.device),labels.to(self.device)
                         group_model.zero_grad()
                         output = group_model(samples)
-                        loss = F.kl_div(F.log_softmax(output),labels)
+                        loss = F.kl_div(F.log_softmax(output,dim=1),labels)
                         loss.backward()
                         optimizer.step()
                         iters+=1
                         if iters == self.tau_s:
                             break
-                    print("Server Iters : {}/{}|\tLoss : {:.4f}".format(iters,self.tau_s,loss.item()))
+                        if iters%10 == 0:
+                            print("Server Iters : {}/{}|\tLoss : {:.4f}".format(iters,self.tau_s,loss.item()))
                 new_edge_models.append(group_model)
             else:
                 new_edge_models.append(edge_models[group])
@@ -127,61 +128,61 @@ class FedET_Server(FedDF_Server):
         rep_weight = 0.0 
         rep_bias = 0.0
         weight_count = 0
-        for n,local_model in enumerate(local_models): # calculate logits from edge devices
-            if local_model is not None:
-                group = training_hyperparameters[n]["model_idx"]
-                local_model.to(self.device)
-                w = local_model.state_dict()
-                edge_model_sd[group].append(w)
-                rep_layers = local_model.rep_layers
-                rep_weight += w[rep_layers[0]]
-                rep_bias += w[rep_layers[1]]
-                weight_count += 1
-                local_model.eval()
+        with torch.no_grad():
+            for n,local_model in enumerate(local_models): # calculate logits from edge devices
+                if local_model is not None:
+                    group = training_hyperparameters[n]["model_idx"]
+                    w = local_model.state_dict()
+                    edge_model_sd[group].append(w)
+                    rep_layers = local_model.rep_layers
+                    rep_weight += w[rep_layers[0]]
+                    rep_bias += w[rep_layers[1]]
+                    weight_count += 1
+                    local_model.to(self.device)
+                    local_model.eval()
 
-                client_preds = []
-                client_pred_variance = []
-                for data,_ in transfer_loader: # ignore the original labels
-                    data = data.to(self.device)
-                    pred = local_model(data)
-                    variance = torch.var(pred,dim=1)
-                    client_preds.append(pred)
-                    client_pred_variance.append(variance)
-                preds.append(torch.cat(client_preds))
-                pred_variance.append(torch.cat(client_pred_variance))
-        
-        # Step 1: initialize the last layer of the server model as the average of edge models
-        rep_weight /= weight_count
-        rep_bias /= weight_count
-        server_model = copy.deepcopy(model)
-        server_model_sd = server_model.state_dict()
-        server_model_sd[server_model.rep_layers[0]]=rep_weight
-        server_model_sd[server_model.rep_layers[1]]=rep_bias
-        server_model.load_state_dict(server_model_sd)
-        # generate consensus label
-        pred_variance = torch.vstack(pred_variance)# CxB
-        pred_weights = pred_variance/torch.sum(pred_variance,dim=0,keepdim=True)
-        logit = 0
-        for i in range(len(preds)):
-            logit += pred_weights[i]*preds[i] # Bxd
-        labels = torch.argmax(logit,dim=1).detach().cpu() # B
-        
+                    client_preds = []
+                    client_pred_variance = []
+                    for data,_ in transfer_loader: # ignore the original labels
+                        data = data.to(self.device)
+                        pred = local_model(data).cpu()
+                        variance = torch.var(pred,dim=1)
+                        client_preds.append(pred)
+                        client_pred_variance.append(variance)
+                    preds.append(torch.cat(client_preds))
+                    pred_variance.append(torch.cat(client_pred_variance))
+                    # local_model.to('cpu') # release the gpu memory
+            # Step 1: initialize the last layer of the server model as the average of edge models
+            rep_weight /= weight_count
+            rep_bias /= weight_count
+            server_model = copy.deepcopy(model)
+            server_model_sd = server_model.state_dict()
+            server_model_sd[server_model.rep_layers[0]]=rep_weight
+            server_model_sd[server_model.rep_layers[1]]=rep_bias
+            server_model.load_state_dict(server_model_sd)
+            # generate consensus label
+            pred_variance = torch.vstack(pred_variance)# CxB
+            pred_weights = pred_variance/torch.sum(pred_variance,dim=0,keepdim=True)
+            logit = 0
+            for i in range(len(preds)):
+                logit += pred_weights[i].reshape([-1,1])*preds[i] # Bxd
+            labels = torch.argmax(logit,dim=1) # B
+            
 
-        # generate diversity label
-        div_mask  = []
-        for p in preds:
-            l = torch.argmax(p,dim=1)
-            div_mask.append(1-torch.eq(l,labels).int()) # B
-        div_mask = torch.vstack(div_mask)# CxB
-        div_variance = div_mask*pred_variance # only reserve the variance with different labels
-        div_weights = div_variance/torch.sum(div_variance,dim=0,keepdim=True)
-        div_logit = 0
-        for i in range(len(preds)):
-            div_logit += div_weights[i]*preds[i]
-        div_logits = div_logit.detach().cpu()
-        
+            # generate diversity label
+            div_mask  = []
+            for p in preds:
+                l = torch.argmax(p,dim=1)
+                div_mask.append(1-torch.eq(l,labels).int()) # B
+            div_mask = torch.vstack(div_mask)# CxB
+            div_variance = div_mask*pred_variance # only reserve the variance with different labels
+            div_weights = div_variance/torch.sum(div_variance,dim=0,keepdim=True)
+            div_logit = 0
+            for i in range(len(preds)):
+                div_logit += div_weights[i].reshape([-1,1])*preds[i] # Bxd
 
-        label_dataset = TensorDataset(labels,div_logits)
+
+        label_dataset = TensorDataset(labels,div_logit)
         KD_dataset = StackDataset(self.public_dataset,label_dataset)
 
 
@@ -202,14 +203,15 @@ class FedET_Server(FedDF_Server):
                 server_model.zero_grad()
                 output = server_model(samples)
                 ce_loss = F.cross_entropy(output,labels)
-                kl_loss = F.kl_div(F.log_softmax(output),F.softmax(div_logits))
+                kl_loss = F.kl_div(F.log_softmax(output,dim=1),F.softmax(div_logits,dim=1),reduction='batchmean')
                 loss = ce_loss + self.lamb_s*kl_loss
                 loss.backward()
                 optimizer.step()
                 iters+=1
                 if iters == self.tau_s:
                     break
-            print("Server Iters : {}/{}|\tLoss : {:.4f}".format(iters,self.tau_s,loss.item()))
+                if iters%10 == 0:
+                    print("Server Iters : {}/{}|\tLoss : {:.4f}|\tCE Loss: {:.4f}|\tKL Loss: {:.4f}".format(iters,self.tau_s,loss.item(),ce_loss.item(),kl_loss.item()))
 
         # Step 3: Update Edge Models
         new_edge_models = []
@@ -224,8 +226,8 @@ class FedET_Server(FedDF_Server):
                         w += ew[p]
                     
                     w0[p] = w/len(group_weights)
-            w0[edge_model.rep_layers[0]] = copy.deepcopy(server_model.state_dict()[server_model.rep_layer[0]])
-            w0[edge_model.rep_layers[1]] = copy.deepcopy(server_model.state_dict()[server_model.rep_layer[1]])
+            w0[edge_model.rep_layers[0]] = copy.deepcopy(server_model.state_dict()[server_model.rep_layers[0]])
+            w0[edge_model.rep_layers[1]] = copy.deepcopy(server_model.state_dict()[server_model.rep_layers[1]])
             edge_model.load_state_dict(w0)
             new_edge_models.append(edge_model)
         
