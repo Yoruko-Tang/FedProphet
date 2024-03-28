@@ -67,14 +67,18 @@ class ST_Stat_Monitor():
                 test_accs,test_losses = [],[]
                 for n in range(len(global_model)):
                     # test_param = dict(validation_kwargs,**global_model[n])
-                    test_acc_n,test_loss_n = self.clients[n].validate(testset=test_dataset,**global_model[n],**validation_kwargs)
+                    test_acc_n,test_loss_n = self.clients[n].validate(testset=test_dataset,
+                                                                      **global_model[n],
+                                                                      **validation_kwargs)
                     test_accs.append(test_acc_n)
                     test_losses.append(test_loss_n)
                 test_acc,test_loss = np.mean(test_accs),np.mean(test_losses)
                 
             else:
                 # test_param = dict(validation_kwargs,**global_model)
-                test_acc,test_loss = self.clients[0].validate(testset=test_dataset,**global_model,**validation_kwargs)
+                test_acc,test_loss = self.clients[0].validate(testset=test_dataset,
+                                                              **global_model,
+                                                              **validation_kwargs)
         
         else:
             test_acc,test_loss = 0,None

@@ -124,7 +124,7 @@ class Module_Client(AT_Client):
         # model preparation
         model = copy.deepcopy(model) # avoid modifying global model
         model.to(self.device)
-        if self.local_states is not None:
+        if self.local_state_preserve and self.local_states is not None:
             model = self.load_local_state_dict(model,self.local_states)
         
 
@@ -147,7 +147,7 @@ class Module_Client(AT_Client):
             if current_aux_model is not None:
                 final_output = current_aux_model(output)
                 stage_task_loss = criterion(final_output,label)
-                stage_cvx_loss = mu*torch.sum(torch.square(output))/(2*len(output))
+                stage_cvx_loss = torch.sum(torch.square(output))/len(output)
                 if output_dict is not None:
                     output_dict.update({"stage_task_loss":stage_task_loss.item(),"stage_cvx_loss":stage_cvx_loss.item()})
             else:
@@ -156,19 +156,17 @@ class Module_Client(AT_Client):
                 stage_cvx_loss = 0
                 if output_dict is not None:
                     output_dict.update({"stage_task_loss":stage_task_loss.item(),"stage_cvx_loss":0})
+               
             
-            
-            loss = stage_task_loss+stage_cvx_loss
-            
-            
-            if len(prophet_module_list)>0:
+            if len(prophet_module_list)>0 and psi > 0:
                 prophet_output = model.module_forward(output,prophet_module_list)
                 if future_aux_model is not None:
                     prophet_final_output = future_aux_model(prophet_output)
                     prophet_task_loss = criterion(prophet_final_output,label)
-                    prophet_cvx_loss = mu*torch.sum(torch.square(prophet_output))/(2*len(prophet_output))
+                    #prophet_cvx_loss = torch.sum(torch.square(prophet_output))/len(prophet_output)
+                    prophet_cvx_loss = 0
                     if output_dict is not None:
-                        output_dict.update({"prophet_task_loss":prophet_task_loss.item(),"prophet_cvx_loss":prophet_cvx_loss.item()})
+                        output_dict.update({"prophet_task_loss":prophet_task_loss.item(),"prophet_cvx_loss":0})#prophet_cvx_loss.item()})
                 else:
                     prophet_final_output = prophet_output
                     prophet_task_loss = criterion(prophet_final_output,label)
@@ -176,9 +174,12 @@ class Module_Client(AT_Client):
                     if output_dict is not None:
                         output_dict.update({"prophet_task_loss":prophet_task_loss.item(),"prophet_cvx_loss":0})
                 
-                
-                prophet_loss = prophet_task_loss + prophet_cvx_loss
-                loss = loss*(1-psi)+prophet_loss*psi
+                loss = (1-psi)*stage_task_loss+psi*prophet_task_loss+mu/2*(stage_cvx_loss+prophet_cvx_loss)
+            else:
+                loss = stage_task_loss+mu/2*stage_cvx_loss
+
+            
+            # loss = loss*(1-psi)+prophet_loss*psi
                 
             return loss
 
@@ -236,7 +237,7 @@ class Module_Client(AT_Client):
                 model.train()
                 model.zero_grad()
                 output_losses = {}
-                loss = fedprophet_loss(model,datas,labels,output_losses)
+                loss = fedprophet_loss(model,datas,labels,output_dict=output_losses)
                 loss.backward()
                 opt.step()
                 iters += 1
@@ -270,12 +271,13 @@ class Module_Client(AT_Client):
         
     def validate(self,model,aux_models,module_list,
                  aux_module_name = None,testset=None,
-                 criterion=torch.nn.CrossEntropyLoss(),**kwargs):
+                 criterion=torch.nn.CrossEntropyLoss(),
+                 load_local_state = True,**kwargs):
         """ Returns the validation accuracy and loss."""
         
         model = copy.deepcopy(model) # avoid modifying global model
         model.to(self.device)
-        if self.local_states is not None:
+        if load_local_state and self.local_states is not None:
             model = self.load_local_state_dict(model,self.local_states)
         
         model.eval()
@@ -310,12 +312,13 @@ class Module_Client(AT_Client):
     
     def adv_validate(self,model,aux_models,module_list,
                      aux_module_name = None, testset=None,
-                     criterion=torch.nn.CrossEntropyLoss(),**kwargs):
+                     criterion=torch.nn.CrossEntropyLoss(),
+                     load_local_state = True,**kwargs):
         """ Returns the validation adversarial accuracy and adversarial loss."""
         
         model = copy.deepcopy(model) # avoid modifying global model
         model.to(self.device)
-        if self.local_states is not None:
+        if load_local_state and self.local_states is not None:
             model = self.load_local_state_dict(model,self.local_states)
         
         model.eval()

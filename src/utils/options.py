@@ -13,6 +13,7 @@ def args_parser():
     harmony_option(parser)
     
     at_option(parser)
+    
     fedprophet_option(parser)
     kd_option(parser)
     
@@ -67,10 +68,7 @@ def fl_options(parser):
     ## FL algorithm options
     parser.add_argument('--flalg',type=str,default='FedAvg',
                         help="The algorithm for FL optimizer")
-    parser.add_argument('--epochs', type=int, default=10,
-                        help="number of rounds of training")
-    parser.add_argument('--target_accuracy',type=float,default=None,
-                        help='stop at a specified test accuracy')
+    
 
     # selector arguments
     parser.add_argument('--strategy',type=str,default='rand',
@@ -79,7 +77,11 @@ def fl_options(parser):
     parser.add_argument('--frac', type=float, default=0.1,
                         help='the fraction of clients: C')
     
-    # local optimizer args
+    # optimizer args
+    parser.add_argument('--epochs', type=int, default=10,
+                        help="number of rounds of training")
+    parser.add_argument('--target_accuracy',type=float,default=None,
+                        help='stop at a specified test accuracy')
     parser.add_argument('--local_ep', type=int, default=10,
                         help="the number of local epochs: E")
     parser.add_argument('--local_bs', type=int, default=10,
@@ -177,12 +179,9 @@ def harmony_option(parser):
 
 def at_option(parser):
     # AT args
+    # Adversarial Training
     parser.add_argument('--adv_train', action = 'store_true',
                         help = 'Use adversarial samples for training')
-    parser.add_argument('--adv_test', action = 'store_true',
-                        help = 'Use adversarial samples for test')
-    # Adversarial Training
-    parser.add_argument('--adv_warmup',type = int,default = 0,help='length of warm up phase')
     parser.add_argument('--adv_method',type = str, choices=['PGD','BIM','FGSM','FGSM_RS'],default='PGD',
                         help = 'Kind of adversarial attack')
     parser.add_argument('--adv_epsilon',type = float, default=8/255)
@@ -190,12 +189,15 @@ def at_option(parser):
     parser.add_argument('--adv_T', type = int, default=10)
     parser.add_argument('--adv_norm', type = str, default='inf')
     parser.add_argument('--adv_bound',type = float,nargs=2, default=[0.0,1.0])
+    parser.add_argument('--adv_warmup',type = int,default = 0,help='length of warm up phase')
     parser.add_argument('--warmup_adv_ratio', type = float,default=0.0,
                         help = 'Ratio of adversarial training samples in warmup phase')
     parser.add_argument('--adv_ratio', type = float,default=1.0,
                         help = 'Ratio of adversarial training samples after warmup phase')
     
-    
+    # Adversarial Test
+    parser.add_argument('--adv_test', action = 'store_true',
+                        help = 'Use adversarial samples for test')
     parser.add_argument('--advt_method',type = str, choices=['PGD','BIM','FGSM','FGSM_RS'],default='PGD',
                         help = 'Kind of adversarial attack in test time')
     parser.add_argument('--advt_epsilon',type = float, default=8/255)
@@ -206,7 +208,7 @@ def at_option(parser):
 
 
 def fedprophet_option(parser):
-    
+    # FedProphet Args
     parser.add_argument('--mu',type = float,default=0.0, help='mu in fedprophet')
     parser.add_argument('--lamb',type = float,default=0.0, help='lambda in fedprophet')
     parser.add_argument('--psi',type = float,default=0.0, help='psi in fedprophet')
@@ -217,13 +219,10 @@ def fedprophet_option(parser):
 
 
 def kd_option(parser):
+    # FedET and FedDF Args
+    parser.add_argument('--public_dataset_size',type=int,default=5000,help="number of data in the public set")
     parser.add_argument('--dist_iters',type=int,default=128,help="number of distillation iterations")
     parser.add_argument('--dist_lr',type=float,default=5e-3,help="learning rate for distillation")
     parser.add_argument('--dist_batch_size',type=int,default=64,help="batch size for distillation")
     parser.add_argument('--diver_lamb',type=float,default=0.05,help="weight of diversity loss")
 
-
-
-if __name__ == '__main__':
-    args = args_parser()
-    print(args.mlp_layers)

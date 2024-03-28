@@ -4,6 +4,7 @@ import datetime
 import json
 from tqdm import tqdm
 import torch
+from torch.utils.data import Subset
 from copy import deepcopy
 
 from client import *
@@ -57,6 +58,10 @@ if __name__ == '__main__':
         if seed is not None:
             setup_seed(seed)
 
+        if args.flalg in ["FedDF","FedET"]:
+            subset_idxs = np.random.choice(range(len(test_dataset)),args.public_dataset_size,replace=False)
+            public_dataset = Subset(test_dataset,subset_idxs)
+
         ## ==================================Build Model==================================
         # try to get the model from torchvision.models with pretraining
         global_model = get_net(modelname = args.model_arch,
@@ -72,13 +77,14 @@ if __name__ == '__main__':
                                       default_local_eps=args.local_ep,
                                       **vars(args))
         
-        if args.flalg in ['FedET','FedETAT']:# generate small edge models
+        if args.flalg in ['FedET','FedDF']:# generate small edge models
             edge_models = []
             for m in args.edge_model_archs:
                 edge_models.append(get_net(modelname = m,
                                     modeltype = dataset_to_datafamily[args.dataset],
                                     num_classes = args.num_classes,
                                     pretrained = args.pretrained,
+                                    norm_type = args.norm,
                                     adv_norm = (args.adv_train or args.adv_test)))
             print(edge_models)
             edge_model_profiles = []
@@ -89,57 +95,39 @@ if __name__ == '__main__':
                                             **vars(args)))
 
         ## ==================================Build Clients==================================
-        if args.flalg in ['FedAvg','FedET']:
-            clients = [ST_Client(train_dataset,user_groups[i],
-                                 sys_info=user_devices[i],
-                                 model_profile=model_profile,
-                                 local_state_preserve = False,
-                                 device=device,verbose=args.verbose,
-                                 random_seed=i+args.device_random_seed,
-                                 reserved_memory=args.reserved_mem
-                                 ) for i in range(args.num_users)]
-        elif args.flalg == 'FedBN':
-            clients = [ST_Client(train_dataset,user_groups[i],
-                                 sys_info=user_devices[i],
-                                 model_profile=model_profile,
-                                 init_local_state = ST_Client.get_local_state_dict(global_model),
-                                 local_state_preserve = True,
-                                 device=device,verbose=args.verbose,
-                                 random_seed=i+args.device_random_seed,
-                                 reserved_memory=args.reserved_mem
-                                 ) for i in range(args.num_users)]
-        
-        elif args.flalg in ['FedAvgAT','FedETAT']:
+        if args.flalg in ['FedAvg']:
             clients = [AT_Client(train_dataset,user_groups[i],
-                                 sys_info=user_devices[i],
-                                 model_profile=model_profile,
-                                 local_state_preserve = False,
-                                 test_adv_method=args.advt_method,
-                                 test_adv_epsilon=args.advt_epsilon,
-                                 test_adv_alpha=args.advt_alpha,
-                                 test_adv_T=args.advt_T,
-                                 test_adv_norm = args.advt_norm,
-                                 test_adv_bound = args.advt_bound,
-                                 device=device,verbose=args.verbose,
-                                 random_seed=i+args.device_random_seed,
-                                 reserved_memory=args.reserved_mem
-                                 ) for i in range(args.num_users)]
-        elif args.flalg == 'FedBNAT':
+                                sys_info=user_devices[i],
+                                model_profile=model_profile,
+                                local_state_preserve = False,
+                                test_adv_method=args.advt_method,
+                                test_adv_epsilon=args.advt_epsilon,
+                                test_adv_alpha=args.advt_alpha,
+                                test_adv_T=args.advt_T,
+                                test_adv_norm = args.advt_norm,
+                                test_adv_bound = args.advt_bound,
+                                device=device,verbose=args.verbose,
+                                random_seed=i+args.device_random_seed,
+                                reserved_memory=args.reserved_mem
+                                ) for i in range(args.num_users)]
+                  
+        elif args.flalg in ['FedBN']:
             clients = [AT_Client(train_dataset,user_groups[i],
-                                 sys_info=user_devices[i],
-                                 model_profile=model_profile,
-                                 init_local_state = ST_Client.get_local_state_dict(global_model),
-                                 local_state_preserve = True,
-                                 test_adv_method=args.advt_method,
-                                 test_adv_epsilon=args.advt_epsilon,
-                                 test_adv_alpha=args.advt_alpha,
-                                 test_adv_T=args.advt_T,
-                                 test_adv_norm = args.advt_norm,
-                                 test_adv_bound = args.advt_bound,
-                                 device=device,verbose=args.verbose,
-                                 random_seed=i+args.device_random_seed,
-                                 reserved_memory=args.reserved_mem
-                                 ) for i in range(args.num_users)]
+                                sys_info=user_devices[i],
+                                model_profile=model_profile,
+                                init_local_state = ST_Client.get_local_state_dict(global_model),
+                                local_state_preserve = True,
+                                test_adv_method=args.advt_method,
+                                test_adv_epsilon=args.advt_epsilon,
+                                test_adv_alpha=args.advt_alpha,
+                                test_adv_T=args.advt_T,
+                                test_adv_norm = args.advt_norm,
+                                test_adv_bound = args.advt_bound,
+                                device=device,verbose=args.verbose,
+                                random_seed=i+args.device_random_seed,
+                                reserved_memory=args.reserved_mem
+                                ) for i in range(args.num_users)]
+            
         elif args.flalg == 'FedProphet':
             clients = [Module_Client(train_dataset,user_groups[i],
                                      sys_info=user_devices[i],
@@ -156,6 +144,23 @@ if __name__ == '__main__':
                                      random_seed=i+args.device_random_seed,
                                      reserved_memory=args.reserved_mem
                                      ) for i in range(args.num_users)]
+        
+        elif args.flalg in ["FedDF","FedET"]:
+            clients = [Multimodel_Client(train_dataset,user_groups[i],
+                                sys_info=user_devices[i],
+                                model_profile=edge_model_profiles[0],
+                                init_local_state = [ST_Client.get_local_state_dict(mod) for mod in edge_models],
+                                local_state_preserve = (args.norm == 'BN'),
+                                test_adv_method=args.advt_method,
+                                test_adv_epsilon=args.advt_epsilon,
+                                test_adv_alpha=args.advt_alpha,
+                                test_adv_T=args.advt_T,
+                                test_adv_norm = args.advt_norm,
+                                test_adv_bound = args.advt_bound,
+                                device=device,verbose=args.verbose,
+                                random_seed=i+args.device_random_seed,
+                                reserved_memory=args.reserved_mem
+                                ) for i in range(args.num_users)]
         # Todo: add other types of clients
         else:
             raise RuntimeError("Not supported FL optimizer: "+args.flalg) 
@@ -174,17 +179,17 @@ if __name__ == '__main__':
         
         ##  ==================================Build Scheduler==================================
         if args.flalg in ["FedAvg","FedBN"]:
-            scheduler = base_scheduler(vars(args))
-        elif args.flalg in ["FedAvgAT","FedBNAT"]:
             scheduler = base_AT_scheduler(vars(args))
+        
         elif args.flalg == "FedProphet":
             scheduler = module_scheduler(vars(args),
                                          model_profile=model_profile,
                                          clients=clients,
                                          log_path=file_name)
-        elif args.flalg in ["FedET","FedETAT"]:
+        elif args.flalg in ["FedET","FedDF"]:
             scheduler = kd_scheduler(vars(args),
-                                     model_profiles=edge_model_profiles)
+                                     model_profiles=edge_model_profiles,
+                                     global_val = (args.flalg == "FedET"))
         # Todo: Add schedulers for other baselines
         else:
             raise RuntimeError("FL optimizer {} has no registered scheduler!".format(args.flalg)) 
@@ -222,7 +227,7 @@ if __name__ == '__main__':
             raise NotImplementedError("Not a supported selection strategy: {}".format(args.strategy))
         
         ## ==================================Build Server==================================
-        if args.flalg in ["FedAvg","FedAvgAT"]:
+        if args.flalg in ["FedAvg"]:
             server = Avg_Server(global_model=global_model,
                                 clients = clients,
                                 selector = selector,
@@ -235,7 +240,7 @@ if __name__ == '__main__':
                                 local_state_preserve=False,
                                 device=device,
                                 test_every = args.test_every)
-        elif args.flalg in ["FedBN","FedBNAT"]:
+        elif args.flalg in ["FedBN"]:
             server = Avg_Server(global_model=global_model,
                                 clients = clients,
                                 selector = selector,
@@ -259,7 +264,25 @@ if __name__ == '__main__':
                                            local_state_preserve=(args.norm == 'BN'),
                                            device=device,
                                            test_every = args.test_every)
-        elif args.flalg in ["FedET","FedETAT"]:
+        elif args.flalg == "FedDF":
+            server = FedDF_Server(global_model=global_model,
+                                edge_models = edge_models,
+                                clients = clients,
+                                selector = selector,
+                                scheduler = scheduler,
+                                stat_monitor=stat_monitor,
+                                sys_monitor=sys_monitor,
+                                frac=args.frac,
+                                weights=weights,
+                                test_dataset=test_dataset,
+                                local_state_preserve=False,
+                                device=device,
+                                test_every = args.test_every,
+                                public_dataset = public_dataset,
+                                dist_iters = args.dist_iters,
+                                dist_lr = args.dist_lr,
+                                dist_batch_size = args.dist_batch_size)
+        elif args.flalg == "FedET":
             server = FedET_Server(global_model=global_model,
                                 edge_models = edge_models,
                                 clients = clients,
@@ -273,7 +296,7 @@ if __name__ == '__main__':
                                 local_state_preserve=False,
                                 device=device,
                                 test_every = args.test_every,
-                                public_dataset = test_dataset,
+                                public_dataset = public_dataset,
                                 dist_iters = args.dist_iters,
                                 dist_lr = args.dist_lr,
                                 dist_batch_size = args.dist_batch_size,

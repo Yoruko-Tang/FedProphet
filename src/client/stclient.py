@@ -79,7 +79,7 @@ class ST_Client():
 
         model = copy.deepcopy(model) # avoid modifying global model
         model.to(self.device)
-        if self.local_states is not None:
+        if self.local_state_preserve and self.local_states is not None:
             model = self.load_local_state_dict(model,self.local_states)
         
 
@@ -129,11 +129,12 @@ class ST_Client():
 
         return model
 
-    def validate(self,model,testset=None,criterion=torch.nn.CrossEntropyLoss(),**kwargs):
+    def validate(self,model,testset=None,criterion=torch.nn.CrossEntropyLoss(),
+                 load_local_state = True,**kwargs):
         """ Returns the validation accuracy and loss."""
         model = copy.deepcopy(model) # avoid modifying global model
         model.to(self.device)
-        if self.local_states is not None:
+        if load_local_state and self.local_states is not None:
             model = self.load_local_state_dict(model,self.local_states)
         
         model.eval()
