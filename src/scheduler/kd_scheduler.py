@@ -31,11 +31,11 @@ class kd_scheduler(base_AT_scheduler):
     
     def monitor_params(self, **kwargs):
         args = super().monitor_params()
-        args["load_local_state"] = False # always validate the server model
+        # args["load_local_state"] = True 
         if self.global_val: # FedET
             args["model_idx"] = None
         else: # FedDF
-            args["model_idx"] = -1 # validate the model trained by this client in the last time
+            args["model_idx"] = 0 # validate the largest model 
 
         return args
 

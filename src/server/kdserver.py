@@ -72,7 +72,8 @@ class FedDF_Server(Avg_Server):
             group_model.to(self.device)
         
             optimizer = torch.optim.SGD(group_model.parameters(),
-                                        lr=self.lr_s)
+                                        lr=self.lr_s,
+                                        momentum=0.9)
 
             group_model.train()
             iters = 0
@@ -195,7 +196,8 @@ class FedET_Server(FedDF_Server):
         server_model.to(self.device)
         
         optimizer = torch.optim.SGD(server_model.parameters(),
-                                    lr=self.lr_s)
+                                    lr=self.lr_s,
+                                    momentum=0.9)
 
         server_model.train()
         iters = 0
@@ -221,20 +223,22 @@ class FedET_Server(FedDF_Server):
         # Step 3: Update Edge Models
         new_edge_models = []
         for g,group_weights in enumerate(edge_model_sd):
-            
-            edge_model = copy.deepcopy(edge_models[g])
-            w0 = edge_model.state_dict()
-            if len(group_weights)>0:
-                for p in w0:
-                    w = 0
-                    for ew in group_weights:
-                        w += ew[p]
-                    
-                    w0[p] = w/len(group_weights)
-            w0[edge_model.rep_layers[0]] = copy.deepcopy(server_model.state_dict()[server_model.rep_layers[0]])
-            w0[edge_model.rep_layers[1]] = copy.deepcopy(server_model.state_dict()[server_model.rep_layers[1]])
-            edge_model.load_state_dict(w0)
-            new_edge_models.append(edge_model)
+            if g == 0: # use the server model as the largest model directly
+                new_edge_models.append(server_model)
+            else:
+                edge_model = copy.deepcopy(edge_models[g])
+                w0 = edge_model.state_dict()
+                if len(group_weights)>0:
+                    for p in w0:
+                        w = 0
+                        for ew in group_weights:
+                            w += ew[p]
+                        
+                        w0[p] = w/len(group_weights)
+                w0[edge_model.rep_layers[0]] = copy.deepcopy(server_model.state_dict()[server_model.rep_layers[0]])
+                w0[edge_model.rep_layers[1]] = copy.deepcopy(server_model.state_dict()[server_model.rep_layers[1]])
+                edge_model.load_state_dict(w0)
+                new_edge_models.append(edge_model)
         
         return {"model":server_model,"edge_models":new_edge_models}
 

@@ -23,9 +23,11 @@ def get_log_path(args):
         file_name = f"./save/{args.dataset}_{args.model_arch}_{args.epochs}_N[{args.num_users}]_{'all' if args.frac == 1.0 else args.strategy}[{args.frac}]_iid_sys[{args.sys_scaling_factor}]_E[{args.local_ep}]_B[{args.local_bs}]_lr[{args.lr}({args.lr_decay})]"
     
     file_name = os.path.join(file_name,args.flalg)
+    if int(args.adv_train)*args.adv_ratio > 0:
+        file_name += "AT{}".format(int(args.adv_train)*args.adv_ratio)
 
     if args.flalg == 'FedProphet':
-        file_name = os.path.join(file_name,"mu{}_lambda{}_psi{}_at{}_quan{}_{}_ada{}".format(args.mu,args.lamb,args.psi,int(args.adv_train)*args.adv_ratio,args.eps_quantile,args.int_adv_norm,int(args.adapt_eps)))
+        file_name = os.path.join(file_name,"mu{}_lambda{}_psi{}_quan{}_ada{}".format(args.mu,args.lamb,args.psi,args.eps_quantile,int(args.adapt_eps)))
     
     
     if not os.path.exists(file_name):
