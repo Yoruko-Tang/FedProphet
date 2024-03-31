@@ -149,7 +149,7 @@ if __name__ == '__main__':
             clients = [Multimodel_Client(train_dataset,user_groups[i],
                                 sys_info=user_devices[i],
                                 model_profile=edge_model_profiles[0],
-                                init_local_state = [None if args.flalg=='FedDF' else ST_Client.get_local_state_dict(mod) for mod in edge_models],
+                                init_local_state = [None for mod in edge_models],
                                 local_state_preserve = (args.norm == 'BN'),
                                 test_adv_method=args.advt_method,
                                 test_adv_epsilon=args.advt_epsilon,
@@ -188,8 +188,8 @@ if __name__ == '__main__':
                                          log_path=file_name)
         elif args.flalg in ["FedET","FedDF"]:
             scheduler = kd_scheduler(vars(args),
-                                     model_profiles=edge_model_profiles,
-                                     global_val = (args.flalg == "FedET"))
+                                     model_profiles=edge_model_profiles)
+                                     #global_val = (args.flalg == "FedET"))
         # Todo: Add schedulers for other baselines
         else:
             raise RuntimeError("FL optimizer {} has no registered scheduler!".format(args.flalg)) 

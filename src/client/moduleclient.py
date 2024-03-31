@@ -150,33 +150,30 @@ class Module_Client(AT_Client):
                 stage_cvx_loss = torch.sum(torch.square(output))/len(output)
                 if output_dict is not None:
                     output_dict.update({"stage_task_loss":stage_task_loss.item(),"stage_cvx_loss":stage_cvx_loss.item()})
-            else:
-                final_output = output
-                stage_task_loss = criterion(final_output,label)
+            else: 
+                stage_task_loss = criterion(output,label)
                 stage_cvx_loss = 0
                 if output_dict is not None:
                     output_dict.update({"stage_task_loss":stage_task_loss.item(),"stage_cvx_loss":0})
-               
+            stage_loss = stage_task_loss + mu/2*stage_cvx_loss
             
             if len(prophet_module_list)>0 and psi > 0:
                 prophet_output = model.module_forward(output,prophet_module_list)
                 if future_aux_model is not None:
                     prophet_final_output = future_aux_model(prophet_output)
                     prophet_task_loss = criterion(prophet_final_output,label)
-                    #prophet_cvx_loss = torch.sum(torch.square(prophet_output))/len(prophet_output)
-                    prophet_cvx_loss = 0
+                    prophet_cvx_loss = torch.sum(torch.square(prophet_output))/len(prophet_output)
                     if output_dict is not None:
-                        output_dict.update({"prophet_task_loss":prophet_task_loss.item(),"prophet_cvx_loss":0})#prophet_cvx_loss.item()})
+                        output_dict.update({"prophet_task_loss":prophet_task_loss.item(),"prophet_cvx_loss":prophet_cvx_loss.item()})
                 else:
-                    prophet_final_output = prophet_output
-                    prophet_task_loss = criterion(prophet_final_output,label)
+                    prophet_task_loss = criterion(prophet_output,label)
                     prophet_cvx_loss = 0
                     if output_dict is not None:
                         output_dict.update({"prophet_task_loss":prophet_task_loss.item(),"prophet_cvx_loss":0})
-                
-                loss = (1-psi)*stage_task_loss+psi*prophet_task_loss+mu/2*(stage_cvx_loss+prophet_cvx_loss)
+                prophet_loss = prophet_task_loss + mu/2*prophet_cvx_loss
+                loss = (1-psi)*stage_loss+psi*prophet_loss
             else:
-                loss = stage_task_loss+mu/2*stage_cvx_loss
+                loss = stage_loss
 
             
             # loss = loss*(1-psi)+prophet_loss*psi
