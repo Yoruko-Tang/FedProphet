@@ -189,7 +189,6 @@ if __name__ == '__main__':
         elif args.flalg in ["FedET","FedDF"]:
             scheduler = kd_scheduler(vars(args),
                                      model_profiles=edge_model_profiles)
-                                     #global_val = (args.flalg == "FedET"))
         # Todo: Add schedulers for other baselines
         else:
             raise RuntimeError("FL optimizer {} has no registered scheduler!".format(args.flalg)) 

@@ -170,14 +170,14 @@ class FedET_Server(FedDF_Server):
             logit = 0
             for i in range(len(preds)):
                 logit += pred_weights[i].reshape([-1,1])*preds[i] # Bxd
-            labels = torch.argmax(logit,dim=1) # B
+            label = torch.argmax(logit,dim=1) # B
             
 
             # generate diversity label
             div_mask  = []
             for p in preds:
                 l = torch.argmax(p,dim=1)
-                div_mask.append(1-torch.eq(l,labels).int()) # B
+                div_mask.append(1-torch.eq(l,label).int()) # B
             div_mask = torch.vstack(div_mask)# CxB
             div_variance = div_mask*pred_variance # only reserve the variance with different labels
             div_weights = div_variance/(torch.sum(div_variance,dim=0,keepdim=True)+1e-6)
@@ -186,7 +186,7 @@ class FedET_Server(FedDF_Server):
                 div_logit += div_weights[i].reshape([-1,1])*preds[i] # Bxd
 
 
-        label_dataset = TensorDataset(labels,div_logit)
+        label_dataset = TensorDataset(label,div_logit)
         KD_dataset = StackDataset(self.public_dataset,label_dataset)
 
 

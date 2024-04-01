@@ -3,7 +3,7 @@ import numpy as np
 
 class kd_scheduler(base_AT_scheduler):
 
-    def __init__(self, args, model_profiles, global_val = True):
+    def __init__(self, args, model_profiles):
         super().__init__(args)
         self.model_profiles = model_profiles
         self.memory_reqs = [mp.mem_dict['total'] for mp in self.model_profiles]
@@ -11,7 +11,7 @@ class kd_scheduler(base_AT_scheduler):
 
         self.available_memory = None
 
-        self.global_val = global_val
+        
 
     def training_params(self, idx, **kwargs):
         args = super().training_params()
