@@ -223,9 +223,9 @@ class FedET_Server(FedDF_Server):
         # Step 3: Update Edge Models
         new_edge_models = []
         for g,group_weights in enumerate(edge_model_sd):
-            if g == 0: # use the server model as the largest model directly
-                new_edge_models.append(server_model)
-            else:
+            # if g == 0: # use the server model as the largest model directly
+            #     new_edge_models.append(server_model)
+            # else:
                 edge_model = copy.deepcopy(edge_models[g])
                 w0 = edge_model.state_dict()
                 if len(group_weights)>0:
