@@ -35,12 +35,12 @@ class FedDF_Server(Avg_Server):
         edge_local_model = [[None]*self.num_users for _ in range(len(edge_models))]
         logits = []
         with torch.no_grad():
-            for n,local_model in enumerate(local_models): # calculate logits from edge devices
-                if local_model is not None:
+            for n,lm in enumerate(local_models): # calculate logits from edge devices
+                if lm is not None:
                     group = training_hyperparameters[n]["model_idx"]
-                    
+                    local_model = lm["model"]
 
-                    edge_local_model[group][n] = copy.deepcopy(local_model)
+                    edge_local_model[group][n] = copy.deepcopy(lm)
                     
                     local_model.to(self.device)
                     client_preds = []
@@ -133,16 +133,18 @@ class FedET_Server(FedDF_Server):
         rep_bias = 0.0
         weight_count = 0
         with torch.no_grad():
-            for n,local_model in enumerate(local_models): # calculate logits from edge devices
-                if local_model is not None:
+            for n,lm in enumerate(local_models): # calculate logits from edge devices
+                if lm is not None:
                     group = training_hyperparameters[n]["model_idx"]
+                    local_model = lm["model"]
+                    local_model.to(self.device)
                     w = local_model.state_dict()
                     edge_model_sd[group].append(w)
                     rep_layers = local_model.rep_layers
                     rep_weight += w[rep_layers[0]]
                     rep_bias += w[rep_layers[1]]
                     weight_count += 1
-                    local_model.to(self.device)
+                    
                     local_model.eval()
 
                     client_preds = []

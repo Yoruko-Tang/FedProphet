@@ -7,7 +7,7 @@ import copy
 import numpy as np
 
 from utils.adversarial import Adv_Sample_Generator
-from hardware.sys_utils import sample_runtime_app,sample_networks,model_summary
+from hardware.sys_utils import model_summary
 
 
 
@@ -187,28 +187,28 @@ class Module_Client(AT_Client):
         self.trainloader = DataLoader(self.feature_trainset,batch_size=local_bs,shuffle=True)
 
         # Set optimizer for the local updates
-        np = model.parameters()
+        param = model.parameters()
         if current_aux_model is not None:
-            anp = current_aux_model.parameters()
+            aparam = current_aux_model.parameters()
         else:
-            anp = []
+            aparam = []
         if future_aux_model is not None:
-            panp = future_aux_model.parameters()
+            paparam = future_aux_model.parameters()
         else:
-            panp = []
+            paparam = []
         # normalize the step size of the stage aux model
         #alr = lr/(1-psi) if len(prophet_module_list)>0 else lr
         alr = lr
         if optimizer == 'sgd':
-            opt = torch.optim.SGD([{'params':np,'lr':lr,'weight_decay':reg},
-                                        {'params':anp,'lr':alr,'weight_decay':lamb},
-                                        {'params':panp,'lr':lr,'weight_decay':lamb}], 
+            opt = torch.optim.SGD([{'params':param,'lr':lr,'weight_decay':reg},
+                                        {'params':aparam,'lr':alr,'weight_decay':lamb},
+                                        {'params':paparam,'lr':lr,'weight_decay':lamb}], 
                                         momentum=momentum)
         elif optimizer == 'adam':
             # normalize the step size of the stage aux model
-            opt = torch.optim.Adam([{'params':np,'lr':lr,'weight_decay':reg},
-                                         {'params':anp,'lr':alr,'weight_decay':lamb},
-                                         {'params':panp,'lr':lr,'weight_decay':lamb}])
+            opt = torch.optim.Adam([{'params':param,'lr':lr,'weight_decay':reg},
+                                         {'params':aparam,'lr':alr,'weight_decay':lamb},
+                                         {'params':paparam,'lr':lr,'weight_decay':lamb}])
         
 
         adv_data_gen = Adv_Sample_Generator(fedprophet_loss,adv_method,adv_epsilon,
@@ -264,7 +264,9 @@ class Module_Client(AT_Client):
                                                            network_latency=self.network_lag,
                                                            **self.__dict__)
         
-        return model,current_aux_model,future_aux_model
+        return {"model":model,
+                "stage_aux_model":current_aux_model,
+                "prophet_aux_model":future_aux_model}
         
     def validate(self,model,aux_models,module_list,
                  aux_module_name = None,testset=None,

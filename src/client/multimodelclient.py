@@ -50,11 +50,11 @@ class Multimodel_Client(AT_Client):
         trainloader = DataLoader(self.trainset,batch_size=local_bs,shuffle=True)
 
         # Set optimizer for the local updates
-        np = model.parameters()
+        param = model.parameters()
         if optimizer == 'sgd':
-            opt = torch.optim.SGD(np, lr=lr, momentum=momentum,weight_decay=reg)
+            opt = torch.optim.SGD(param, lr=lr, momentum=momentum,weight_decay=reg)
         elif optimizer == 'adam':
-            opt = torch.optim.Adam(np, lr=lr, weight_decay=reg)
+            opt = torch.optim.Adam(param, lr=lr, weight_decay=reg)
         
 
         adv_data_gen = Adv_Sample_Generator(standard_loss,adv_method,adv_epsilon,
@@ -104,7 +104,7 @@ class Multimodel_Client(AT_Client):
                                                            network_latency=self.network_lag,
                                                            **self.__dict__)
         
-        return model
+        return {"model":model}
     
     def validate(self,model=None,edge_models=None,model_idx=None,
                  testset=None,criterion=torch.nn.CrossEntropyLoss(),
@@ -149,10 +149,10 @@ class Multimodel_Client(AT_Client):
         """ Returns the validation adversarial accuracy and adversarial loss."""
         if model_idx is None:
             model = copy.deepcopy(model)
-        else:
-            model = copy.deepcopy(edge_models[model_idx])
+        else:      
             if model_idx == -1:# validate the model trained by this client in the last time
                 model_idx = self.model_idx
+            model = copy.deepcopy(edge_models[model_idx])
             if load_local_state and self.local_states[model_idx] is not None:
                 model = self.load_local_state_dict(model,self.local_states[model_idx])
         model.to(self.device)

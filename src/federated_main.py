@@ -61,6 +61,8 @@ if __name__ == '__main__':
         if args.flalg in ["FedDF","FedET"]:
             subset_idxs = np.random.choice(range(len(test_dataset)),args.public_dataset_size,replace=False)
             public_dataset = Subset(test_dataset,subset_idxs)
+            rest_idxs = list(set(range(len(test_dataset)))-set(subset_idxs.tolist()))
+            test_dataset = Subset(test_dataset,rest_idxs)
 
         ## ==================================Build Model==================================
         # try to get the model from torchvision.models with pretraining
@@ -70,7 +72,8 @@ if __name__ == '__main__':
                                pretrained = args.pretrained,
                                norm_type = args.norm,
                                adv_norm = (args.adv_train or args.adv_test),
-                               modularization = (args.flalg == "FedProphet"))
+                               modularization = (args.flalg == "FedProphet"),
+                               partialization = (args.flalg in ["HeteroFL",'FedDrop',"FedRolex"]))
         print(global_model)
         model_profile = model_summary(model = deepcopy(global_model),
                                       inputsize=[args.local_bs]+list(train_dataset[0][0].shape),
@@ -133,7 +136,7 @@ if __name__ == '__main__':
                                      sys_info=user_devices[i],
                                      model_profile=model_profile,
                                      init_local_state = ST_Client.get_local_state_dict(global_model),
-                                     local_state_preserve = (args.norm == 'BN'),
+                                     local_state_preserve = (args.norm != 'None'),
                                      test_adv_method=args.advt_method,
                                      test_adv_epsilon=args.advt_epsilon,
                                      test_adv_alpha=args.advt_alpha,
@@ -150,7 +153,23 @@ if __name__ == '__main__':
                                 sys_info=user_devices[i],
                                 model_profile=edge_model_profiles[0],
                                 init_local_state = [ST_Client.get_local_state_dict(mod) for mod in edge_models],
-                                local_state_preserve = (args.norm == 'BN'),
+                                local_state_preserve = (args.norm != 'None'),
+                                test_adv_method=args.advt_method,
+                                test_adv_epsilon=args.advt_epsilon,
+                                test_adv_alpha=args.advt_alpha,
+                                test_adv_T=args.advt_T,
+                                test_adv_norm = args.advt_norm,
+                                test_adv_bound = args.advt_bound,
+                                device=device,verbose=args.verbose,
+                                random_seed=i+args.device_random_seed,
+                                reserved_memory=args.reserved_mem
+                                ) for i in range(args.num_users)]
+        elif args.flalg in ["HeteroFL",'FedDrop',"FedRolex"]:
+            clients = [PT_Client(train_dataset,user_groups[i],
+                                sys_info=user_devices[i],
+                                model_profile=model_profile,
+                                init_local_state = ST_Client.get_local_state_dict(global_model),
+                                local_state_preserve = (args.norm != 'None'),
                                 test_adv_method=args.advt_method,
                                 test_adv_epsilon=args.advt_epsilon,
                                 test_adv_alpha=args.advt_alpha,
@@ -189,6 +208,11 @@ if __name__ == '__main__':
         elif args.flalg in ["FedET","FedDF"]:
             scheduler = kd_scheduler(vars(args),
                                      model_profiles=edge_model_profiles)
+        elif args.flalg in ["HeteroFL",'FedDrop',"FedRolex"]:
+            scheduler = pt_scheduler(vars(args),
+                                     model_profile=model_profile,
+                                     neuron_num=global_model.neuron_num,
+                                     sample_method=args.flalg)
         # Todo: Add schedulers for other baselines
         else:
             raise RuntimeError("FL optimizer {} has no registered scheduler!".format(args.flalg)) 
@@ -235,7 +259,7 @@ if __name__ == '__main__':
                                 sys_monitor=sys_monitor,
                                 frac=args.frac,
                                 weights=weights,
-                                test_dataset=test_dataset,
+                                #test_dataset=test_dataset,
                                 device=device,
                                 test_every = args.test_every)
         elif args.flalg in ["FedBN"]:
@@ -259,7 +283,7 @@ if __name__ == '__main__':
                                            sys_monitor=sys_monitor,
                                            frac=args.frac,
                                            weights=weights,
-                                           test_dataset=None if args.norm == 'BN' else test_dataset,
+                                           #test_dataset=None if args.norm == 'BN' else test_dataset,
                                            device=device,
                                            test_every = args.test_every)
         elif args.flalg == "FedDF":
@@ -297,7 +321,18 @@ if __name__ == '__main__':
                                 dist_lr = args.dist_lr,
                                 dist_batch_size = args.dist_batch_size,
                                 diver_lamb = args.diver_lamb)
-
+        elif args.flalg in ["HeteroFL",'FedDrop',"FedRolex"]:
+            server = Partial_Avg_Server(global_model=global_model,
+                                clients = clients,
+                                selector = selector,
+                                scheduler = scheduler,
+                                stat_monitor=stat_monitor,
+                                sys_monitor=sys_monitor,
+                                frac=args.frac,
+                                weights=weights,
+                                #test_dataset=None if args.norm == 'BN' else test_dataset,
+                                device=device,
+                                test_every = args.test_every)
         server.monitor() # initialize the stat_info and sys_info at the beginning
         
         ## ==================================Start Training==================================

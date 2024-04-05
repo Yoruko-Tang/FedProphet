@@ -4,116 +4,53 @@ import torch
 from hardware.sys_utils import model_summary
 from scheduler.module_scheduler import module_scheduler
 from client import *
-
-# model = get_net('vgg11','cifar',num_classes=10)
-# print("model-----------------------------------------")
-# print(model)
-# # print("----------------------------------------------")
-
-# x = torch.rand([10,3,32,32])
-# flops = FlopCountAnalysis(model,x)
-
-# print("flops per module----------------------------- ")
-# flops_per_module = flops.by_module()
-# #flops_per_module = parameter_count(model)
-# sorted_flops_per_module = {}
-# sum = 0
-# dot_count = 0
-# for key in flops_per_module.keys():
-#     for c in key:
-#         if c == '.':
-#             dot_count += 1
-#     if (dot_count == 0 and 'layer' not in key and 'classifier' not in key and 'features' not in key) \
-#         or (dot_count == 1 and 'weight' not in key and 'bias' not in key):
-#         sorted_flops_per_module[key] = flops_per_module[key]
-#     dot_count = 0
-
-# print(sorted_flops_per_module)
-# for key in sorted_flops_per_module:
-#     if key != '':
-#         sum += sorted_flops_per_module[key]
-# print(sum)
-
-# temp = 0
-# print(sorted_flops_per_module)
-# for key in sorted_flops_per_module.keys():
-#     if "layer3." in key:
-#         for c in key:
-#             if c == '.':
-#                 temp += 1
-#         if temp == 1:
-#             sum += sorted_flops_per_module[key]
-#             print(sum)
-#     temp = 0        
-# print("--------")
-# print(sum)
-# print(sorted_flops_per_module['layer3'])
-
-# print(flops_per_module['layer3'])
-# for key in flops_per_module.keys():
-#     print(key)
-# print("----------------------------------------------")
-# print("params per module-----------------------------")
-# print(parameter_count(model))
-# print("----------------------------------------------")
-
-# def profile_model(model, inputsize):
-#     x = torch.rand(inputsize)
-
-#     flops = FlopCountAnalysis(model,x)
-#     _flops_per_module = flops.by_module()
-#     _params_per_module = parameter_count(model)
-#     flops_per_module = {}
-#     params_per_module = {}
-#     dot_count = 0
-#     for key in _flops_per_module.keys():
-#         for c in key:
-#             if c == '.':
-#                 dot_count += 1
-#         if (dot_count == 0 and 'layer' not in key and 'classifier' not in key and 'features' not in key) \
-#             or (dot_count == 1 and 'weight' not in key and 'bias' not in key):
-#             flops_per_module[key] = _flops_per_module[key]
-#             params_per_module[key] = _params_per_module[key]
-#         dot_count = 0
-
-#     flops_per_module['total'] = flops_per_module.pop('')
-#     params_per_module['total'] = params_per_module.pop('')
-
-#     def validate(dic):
-#         sum = 0
-#         for key in dic:
-#             if key != 'total':
-#                 sum += dic[key]
-#         assert sum == dic['total'], "Wrong profiling data!"
-    
-#     validate(flops_per_module)
-#     validate(params_per_module)
-#     layer_name_list = []
-#     for k in flops_per_module.keys():
-#         if k != 'normalize' and k != 'total':
-#             layer_name_list.append(k)
-            
-
-    # print(flops_per_module)
-    # print(params_per_module)
-
-    # print(len(flops_per_module))
-    # print(len(params_per_module))
-    # return layer_name_list, flops_per_module, params_per_module
-    
+import numpy as np
 
 
-#model = get_net('vgg16_bn','cifar',num_classes=10,adv_norm=True,modularization=True)
-model = get_net('vgg13_bn','cifar',num_classes=10,adv_norm=True,modularization=True,norm_type='BN')
-print(model.state_dict().keys())
+
+model = get_net('vgg16_bn','cifar',num_classes=10,adv_norm=True,partialization=True,norm_type='BN')
+
 inputsize = [64,3,32,32]
+args = {"epochs":500,
+        "reserved_flops":None,
+        "reserved_mem":6.4e7,
+        "adv_epsilon":0,
+        "adv_alpha":0,
+        "adv_norm":"inf",
+        "adv_bound":[0,1],
+        "mu":0,
+        "lamb":0,
+        "psi":1}
 
-
-# model = get_net('resnet50','imagenet',num_classes=256,adv_norm=True,modularization=False,norm_type='LN')
-# print(model)
+# model = get_net('resnet50','imagenet',num_classes=256,adv_norm=True,partialization=True,norm_type='sBN')
 # inputsize = [32,3,224,224]
+# args = {"epochs":500,
+#         "reserved_flops":None,
+#         "reserved_mem":5.12e8,
+#         "adv_epsilon":0,
+#         "adv_alpha":0,
+#         "adv_norm":"inf",
+#         "adv_bound":[0,1],
+#         "mu":0,
+#         "lamb":0,
+#         "psi":1}
 # ms = model_summary(model,inputsize,optimizer='adam')
 ms = model_summary(model,inputsize,optimizer='sgd',momentum=0.9)
+
+# print(ST_Client.get_local_state_dict(model).keys())
+# # print(ms.training_latency(1e12,1e9,6.4e10,partial_frac=0.5))
+# # print(ms.training_latency(1e12,1e9,6.4e10,partial_frac=1.0))
+print(model.neuron_num)
+neuron_dict={n:np.random.choice(range(model.neuron_num[n]),int(model.neuron_num[n]*0.2),replace=False) for n in model.neuron_num}
+print(neuron_dict)
+x = torch.rand(inputsize)
+
+a = model.partial_forward(x,neuron_dict)
+loss = torch.mean(torch.norm(a,dim=1))
+loss.backward()
+for p in model.parameters():
+    print(torch.sum(p.grad!=0))
+    input()
 
 print("module list---------------------------")
 print(ms.module_list)
@@ -135,3 +72,6 @@ print("output dictionary---------------------")
 print(ms.out_feature_dict)
 print("\n")
 
+
+# msch = module_scheduler(args,ms,None,None)
+# print(msch.auxiliary_model_dict)

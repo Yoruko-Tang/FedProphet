@@ -116,12 +116,12 @@ class Avg_Server():
             w = 0
             for n,lm in enumerate(local_models):
                 if lm is not None:
-                    if isinstance(lm,list):
-                        lm[0].to(self.device)
-                        lw = lm[0].state_dict()
+                    if isinstance(lm,dict):
+                        local_model = lm["model"]
                     else:
-                        lm.to(self.device)
-                        lw = lm.state_dict()
+                        local_model = lm
+                    local_model.to(self.device)
+                    lw = local_model.state_dict()
                     if p in lw:
                         weights_sum += self.weights[n]
                         w += self.weights[n]*lw[p]

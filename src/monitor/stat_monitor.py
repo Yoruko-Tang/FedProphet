@@ -59,6 +59,7 @@ class ST_Stat_Monitor():
         # test acc and loss
         if test_dataset is not None:
             test_acc,test_loss = self.clients[0].validate(testset=test_dataset,
+                                                          load_local_state=False,
                                                           **global_model,
                                                           **validation_kwargs)
         else:
@@ -179,7 +180,7 @@ class AT_Stat_Monitor(ST_Stat_Monitor):
             global_adv_losses = np.array(global_adv_losses)
 
             if test_dataset is not None:
-                test_adv_acc,test_adv_loss = self.clients[0].adv_validate(testset=test_dataset,**global_model,**validation_kwargs)
+                test_adv_acc,test_adv_loss = self.clients[0].adv_validate(testset=test_dataset,load_local_state=False,**global_model,**validation_kwargs)
             else:
                 test_adv_acc,test_adv_loss = 0,None
 

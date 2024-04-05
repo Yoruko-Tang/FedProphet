@@ -105,6 +105,37 @@ def add_normalization(model,normalization_layer):
     model.forward = types.MethodType(forward,model)
     return model
 
+def replace_norm(model,norm='BN'):
+    if norm == 'LN':
+        model._norm_layer = nn.LayerNorm
+    elif norm == 'GN':
+        model._norm_layer = nn.GroupNorm
+    elif norm == 'IN':
+        model._norm_layer = nn.InstanceNorm2d
+    elif norm == 'sBN':
+        model._norm_layer = nn.BatchNorm2d
+    elif norm == 'BN':
+        model._norm_layer = nn.BatchNorm2d
+        return model
+    else: # remove the normalization
+        model._norm_layer = nn.Identity
+    
+    for n,m in model.named_modules():
+        if isinstance(m,nn.BatchNorm2d):
+            if norm == 'LN':
+                norm_layer = nn.LayerNorm(m.num_features)
+            elif norm == 'GN':
+                norm_layer = nn.GroupNorm(4,m.num_features)
+            elif norm == 'IN':
+                norm_layer == nn.InstanceNorm2d(m.num_features)
+            elif norm == 'sBN':
+                norm_layer = nn.BatchNorm2d(m.num_features,track_running_stats=False)
+            else: # remove the normalization
+                norm_layer = nn.Identity()
+            norm_layer.num_features = m.num_features
+            getattr(model,n.split('.')[0])[int(n.split('.')[1])] = norm_layer
+    return model
+
 def modularization(model):
     """
     Make the model into cascaded modules.
@@ -153,7 +184,7 @@ def modularization(model):
         if n == 'normalize':
             module_list.insert(0,n)
         elif n.count('.') == 1:
-            if isinstance(m,nn.Conv2d) or isinstance(m,nn.Linear):
+            if isinstance(m,nn.Conv2d):
                 if len(continue_layer)>0:
                     module_list.append(continue_layer)
                 continue_layer = [n]
@@ -163,6 +194,47 @@ def modularization(model):
         module_list.append(continue_layer)
 
     model.module_list = module_list
+    return model
+
+def partialization(model):
+    """
+    This function will modify the model to enable partial training.
+    """
+    
+    
+    def partial_forward(self,x: torch.Tensor, neuron_dict: dict) -> torch.Tensor:
+        def partial_forward_hook(module,fea_in,fea_out):
+            mask = torch.zeros_like(fea_out)
+            mask[:,module.retain_idx] = 1.0
+            fea_out = fea_out*mask/(len(module.retain_idx)/fea_out.size(1))
+            return fea_out
+        handles = []
+        for n,m in self.named_modules():
+            if n in neuron_dict and n in self.neuron_num:
+                m.retain_idx = neuron_dict[n]
+                h = m.register_forward_hook(partial_forward_hook)
+                handles.append(h)
+                
+        x = self.forward(x)
+
+        for h in handles:
+            h.remove() # remove the hook
+
+        return x
+    
+    
+    neuron_num = {}
+    for n,m in model.named_modules():
+        if isinstance(m,nn.Conv2d):
+            neuron_num[n] = m.out_channels
+            m.retain_idx = None
+        # elif isinstance(m,nn.Linear):
+        #     neuron_num[n] = m.out_features
+        #     m.retain_idx = None
+    
+    model.partial_forward = types.MethodType(partial_forward,model)
+    model.neuron_num = neuron_num
+
     return model
 
 def set_feature_layer(model):

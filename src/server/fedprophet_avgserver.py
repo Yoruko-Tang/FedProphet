@@ -25,8 +25,9 @@ class Fedprophet_Avg_Server(Avg_Server):
         masked_weights = [None]*self.num_users
         for n,lm in enumerate(local_models):
             if lm is not None:
-                lm[0].to(self.device)
-                lw = lm[0].state_dict()
+                local_model = lm["model"]
+                local_model.to(self.device)
+                lw = local_model.state_dict()
                 masked_weights[n] = copy.deepcopy(lw)
                 module_list = []
                 trained_module_list = training_hyperparameters[n]["stage_module_list"] \
@@ -64,8 +65,8 @@ class Fedprophet_Avg_Server(Avg_Server):
                              for m in aux_models.keys()}
         for n,lm in enumerate(local_models):
             if lm is not None:
-                stage_aux_model = lm[1]
-                prophet_aux_model = lm[2]
+                stage_aux_model = lm["stage_aux_model"]
+                prophet_aux_model = lm["prophet_aux_model"]
                 if stage_aux_model is not None:
                     stage_aux_model.to(self.device)
                     current_stage = training_hyperparameters[n]["stage_aux_model_name"]

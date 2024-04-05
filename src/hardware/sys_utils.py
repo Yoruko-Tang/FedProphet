@@ -5,6 +5,7 @@ import torch
 from math import ceil
 from scipy.stats import truncnorm
 import csv
+import copy
 
 
 unique_runtime_app_list = ['idle', '1080p', '4k', 'inference', 'detection', 'web']
@@ -183,7 +184,7 @@ class model_summary():
     """
 
     data_Byte = 4 # FP32
-    def __init__(self,model,inputsize,default_local_eps=[1,],optimizer='sgd',**opt_kwargs):
+    def __init__(self,model,inputsize,default_local_eps=1,optimizer='sgd',**opt_kwargs):
         self.inputsize = inputsize
         self.default_local_eps = default_local_eps
         if optimizer == 'adam':
@@ -199,17 +200,21 @@ class model_summary():
               = self.profile_model(model,inputsize) 
 
 
-    def register_feature_hook(self,model):
+    def register_feature_hook(self,model,output):
+        def in_feature_hook(module,fea_in,fea_out):
+            output[module.called_name] = fea_in[0].size()
+            return None
+        handles = []
         for n,m in model.named_modules():
             m.called_name = n
             if n in model.feature_layer_list:
-                m.register_forward_hook(self.in_feature_hook)
+                h = m.register_forward_hook(in_feature_hook)
+                handles.append(h)
+        return handles
 
         
 
-    def in_feature_hook(self,module,fea_in,fea_out):
-        self.in_feature_dict[module.called_name] = fea_in[0].size()
-        return None
+    
     
 
     
@@ -228,16 +233,21 @@ class model_summary():
             assert sum == dic['total'], "Wrong profiling data!"
 
         # initialize the dicts
-        self.in_feature_dict = {} # layer: input_feature_size
+        in_feature_dict = {} # layer: input_feature_size
         self.out_feature_dict = {} # module: output_feature_size
         self.num_classes = model.output_size
 
-        self.register_feature_hook(model)
+        handles = self.register_feature_hook(model,in_feature_dict)
         x = torch.rand(inputsize,device=next(model.parameters()).device)
         flops = FlopCountAnalysis(model,x)
         flops.unsupported_ops_warnings(False)
         _flops_per_module = flops.by_module()
         _params_per_module = parameter_count(model)
+        
+        self.in_feature_dict = copy.deepcopy(in_feature_dict)
+        for h in handles:
+            h.remove()
+
         flops_per_module = {}
         params_per_module = {}
         mem_per_module = {}
@@ -289,29 +299,11 @@ class model_summary():
             module_name_list.remove("total")
 
             # calculate the output size of each module
-            for n in range(len(module_name_list)-1):
-                self.out_feature_dict[module_name_list[n]] = None
-                nidx = n+1
-                while self.out_feature_dict[module_name_list[n]] == None and nidx < len(module_name_list):
-                    # find the first layer in the next module
-                    for nl in module_name_list[nidx].split('+'):
-                        if nl in self.in_feature_dict.keys():
-                            self.out_feature_dict[module_name_list[n]] = self.in_feature_dict[nl]
-                            break
-                        else:
-                            for layer in self.in_feature_dict.keys():
-                                if (nl+'.') in layer:
-                                    self.out_feature_dict[module_name_list[n]] = self.in_feature_dict[layer]
-                                    break
-                            if self.out_feature_dict[module_name_list[n]] is not None:
-                                break
-                    nidx += 1
-                if self.out_feature_dict[module_name_list[n]] == None:
-                    raise RuntimeWarning("Cannot fetch the output size of the module: "+ module_name_list[n])
-            self.out_feature_dict[module_name_list[-1]]=[inputsize[0],self.num_classes]
-            
-
-        
+            cum_output = x
+            for module in module_name_list:
+                cum_output = model.module_forward(cum_output,[module,])
+                self.out_feature_dict[module] = cum_output.size()
+                
 
 
         return module_name_list, flops_per_module, params_per_module, mem_per_module
@@ -320,7 +312,7 @@ class model_summary():
                          eff_bandwidth=None,access_latency=0.17,
                          network_bandwidth=None,network_latency=0.0,
                          batches=None,adv_iters=0,adv_ratio=1.0,
-                         module_list=None,**kwargs):
+                         module_list=None,partial_frac=1.0,**kwargs):
         """
         Calculate the training latency of the whole model with the model profile.
         module_list: a list of atom module names in self.module_lists, 
@@ -349,6 +341,10 @@ class model_summary():
             flops_req += int(self.flops_dict[k])
         if module_list[-1] in self.out_feature_dict:
             total_feature_size += int(np.prod(self.out_feature_dict[module_list[-1]]))
+        if partial_frac < 1.0:
+            total_params = int(total_params*partial_frac**2)
+            total_feature_size = int(total_feature_size*partial_frac)
+            flops_req = int(flops_req*partial_frac**2)
         
         if batches is None:
             batches = [self.inputsize]*self.default_local_eps

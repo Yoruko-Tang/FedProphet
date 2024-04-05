@@ -86,11 +86,11 @@ class ST_Client():
         trainloader = DataLoader(self.trainset,batch_size=local_bs,shuffle=True)
 
         # Set optimizer for the local updates
-        np = model.parameters()
+        param = model.parameters()
         if optimizer == 'sgd':
-            opt = torch.optim.SGD(np, lr=lr, momentum=momentum,weight_decay=reg)
+            opt = torch.optim.SGD(param, lr=lr, momentum=momentum,weight_decay=reg)
         elif optimizer == 'adam':
-            opt = torch.optim.Adam(np, lr=lr, weight_decay=reg)
+            opt = torch.optim.Adam(param, lr=lr, weight_decay=reg)
         
 
         iters = 0
@@ -127,7 +127,7 @@ class ST_Client():
                                                            network_latency=self.network_lag,
                                                            **self.__dict__)
 
-        return model
+        return {"model":model}
 
     def validate(self,model,testset=None,criterion=torch.nn.CrossEntropyLoss(),
                  load_local_state = True,**kwargs):
@@ -141,7 +141,7 @@ class ST_Client():
 
         loss, total, correct = 0.0, 0.0, 0.0
         if testset is None:
-            testset = self.testset
+            testset = self.testset    
         testloader = DataLoader(testset,batch_size=128, shuffle=False)
 
         for batch_idx, (datas, labels) in enumerate(testloader):
@@ -182,14 +182,20 @@ class ST_Client():
 
     @staticmethod
     def get_local_state_dict(model):
+        norm_layers = []
+        for n,m in model.named_modules():
+            if isinstance(m,model._norm_layer):
+                norm_layers.append(n)
         sd = model.state_dict()
+        local_state = {}
         for name in list(sd.keys()):
             # pop out the parameters except for bn layers
-            if 'weight' in name and name.replace('weight','running_mean') not in sd.keys():
-                sd.pop(name)
-            elif 'bias' in name and name.replace('bias','running_mean') not in sd.keys():
-                sd.pop(name)
-        return sd
+            for nl in norm_layers:
+                if nl+'.' in name:
+                    local_state[name] = sd[name]
+                    break
+            
+        return local_state
     
     @staticmethod
     def load_local_state_dict(model,local_dict):

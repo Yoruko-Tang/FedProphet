@@ -3,7 +3,6 @@ import numpy as np
 import torch
 import torch.nn as nn
 from fvcore.nn import FlopCountAnalysis,parameter_count
-from datasets import dataset_to_datafamily
 from math import ceil
 import copy
 import os.path as osp
@@ -27,7 +26,7 @@ class module_scheduler(base_AT_scheduler):
         self.atom_mem_dict = self.model_profile.mem_dict
         self.atom_output_dict = self.model_profile.out_feature_dict
         self.num_classes = model_profile.num_classes
-        self.datafamily = dataset_to_datafamily[self.args["dataset"]]
+        # self.datafamily = dataset_to_datafamily[self.args["dataset"]]
 
         self.partition_module_list,self.module_dict,self.auxiliary_model_dict,\
         self.module_flops_dict,self.module_mem_dict,self.auxiliary_model_flops_dict, \
@@ -53,8 +52,8 @@ class module_scheduler(base_AT_scheduler):
 
         # print("=================Stage 1=================")
         self.clients = clients
-        self.available_performance = np.array([c.avail_perf for c in self.clients])
-        self.available_memory = np.array([c.avail_mem for c in self.clients])
+        self.available_performance = None
+        self.available_memory = None
 
 
         self.adv_epsilon = args["adv_epsilon"]
