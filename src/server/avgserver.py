@@ -76,7 +76,7 @@ class Avg_Server():
             
             
             # train selected clients
-            self.global_model.update(self.train_idx(self.idxs_users))
+            self.global_model = self.train_idx(self.idxs_users)
             
             # collect statistical and systematic information
             self.monitor(chosen_idxs=self.idxs_users,log=True)
@@ -90,12 +90,9 @@ class Avg_Server():
         for idx in idxs_users:
             training_hyperparameters = self.scheduler.training_params(idx=idx,chosen_idxs=idxs_users)
             local_model = self.clients[idx].train(**self.global_model,**training_hyperparameters)
-            # if isinstance(local_model,list):
-            #     local_model = local_model[0]
-            # local_model.to(self.device) # return the local model to the server's device
             local_models[idx] = local_model
             local_training_params[idx] = training_hyperparameters
-            
+
         global_model = self.aggregate(local_models = local_models,
                                       training_hyperparameters = local_training_params,
                                       **self.global_model)

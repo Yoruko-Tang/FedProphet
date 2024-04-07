@@ -31,12 +31,9 @@ class kd_scheduler(base_AT_scheduler):
     
     def monitor_params(self, **kwargs):
         args = super().monitor_params()
-        # args["load_local_state"] = True 
-        # if self.global_val: # FedET
-        args["model_idx"] = -1
-        # else: # FedDF
-        # args["load_local_state"] = False
-        # args["model_idx"] = 0 # validate the largest model 
+
+        args["model_idx"] = None
+ 
 
         return args
 
