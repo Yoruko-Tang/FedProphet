@@ -158,8 +158,8 @@ def partialization(model):
 
         
         def partial_pre_forward_hook(module,fea_in):
-            if len(fea_in[0]) == 4: # downsample output
-                assert all(fea_in[0][1] == fea_in[0][3]), "The retain channel of the downsample module must be the same as that of the last conv layer!"
+            if len(fea_in[0]) == 4: # shortcut output
+                assert all(fea_in[0][1] == fea_in[0][3]), "The retain channel of the shortcut must be the same as that of the last conv layer!"
                 
                 fea_in = [[fea_in[0][0]+fea_in[0][2],fea_in[0][1]]]
             if isinstance(module,(nn.Conv2d,nn.Linear)):
@@ -173,13 +173,18 @@ def partialization(model):
         for n,m in self.named_modules():
             if n.count('.') == 3 or (n.count('.') == 2 and 'downsample' not in n) or (n.count('.') == 0 and n not in ['','fc'] and 'layer' not in n):
                 if n in neuron_dict and n in self.neuron_num:
-                    if 'downsample' in n:
+                    if 'downsample.0' in n:
                         if n.replace('downsample.0','conv3') in neuron_dict: # bottleneck
                             m.retain_idx = neuron_dict[n.replace('downsample.0','conv3')]
                         else: # basicblock
                             m.retain_idx = neuron_dict[n.replace('downsample.0','conv2')]
                         
-                    elif 'conv3' in n and n.replace('conv3','downsample.0') not in neuron_dict: 
+                    elif 'conv3' in n and n.replace('conv3','downsample.0') not in neuron_dict: # bottleneck
+                        first_block = n.split('.')
+                        first_block[1] = '0'
+                        first_block = '.'.join(first_block)
+                        m.retain_idx = neuron_dict[first_block]
+                    elif 'conv2' in n and n.replace('conv2','downsample.0') not in neuron_dict and n.replace('conv2','conv3') not in neuron_dict: # basicblock
                         first_block = n.split('.')
                         first_block[1] = '0'
                         first_block = '.'.join(first_block)
