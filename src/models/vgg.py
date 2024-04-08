@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 from typing import List
 import types
+import numpy as np
 
 def adapt(model,modeltype,num_classes):
     """
@@ -150,22 +151,47 @@ def partialization(model):
     
     
     def partial_forward(self,x: torch.Tensor, neuron_dict: dict) -> torch.Tensor:
-        def partial_forward_hook(module,fea_in,fea_out):
-            mask = torch.zeros_like(fea_out)
-            mask[:,module.retain_idx] = 1.0
-            fea_out = fea_out*mask/(len(module.retain_idx)/fea_out.size(1))
-            return fea_out
+        def partial_forward_hook(module,fea_in,fea_out): 
+            if isinstance(module,(nn.Conv2d,nn.Linear)):
+                # for linear and conv layers
+                # do not mask the output for now, but only scale the output
+                fea_out = fea_out/(len(module.in_retain_idx)/fea_in[0].size(1))
+                return [fea_out,module.retain_idx] # tell the next module the retained idx
+            else:
+                # for normalization layer and relu layer, mask the output
+                mask = torch.zeros_like(fea_out)
+                mask[:,module.retain_idx] = 1.0
+                fea_out = fea_out*mask
+                return [fea_out,module.retain_idx]
+
+           
+        def partial_pre_forward_hook(module,fea_in):
+            #print(fea_in)
+            if isinstance(module,(nn.Conv2d,nn.Linear)):
+                module.in_retain_idx = fea_in[0][1] # record the input mask
+            else:
+                module.retain_idx = fea_in[0][1] # record the output mask
+            return fea_in[0][0]
+
         handles = []
+        pre_handles = []
         for n,m in self.named_modules():
-            if n in neuron_dict and n in self.neuron_num:
-                m.retain_idx = neuron_dict[n]
-                h = m.register_forward_hook(partial_forward_hook)
-                handles.append(h)
+            if n not in ["features",""] and "classifier" not in n:
+                if n in neuron_dict and n in self.neuron_num:
+                    m.retain_idx = neuron_dict[n]
+                ph = m.register_forward_pre_hook(partial_pre_forward_hook)
+                if n != 'avgpool':
+                    h = m.register_forward_hook(partial_forward_hook)
                 
-        x = self.forward(x)
+                handles.append(h)
+                pre_handles.append(ph)
+                
+        x = self.forward([x,np.arange(x.size(1))])
 
         for h in handles:
             h.remove() # remove the hook
+        for ph in pre_handles:
+            ph.remove()
 
         return x
     
@@ -175,11 +201,10 @@ def partialization(model):
         
         if isinstance(m,nn.Conv2d):
             neuron_num[n] = m.out_channels
-            m.retain_idx = None
-        # elif isinstance(m,nn.Linear):
-        #     neuron_num[n] = m.out_features
-        #     m.retain_idx = None
-
+    #     elif isinstance(m,nn.Linear):
+    #         neuron_num[n] = m.out_features
+    #         m.retain_idx = None
+    # neuron_num.pop(list(neuron_num.keys())[-1]) # do not mask the last layer
     
     model.partial_forward = types.MethodType(partial_forward,model)
     model.neuron_num = neuron_num

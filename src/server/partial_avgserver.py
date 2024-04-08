@@ -29,12 +29,13 @@ class Partial_Avg_Server(Avg_Server):
                     local_model.to(self.device)
                     lw = local_model.state_dict()
                     local_update_idxs = lm["updated_partial_idxs"]
-                    if p in lw:
+                    if p in lw and p in local_update_idxs:
                         update = lw[p]-w0[p]
                         updated_idx = local_update_idxs[p].to(self.device)
                         weights_sum += updated_idx
                         w += update*updated_idx
-            w0[p] += w/(weights_sum+1e-6)
+            if torch.sum(weights_sum) > 0:
+                w0[p] += w/(weights_sum+1e-5)
         model.load_state_dict(w0)
         return {"model":model}
                 

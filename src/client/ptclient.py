@@ -2,7 +2,7 @@ from client.atclient import AT_Client
 
 import torch
 from torch.utils.data import DataLoader
-import torch.nn
+import torch.nn as nn
 import copy
 import numpy as np
 
@@ -69,7 +69,7 @@ class PT_Client(AT_Client):
 
         iters = 0
         self.batches = []
-        updated_partial_idxs = {}
+        
         while iters < local_ep:
         #for iter in range(self.args.local_ep):
             for _, (datas, labels) in enumerate(trainloader):
@@ -90,25 +90,6 @@ class PT_Client(AT_Client):
                 loss = partial_loss(model, datas, labels)
                 loss.backward()
 
-                for n,p in model.named_parameters():
-                    if n not in updated_partial_idxs:
-                        updated_partial_idxs[n] = torch.zeros_like(p,device='cpu')
-                    if p.dim() == 1: # bias/Batchnorm
-                        updated_partial_idxs[n][p.grad.cpu()!=0] = 1
-                    elif p.dim() == 2: # Linear
-                        row_norm = torch.norm(p.grad,p=2,dim=1).cpu()
-                        row_idx = torch.arange(p.grad.size(0))[row_norm!=0]
-                        column_norm = torch.norm(p.grad,p=2,dim=0).cpu()
-                        column_idx = torch.arange(p.grad.size(1))[column_norm!=0]
-                        updated_partial_idxs[n][np.ix_(row_idx,column_idx)] = 1
-                    elif p.dim() == 4: # Conv2d
-                        row_norm = torch.norm(p.grad,p=2,dim=(1,2,3)).cpu()
-                        row_idx = torch.arange(p.grad.size(0))[row_norm!=0]
-                        column_norm = torch.norm(p.grad,p=2,dim=(0,2,3)).cpu()
-                        column_idx = torch.arange(p.grad.size(1))[column_norm!=0]
-                        updated_partial_idxs[n][np.ix_(row_idx,column_idx)] = 1
-                    else:
-                        raise RuntimeError("Currently only support parameters with 1, 2 or 4 dimensions!")
                 opt.step()
                 
                 iters += 1
@@ -132,7 +113,36 @@ class PT_Client(AT_Client):
                                                            network_bandwidth=self.network_speed,
                                                            network_latency=self.network_lag,
                                                            **self.__dict__)
+        sd = model.state_dict()
+        updated_partial_idxs = {}
+        
+        for n,m in model.named_modules():
+            if n+'.weight' in sd:
+                if hasattr(m,'in_retain_idx') and hasattr(m,'retain_idx'): # conv
+                    column_idx = m.in_retain_idx
+                    row_idx = m.retain_idx
+                    updated_partial_idxs[n+'.weight'] = torch.zeros_like(m.weight.data)
+                    updated_partial_idxs[n+'.weight'][np.ix_(row_idx,column_idx)] = 1
+                elif hasattr(m,'retain_idx'): # batchnorm
+                    updated_partial_idxs[n+'.weight'] = torch.zeros_like(m.weight.data)
+                    updated_partial_idxs[n+'.weight'][m.retain_idx] = 1
+                else:# linear
+                    updated_partial_idxs[n+'.weight'] = torch.ones_like(m.weight.data)
 
+            if n+'.bias' in sd:
+                if hasattr(m,'retain_idx'): # conv, batchnorm
+                    updated_partial_idxs[n+'.bias'] = torch.zeros_like(m.bias.data)
+                    updated_partial_idxs[n+'.bias'][m.retain_idx] = 1
+                else:# linear
+                    updated_partial_idxs[n+'.bias'] = torch.ones_like(m.bias.data)
+
+        
+        # print(model.neuron_num)
+        # for k in updated_partial_idxs:
+        #     print(k,torch.sum(updated_partial_idxs[k]))
+        # for n,p in model.named_parameters():
+        #     print(n,torch.sum(p.grad!=0))
+        # input()
         return {"model":model,"updated_partial_idxs":updated_partial_idxs}
         
     

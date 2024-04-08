@@ -19,7 +19,7 @@ class FedDF_Server(Avg_Server):
         for m in edge_models:
             m.to(device)
         self.global_model["edge_models"] = edge_models
-        #self.edge_model_sds = [ST_Client.get_local_state_dict(m) for m in edge_models]
+        self.local_state_preserve = self.clients[0].local_state_preserve
 
         self.public_dataset = public_dataset
         self.tau_s = dist_iters
@@ -67,7 +67,8 @@ class FedDF_Server(Avg_Server):
         for group in range(len(edge_local_model)):
             
             group_model = super().aggregate(edge_local_model[group],edge_models[group])["model"]
-            group_model = ST_Client.load_local_state_dict(group_model,ST_Client.get_local_state_dict(edge_models[group]))
+            if self.local_state_preserve:
+                group_model = ST_Client.load_local_state_dict(group_model,ST_Client.get_local_state_dict(edge_models[group]))
             
             group_model.to(self.device)
         

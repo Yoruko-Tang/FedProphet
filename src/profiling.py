@@ -9,7 +9,6 @@ import numpy as np
 
 
 model = get_net('vgg16_bn','cifar',num_classes=10,adv_norm=True,partialization=True,norm_type='BN')
-
 inputsize = [64,3,32,32]
 args = {"epochs":500,
         "reserved_flops":None,
@@ -22,7 +21,7 @@ args = {"epochs":500,
         "lamb":0,
         "psi":1}
 
-# model = get_net('resnet50','imagenet',num_classes=256,adv_norm=True,partialization=True,norm_type='sBN')
+# model = get_net('resnet50','imagenet',num_classes=256,adv_norm=True,partialization=True,norm_type='BN')
 # inputsize = [32,3,224,224]
 # args = {"epochs":500,
 #         "reserved_flops":None,
@@ -40,17 +39,21 @@ ms = model_summary(model,inputsize,optimizer='sgd',momentum=0.9)
 # print(ST_Client.get_local_state_dict(model).keys())
 # # print(ms.training_latency(1e12,1e9,6.4e10,partial_frac=0.5))
 # # print(ms.training_latency(1e12,1e9,6.4e10,partial_frac=1.0))
-print(model.neuron_num)
+print(model)
 neuron_dict={n:np.random.choice(range(model.neuron_num[n]),int(model.neuron_num[n]*0.2),replace=False) for n in model.neuron_num}
 print(neuron_dict)
 x = torch.rand(inputsize)
 
 a = model.partial_forward(x,neuron_dict)
-loss = torch.mean(torch.norm(a,dim=1))
-loss.backward()
-for p in model.parameters():
-    print(torch.sum(p.grad!=0))
-    input()
+
+# for n,m in model.named_modules():
+#     if hasattr(m,'in_retain_idx'):
+#         print(n)
+#         print(m.in_retain_idx,m.retain_idx)
+#     elif hasattr(m,'retain_idx'):
+#         print(n)
+#         print(m.retain_idx)
+# print(a)
 
 print("module list---------------------------")
 print(ms.module_list)

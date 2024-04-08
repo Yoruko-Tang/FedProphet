@@ -136,7 +136,7 @@ if __name__ == '__main__':
                                      sys_info=user_devices[i],
                                      model_profile=model_profile,
                                      init_local_state = ST_Client.get_local_state_dict(global_model),
-                                     local_state_preserve = (args.norm != 'None'),
+                                     local_state_preserve = (args.norm in ["BN","IN"]),
                                      test_adv_method=args.advt_method,
                                      test_adv_epsilon=args.advt_epsilon,
                                      test_adv_alpha=args.advt_alpha,
@@ -153,7 +153,7 @@ if __name__ == '__main__':
                                 sys_info=user_devices[i],
                                 model_profile=edge_model_profiles[0],
                                 init_local_state = [ST_Client.get_local_state_dict(mod) for mod in edge_models],
-                                local_state_preserve = (args.norm != 'None'),
+                                local_state_preserve = (args.norm in ["BN","IN"]),
                                 test_adv_method=args.advt_method,
                                 test_adv_epsilon=args.advt_epsilon,
                                 test_adv_alpha=args.advt_alpha,
@@ -169,7 +169,7 @@ if __name__ == '__main__':
                                 sys_info=user_devices[i],
                                 model_profile=model_profile,
                                 init_local_state = ST_Client.get_local_state_dict(global_model),
-                                local_state_preserve = (args.norm != 'None'),
+                                local_state_preserve = (args.norm in ["BN","IN"]),
                                 test_adv_method=args.advt_method,
                                 test_adv_epsilon=args.advt_epsilon,
                                 test_adv_alpha=args.advt_alpha,
@@ -180,7 +180,7 @@ if __name__ == '__main__':
                                 random_seed=i+args.device_random_seed,
                                 reserved_memory=args.reserved_mem
                                 ) for i in range(args.num_users)]
-        # Todo: add other types of clients
+        
         else:
             raise RuntimeError("Not supported FL optimizer: "+args.flalg) 
 

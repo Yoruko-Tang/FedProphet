@@ -157,6 +157,9 @@ class ST_Client():
             total += len(labels)
 
         accuracy = correct/total
+        if loss == torch.nan:
+            print(self.local_states)
+            exit()
         return accuracy, loss/(batch_idx+1)
     
     
@@ -189,7 +192,6 @@ class ST_Client():
         sd = model.state_dict()
         local_state = {}
         for name in list(sd.keys()):
-            # pop out the parameters except for bn layers
             for nl in norm_layers:
                 if nl+'.' in name:
                     local_state[name] = sd[name]
