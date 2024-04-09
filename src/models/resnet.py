@@ -143,12 +143,15 @@ def partialization(model):
     
     
     def partial_forward(self,x: torch.Tensor, neuron_dict: dict) -> torch.Tensor:
-        def partial_forward_hook(module,fea_in,fea_out): 
+        def partial_forward_hook(module,fea_in,fea_out):
             if isinstance(module,(nn.Conv2d,nn.Linear)):
                 # for linear and conv layers
                 # do not mask the output for now, but only scale the output
                 fea_out = fea_out/(len(module.in_retain_idx)/fea_in[0].size(1))
-                return [fea_out,module.retain_idx] # tell the next module the retained idx
+                if hasattr(module,'retain_idx'):
+                    return [fea_out,module.retain_idx] # tell the next module the retained idx
+                else: # for the last layer of the model
+                    return fea_out
             else:
                 # for normalization layer and relu layer, mask the output
                 mask = torch.zeros_like(fea_out)
@@ -171,7 +174,8 @@ def partialization(model):
         handles = []
         pre_handles = []
         for n,m in self.named_modules():
-            if n.count('.') == 3 or (n.count('.') == 2 and 'downsample' not in n) or (n.count('.') == 0 and n not in ['','fc'] and 'layer' not in n):
+            if n.count('.') == 3 or (n.count('.') == 2 and 'downsample' not in n) or (n.count('.') == 0 and n != '' and 'layer' not in n):
+                # register retain_idx
                 if n in neuron_dict and n in self.neuron_num:
                     if 'downsample.0' in n:
                         if n.replace('downsample.0','conv3') in neuron_dict: # bottleneck
@@ -191,7 +195,18 @@ def partialization(model):
                         m.retain_idx = neuron_dict[first_block]
                     else:
                         m.retain_idx = neuron_dict[n]
-                ph = m.register_forward_pre_hook(partial_pre_forward_hook)
+                
+                # register in_retain_idx
+                if n != 'fc':
+                    ph = m.register_forward_pre_hook(partial_pre_forward_hook)
+                else: # the first linear layer
+                    last_feature_layer = "layer4.0.conv3"
+                    if last_feature_layer not in neuron_dict: # basic block
+                        last_feature_layer = "layer4.0.conv2"
+                    m.in_retain_idx = np.arange(m.in_features).reshape((-1,) + self.avgpool.output_size)
+                    m.in_retain_idx = m.in_retain_idx[neuron_dict[last_feature_layer]].flatten()
+
+                # register retain_idx propagate
                 if n != 'avgpool':
                     h = m.register_forward_hook(partial_forward_hook)
                 
@@ -213,11 +228,9 @@ def partialization(model):
         
         if isinstance(m,nn.Conv2d):
             neuron_num[n] = m.out_channels
-            m.retain_idx = None
-    #     elif isinstance(m,nn.Linear):
-    #         neuron_num[n] = m.out_features
-    #         m.retain_idx = None
-    # neuron_num.pop(list(neuron_num.keys())[-1]) # do not mask the last layer
+        elif isinstance(m,nn.Linear) and n!='fc':
+            neuron_num[n] = m.out_features
+    
     
     model.partial_forward = types.MethodType(partial_forward,model)
     model.neuron_num = neuron_num

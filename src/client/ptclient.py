@@ -118,7 +118,7 @@ class PT_Client(AT_Client):
         
         for n,m in model.named_modules():
             if n+'.weight' in sd:
-                if hasattr(m,'in_retain_idx') and hasattr(m,'retain_idx'): # conv
+                if hasattr(m,'in_retain_idx') and hasattr(m,'retain_idx'): # conv/linear
                     column_idx = m.in_retain_idx
                     row_idx = m.retain_idx
                     updated_partial_idxs[n+'.weight'] = torch.zeros_like(m.weight.data)
@@ -126,14 +126,17 @@ class PT_Client(AT_Client):
                 elif hasattr(m,'retain_idx'): # batchnorm
                     updated_partial_idxs[n+'.weight'] = torch.zeros_like(m.weight.data)
                     updated_partial_idxs[n+'.weight'][m.retain_idx] = 1
-                else:# linear
+                elif hasattr(m,'in_retain_idx'):# last linear
+                    updated_partial_idxs[n+'.weight'] = torch.zeros_like(m.weight.data)
+                    updated_partial_idxs[n+'.weight'][:,m.in_retain_idx] = 1
+                else:
                     updated_partial_idxs[n+'.weight'] = torch.ones_like(m.weight.data)
 
             if n+'.bias' in sd:
-                if hasattr(m,'retain_idx'): # conv, batchnorm
+                if hasattr(m,'retain_idx'): # conv, batchnorm, linear
                     updated_partial_idxs[n+'.bias'] = torch.zeros_like(m.bias.data)
                     updated_partial_idxs[n+'.bias'][m.retain_idx] = 1
-                else:# linear
+                else:# last linear
                     updated_partial_idxs[n+'.bias'] = torch.ones_like(m.bias.data)
 
         
