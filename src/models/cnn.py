@@ -74,12 +74,47 @@ class CNN6(nn.Module):
         x = self.classifier(x)
 
         return x
+    
+class CNN3(nn.Module):
+    """
+    CNN model for CIFAR-like dataset only
+    """
+    def __init__(self):
+        super().__init__()
+        features = []
+        conv1 = nn.Conv2d(3, 64, 3, padding=1)
+        conv2 = nn.Conv2d(64, 64, 3,padding=1)
+        features += [conv1,nn.BatchNorm2d(64),nn.ReLU(inplace=True)] # 32x32x64
+        features += [conv2,nn.BatchNorm2d(64),nn.ReLU(inplace=True),nn.MaxPool2d(kernel_size=2,stride=2)] # 16x16x64
+        features += [nn.AdaptiveAvgPool2d((1,1))] # 16x16x64
+        self.features = nn.Sequential(*features)
+        classifier = []
+        fc   = nn.Linear(64, 10)
+        classifier += [fc]
+
+        self.classifier = nn.Sequential(*classifier)
+
+    def forward(self, x):
+        '''
+        One forward pass through the network.
+        
+        Args:
+            x: input
+        '''
+        x = self.features(x)
+        x = torch.flatten(x,1)
+        x = self.classifier(x)
+
+        return x
 
 def lenet5(**kwargs):
     return LeNet5()
 
 def cnn6(**kwargs):
     return CNN6()
+
+def cnn3(**kwargs):
+    return CNN3()
 
 def adapt(model,modeltype,num_classes):
     """
