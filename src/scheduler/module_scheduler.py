@@ -339,6 +339,8 @@ class module_scheduler(base_AT_scheduler):
 
             if len(output_size)>2:
                 output_width = ceil(np.sqrt(self.num_classes/output_size[1]))
+                #output_width = max([ceil(np.sqrt(self.num_classes/output_size[1])),ceil(output_size[2]/max_pooling_size)])
+                #output_width = max([int(np.sqrt(max_auxiliary_neuron/output_size[1])),1])
                 # if the output is too large, we conduct avgpool first
                 if output_size[2] > output_width:
                     auxiliary_model = nn.Sequential(nn.AdaptiveAvgPool2d((output_width,output_width)),nn.Flatten(),nn.Linear(output_size[1]*output_width**2,self.num_classes))

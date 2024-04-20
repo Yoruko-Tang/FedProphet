@@ -79,7 +79,8 @@ def get_data_matrix(dataset,user_groups,num_classes):
     num_users = len(user_groups.keys())
     data_matrix = np.zeros([num_users,num_classes],dtype = np.int64)
     for i in range(num_users):
-        subset = Subset(dataset,user_groups[i])
-        for _,label in subset:
+        # subset = Subset(dataset,user_groups[i])
+        for idx in user_groups[i]:
+            label = dataset.samples[idx][1]
             data_matrix[i,label] = data_matrix[i,label] + 1
     return data_matrix

@@ -25,6 +25,22 @@ class ImageNet1k(TVImageNet):
         #                                                         len(self.samples)))
 
 
+class ImageNette(ImageFolder):
+
+    def __init__(self, train=True, transform=None, target_transform=None,**kwargs):
+        root = osp.join("./data", 'imagenette2-320')
+        if not osp.exists(root):
+            raise ValueError('Dataset not found at {}. Please download it from {}.'.format(
+                root, 'https://s3.amazonaws.com/fast-ai-imageclas/imagenette2-320.tgz'
+            ))
+
+        # Initialize ImageFolder
+        super().__init__(root=osp.join(root, 'train' if train else 'val'), transform=transform,
+                         target_transform=target_transform)
+        self.root = root
+
+        
+
 class CUBS200(ImageFolder):
     def __init__(self, train=True, transform=None, target_transform=None,**kwargs):
         root = osp.join('./data', 'CUB_200_2011')

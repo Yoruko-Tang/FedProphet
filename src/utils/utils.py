@@ -18,13 +18,13 @@ def setup_seed(seed):
 def get_log_path(args):
 
     if not args.iid:
-        file_name = f"./save/{args.dataset}_{args.model_arch}_{args.epochs}_N[{args.num_users}]_{'all' if args.frac == 1.0 else args.strategy}[{args.frac}]_{'sp' if args.alpha is None else 'alpha'}[{args.shards_per_client+args.skew if args.alpha is None else args.alpha}]_sys[{args.sys_scaling_factor}]_E[{args.local_ep}]_B[{args.local_bs}]_lr[{args.lr}({args.lr_decay})]"
+        file_name = f"./save/{args.dataset}_{args.model_arch}_{args.epochs}_N[{args.num_users}]_{'all' if args.frac == 1.0 else args.strategy}[{args.frac}]_{'sp' if args.alpha is None else 'alpha'}[{args.shards_per_client+(args.skew if args.skew is not None else 0) if args.alpha is None else args.alpha}]_sys[{args.sys_scaling_factor}]_E[{args.local_ep}]_B[{args.local_bs}]_lr[{args.lr}({args.lr_decay})]"
     else:
         file_name = f"./save/{args.dataset}_{args.model_arch}_{args.epochs}_N[{args.num_users}]_{'all' if args.frac == 1.0 else args.strategy}[{args.frac}]_iid_sys[{args.sys_scaling_factor}]_E[{args.local_ep}]_B[{args.local_bs}]_lr[{args.lr}({args.lr_decay})]"
     
     file_name = os.path.join(file_name,args.flalg)
     if int(args.adv_train)*args.adv_ratio > 0:
-        file_name += "AT{}".format(int(args.adv_train)*args.adv_ratio)
+        file_name += "AT{}[eps{}_T{}]".format(int(args.adv_train)*args.adv_ratio,args.adv_epsilon,args.adv_T)
 
     if args.flalg == 'FedProphet':
         file_name = os.path.join(file_name,"mu{}_lambda{}_psi{}_quan{}_ada{}".format(args.mu,args.lamb,args.psi,args.eps_quantile,int(args.adapt_eps)))
@@ -48,7 +48,7 @@ def exp_details(args):
     if args.iid:
         print('    IID')
     else:
-        print(f"    Non-IID: {'sp' if args.alpha is None else 'alpha'}={args.shards_per_client+args.skew if args.alpha is None else args.alpha}")
+        print(f"    Non-IID: {'sp' if args.alpha is None else 'alpha'}={args.shards_per_client+(args.skew if args.skew is not None else 0) if args.alpha is None else args.alpha}")
     print('    Fraction of users  : {}'.format(args.frac))
     print('    Local Batch size   : {}'.format(args.local_bs))
     print('    Local Epochs       : {}\n'.format(args.local_ep))
