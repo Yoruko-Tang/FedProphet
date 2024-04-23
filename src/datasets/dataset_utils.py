@@ -81,6 +81,6 @@ def get_data_matrix(dataset,user_groups,num_classes):
     for i in range(num_users):
         # subset = Subset(dataset,user_groups[i])
         for idx in user_groups[i]:
-            label = dataset.samples[idx][1]
+            label = dataset.targets[idx]
             data_matrix[i,label] = data_matrix[i,label] + 1
     return data_matrix

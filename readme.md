@@ -59,13 +59,13 @@ python3 src/federated_main.py --gpu=2 --dataset=CIFAR10 --model_arch=vgg16_bn --
 ### CIFAR100
 * FedBN
 ```shell
-python3 src/federated_main.py --gpu=2 --dataset=CIFAR100 --model_arch=resnet34 --norm=BN --pretrained --flalg=FedBN --epochs=1000 --num_user=100 --frac=0.1 --strategy=rand --local_ep=30 --local_bs=64 --optimizer=sgd --lr=0.01 --lr_decay=0.997 --momentum=0.9 --iid=0 --shards_per_client=20 --skew=0.2  --flsys_profile_info=./src/hardware/flsys_profile_info_low --device_random_seed=717 --sys_scaling_factor=0.0 --reserved_mem=6.4e7 --verbose --seed 1 2 3 --adv_train --adv_warmup=200 --adv_method=PGD --adv_epsilon=0.0314 --adv_alpha=0.0078 --adv_T=10  --adv_ratio=1.0 --adv_test --advt_method=PGD --advt_epsilon=0.0314 --advt_alpha=0.0078 --advt_T=20
+python3 src/federated_main.py --gpu=2 --dataset=CIFAR100 --model_arch=resnet34 --norm=BN --pretrained --flalg=FedBN --epochs=1000 --num_user=100 --frac=0.1 --strategy=rand --local_ep=30 --local_bs=64 --optimizer=sgd --lr=0.005 --lr_decay=0.997 --momentum=0.9 --iid=0 --shards_per_client=20 --skew=0.2  --flsys_profile_info=./src/hardware/flsys_profile_info_low --device_random_seed=717 --sys_scaling_factor=0.0 --reserved_mem=6.4e7 --verbose --seed 1 2 3 --adv_train --adv_warmup=200 --adv_method=PGD --adv_epsilon=0.0314 --adv_alpha=0.0078 --adv_T=10  --adv_ratio=1.0 --adv_test --advt_method=PGD --advt_epsilon=0.0314 --advt_alpha=0.0078 --advt_T=20
 ```
 
 * FedProphet
 
 ```shell
-python3 src/federated_main.py --gpu=1 --dataset=CIFAR100 --model_arch=resnet34 --norm=BN --pretrained --flalg=FedProphet --mu=1e-6 --lamb=1e-4 --psi=1.0 --eps_quantile=0.8 --adapt_eps --epochs=2500 --num_user=100 --frac=0.1 --strategy=rand --local_ep=30 --local_bs=64 --optimizer=sgd --lr=0.003 --lr_decay=0.997 --momentum=0.9 --iid=0 --shards_per_client=20 --skew=0.2  --flsys_profile_info=./src/hardware/flsys_profile_info_low --device_random_seed=717 --sys_scaling_factor=0.0 --reserved_mem=6.4e7 --verbose --seed 1 2 3 --adv_train --adv_warmup=100 --adv_method=PGD --adv_epsilon=0.0314 --adv_alpha=0.0078 --adv_T=10  --adv_ratio=1.0 --adv_test --advt_method=PGD --advt_epsilon=0.0314 --advt_alpha=0.0078 --advt_T=20
+python3 src/federated_main.py --gpu=1 --dataset=CIFAR100 --model_arch=resnet34 --norm=BN --pretrained --flalg=FedProphet --mu=0 --lamb=1e-4 --psi=1.0 --eps_quantile=0.8 --adapt_eps --epochs=2500 --num_user=100 --frac=0.1 --strategy=rand --local_ep=30 --local_bs=64 --optimizer=sgd --lr=0.005 --lr_decay=0.997 --momentum=0.9 --iid=0 --shards_per_client=20 --skew=0.2  --flsys_profile_info=./src/hardware/flsys_profile_info_low --device_random_seed=717 --sys_scaling_factor=0.0 --reserved_mem=6.4e7 --verbose --seed 1 2 3 --adv_train --adv_warmup=100 --adv_method=PGD --adv_epsilon=0.0314 --adv_alpha=0.0078 --adv_T=10  --adv_ratio=1.0 --adv_test --advt_method=PGD --advt_epsilon=0.0314 --advt_alpha=0.0078 --advt_T=20
 ```
 
 ### Caltech256
@@ -73,13 +73,19 @@ python3 src/federated_main.py --gpu=1 --dataset=CIFAR100 --model_arch=resnet34 -
 
 largest
 ```shell
-python3 src/federated_main.py --gpu=0 --dataset=Caltech256 --model_arch=resnet50 --norm=BN --pretrained --flalg=FedBN --epochs=500 --num_user=100 --frac=0.1 --strategy=rand --local_ep=30 --local_bs=32 --optimizer=adam --lr=0.001 --lr_decay=0.997 --iid=0 --shards_per_client=46 --skew=0.2  --flsys_profile_info=./src/hardware/flsys_profile_info_high --device_random_seed=717 --sys_scaling_factor=0.0 --reserved_mem=6.4e8 --verbose --seed 1 2 3 --adv_train --adv_warmup=100 --adv_method=PGD --adv_epsilon=0.0157 --adv_alpha=0.0039 --adv_T=10 --adv_test --advt_method=PGD --advt_epsilon=0.0157 --advt_alpha=0.0039 --advt_T=20
+python3 src/federated_main.py --gpu=3 --dataset=Caltech256 --model_arch=resnet50 --norm=BN --pretrained --flalg=FedBN --epochs=1000 --num_user=100 --frac=0.1 --strategy=rand --local_ep=30 --local_bs=32 --optimizer=adam --lr=0.001 --lr_decay=0.997 --iid=0 --shards_per_client=46 --skew=0.2  --flsys_profile_info=./src/hardware/flsys_profile_info_high --device_random_seed=717 --sys_scaling_factor=0.0 --reserved_mem=6.4e8 --verbose --seed 1 2 3 --adv_train --adv_warmup=200 --adv_method=PGD --adv_epsilon=0.0157 --adv_alpha=0.0039 --adv_T=10 --adv_test --advt_method=PGD --advt_epsilon=0.0157 --advt_alpha=0.0039 --advt_T=20
 ```
 
 * FedProphet
 
+ResNet50
 ```shell
-python3 src/federated_main.py --gpu=1 --dataset=Caltech256 --model_arch=resnet50 --norm=BN --pretrained --flalg=FedProphet --mu=0 --lamb=1e-4 --psi=0.0 --eps_quantile=0.3 --adapt_eps --epochs=2000 --num_user=100 --frac=0.1 --strategy=rand --local_ep=30 --local_bs=32 --optimizer=adam --lr=0.001 --lr_decay=0.985 --iid=0 --shards_per_client=46 --skew=0.2  --flsys_profile_info=./src/hardware/flsys_profile_info_high --device_random_seed=717 --sys_scaling_factor=0.0 --reserved_mem=6.4e8 --verbose --seed 1 2 3 --adv_train --adv_warmup=40 --adv_method=PGD --adv_epsilon=0.0157 --adv_alpha=0.0039 --adv_T=50 --adv_test --advt_method=PGD --advt_epsilon=0.0157 --advt_alpha=0.0039 --advt_T=20
+python3 src/federated_main.py --gpu=3 --dataset=Caltech256 --model_arch=resnet50 --norm=BN --pretrained --flalg=FedProphet --mu=0 --lamb=1e-4 --psi=0.0 --eps_quantile=0.3 --adapt_eps --epochs=4000 --num_user=100 --frac=0.1 --strategy=rand --local_ep=30 --local_bs=32 --optimizer=adam --lr=0.001 --lr_decay=0.985 --iid=0 --shards_per_client=46 --skew=0.2  --flsys_profile_info=./src/hardware/flsys_profile_info_high --device_random_seed=717 --sys_scaling_factor=0.0 --reserved_mem=6.4e8 --verbose --seed 1 2 3 --adv_train --adv_warmup=100 --adv_method=PGD --adv_epsilon=0.0157 --adv_alpha=0.0039 --adv_T=50 --adv_test --advt_method=PGD --advt_epsilon=0.0157 --advt_alpha=0.0039 --advt_T=20
+```
+
+ResNet34
+```shell
+python3 src/federated_main.py --gpu=2 --dataset=Caltech256 --model_arch=resnet34 --norm=BN --pretrained --flalg=FedProphet --mu=0 --lamb=1e-4 --psi=0.0 --eps_quantile=0.3 --adapt_eps --epochs=3000 --num_user=100 --frac=0.1 --strategy=rand --local_ep=30 --local_bs=32 --optimizer=sgd --lr=0.001 --momentum=0.9 --lr_decay=0.997 --iid=0 --shards_per_client=46 --skew=0.2  --flsys_profile_info=./src/hardware/flsys_profile_info_mid --device_random_seed=717 --sys_scaling_factor=0.0 --reserved_mem=2.56e8 --verbose --seed 1 2 3 --adv_train --adv_warmup=100 --adv_method=PGD --adv_epsilon=0.0157 --adv_alpha=0.0039 --adv_T=50 --adv_test --advt_method=PGD --advt_epsilon=0.0157 --advt_alpha=0.0039 --advt_T=20
 ```
 
 ### Imagenette
@@ -87,5 +93,5 @@ python3 src/federated_main.py --gpu=1 --dataset=Caltech256 --model_arch=resnet50
 
 largest
 ```shell
-python3 src/federated_main.py --gpu=2 --dataset=ImageNette --model_arch=resnet50 --norm=BN --pretrained --flalg=FedBN --epochs=100 --num_user=100 --frac=0.1 --strategy=rand --local_ep=30 --local_bs=32 --optimizer=sgd --lr=0.003 --lr_decay=0.97 --momentum=0.9 --iid=0 --shards_per_client=2 --skew=0.2  --flsys_profile_info=./src/hardware/flsys_profile_info_high --device_random_seed=717 --sys_scaling_factor=0.0 --reserved_mem=6.4e8 --verbose --seed 1 2 3 --adv_train --adv_warmup=5 --adv_method=PGD --adv_epsilon=0.0157 --adv_alpha=0.0039 --adv_T=10 --adv_test --advt_method=PGD --advt_epsilon=0.0157 --advt_alpha=0.0039 --advt_T=20
+python3 src/federated_main.py --gpu=2 --dataset=ImageNette --model_arch=resnet34 --norm=BN --pretrained --flalg=FedBN --epochs=100 --num_user=100 --frac=0.1 --strategy=rand --local_ep=30 --local_bs=32 --optimizer=sgd --lr=0.003 --lr_decay=0.97 --momentum=0.9 --iid=0 --shards_per_client=2 --skew=0.2  --flsys_profile_info=./src/hardware/flsys_profile_info_high --device_random_seed=717 --sys_scaling_factor=0.0 --reserved_mem=6.4e8 --verbose --seed 1 2 3 --adv_train --adv_warmup=5 --adv_method=PGD --adv_epsilon=0.0157 --adv_alpha=0.0039 --adv_T=10 --adv_test --advt_method=PGD --advt_epsilon=0.0157 --advt_alpha=0.0039 --advt_T=20
 ```
