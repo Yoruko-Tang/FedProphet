@@ -244,7 +244,7 @@ def set_feature_layer(model):
     """
     feature_layer_list = []
     for n in model.state_dict().keys():
-        if '.weight' in n:
+        if '.weight' in n and 'downsample.0' not in n:
             feature_layer_list.append(n.replace('.weight',''))
     model.feature_layer_list = feature_layer_list
     return model

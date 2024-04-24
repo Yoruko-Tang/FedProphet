@@ -8,7 +8,7 @@ import numpy as np
 
 
 
-model = get_net('resnet34','cifar',num_classes=100,adv_norm=True,modularization=True,norm_type='BN')
+model = get_net('cnn4','cifar',num_classes=10,adv_norm=True,modularization=False,norm_type='BN')
 inputsize = [64,3,32,32]
 args = {"epochs":500,
         "reserved_flops":None,
@@ -25,7 +25,7 @@ args = {"epochs":500,
 # inputsize = [32,3,224,224]
 # args = {"epochs":500,
 #         "reserved_flops":None,
-#         "reserved_mem":256e6,
+#         "reserved_mem":192e6,
 #         "adv_epsilon":0,
 #         "adv_alpha":0,
 #         "adv_norm":"inf",

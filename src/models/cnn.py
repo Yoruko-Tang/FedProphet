@@ -75,7 +75,7 @@ class CNN6(nn.Module):
 
         return x
     
-class CNN3(nn.Module):
+class CNN4(nn.Module):
     """
     CNN model for CIFAR-like dataset only
     """
@@ -84,13 +84,14 @@ class CNN3(nn.Module):
         features = []
         conv1 = nn.Conv2d(3, 64, 3, padding=1)
         conv2 = nn.Conv2d(64, 64, 3,padding=1)
-        features += [conv1,nn.BatchNorm2d(64),nn.ReLU(inplace=True)] # 32x32x64
-        features += [conv2,nn.BatchNorm2d(64),nn.ReLU(inplace=True),nn.MaxPool2d(kernel_size=2,stride=2)] # 16x16x64
-        features += [nn.AdaptiveAvgPool2d((1,1))] # 16x16x64
+        features += [conv1,nn.BatchNorm2d(64),nn.ReLU(inplace=True),nn.MaxPool2d(kernel_size=2,stride=2)] # 16x16x64
+        features += [conv2,nn.BatchNorm2d(64),nn.ReLU(inplace=True),nn.MaxPool2d(kernel_size=2,stride=2)] # 8x8x64
         self.features = nn.Sequential(*features)
         classifier = []
-        fc   = nn.Linear(64, 10)
-        classifier += [fc]
+        fc1 = nn.Linear(8*8*64,512)
+        fc2   = nn.Linear(512, 10)
+        classifier += [fc1,nn.ReLU(inplace=True)]
+        classifier += [fc2]
 
         self.classifier = nn.Sequential(*classifier)
 
@@ -113,8 +114,8 @@ def lenet5(**kwargs):
 def cnn6(**kwargs):
     return CNN6()
 
-def cnn3(**kwargs):
-    return CNN3()
+def cnn4(**kwargs):
+    return CNN4()
 
 def adapt(model,modeltype,num_classes):
     """
