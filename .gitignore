@@ -133,3 +133,4 @@ dmypy.json
 /save/
 *.pdf
 *.ipynb
+*.sh
