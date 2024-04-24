@@ -8,24 +8,11 @@ import numpy as np
 
 
 
-model = get_net('cnn4','cifar',num_classes=10,adv_norm=True,modularization=False,norm_type='BN')
-inputsize = [64,3,32,32]
-args = {"epochs":500,
-        "reserved_flops":None,
-        "reserved_mem":6.4e7,
-        "adv_epsilon":0,
-        "adv_alpha":0,
-        "adv_norm":"inf",
-        "adv_bound":[0,1],
-        "mu":0,
-        "lamb":0,
-        "psi":1}
-
-# model = get_net('resnet34','imagenet',num_classes=256,adv_norm=True,modularization=True,norm_type='BN')
-# inputsize = [32,3,224,224]
+# model = get_net('vgg11_bn','cifar',num_classes=10,adv_norm=True,modularization=False,norm_type='BN')
+# inputsize = [64,3,32,32]
 # args = {"epochs":500,
 #         "reserved_flops":None,
-#         "reserved_mem":192e6,
+#         "reserved_mem":6.4e7,
 #         "adv_epsilon":0,
 #         "adv_alpha":0,
 #         "adv_norm":"inf",
@@ -33,6 +20,19 @@ args = {"epochs":500,
 #         "mu":0,
 #         "lamb":0,
 #         "psi":1}
+
+model = get_net('resnet34','imagenet',num_classes=256,adv_norm=True,modularization=True,norm_type='BN')
+inputsize = [32,3,224,224]
+args = {"epochs":500,
+        "reserved_flops":None,
+        "reserved_mem":224e6,
+        "adv_epsilon":0,
+        "adv_alpha":0,
+        "adv_norm":"inf",
+        "adv_bound":[0,1],
+        "mu":0,
+        "lamb":0,
+        "psi":1}
 #ms = model_summary(model,inputsize,optimizer='adam')
 ms = model_summary(model,inputsize,optimizer='sgd',momentum=0.9)
 

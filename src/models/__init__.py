@@ -1,7 +1,8 @@
 # regisiter your models here to be considered
 from torchvision.models.vgg import *
 from torchvision.models.resnet import *
-from models.cnn import lenet5,cnn6,cnn4
+from models.cnn import lenet5,cnn6,cnn4,cnn4_imgnet
+from models.resnet import resnet10
 
 import models.resnet as resnet
 import models.vgg as vgg

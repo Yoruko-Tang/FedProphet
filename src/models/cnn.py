@@ -107,6 +107,39 @@ class CNN4(nn.Module):
         x = self.classifier(x)
 
         return x
+    
+class CNN4_ImageNet(nn.Module):
+    """
+    CNN model for ImageNet-like dataset only
+    """
+    def __init__(self):
+        super().__init__()
+        features = []
+        conv1 = nn.Conv2d(3, 64, 7, stride=2, padding=3,bias=False)
+        conv2 = nn.Conv2d(64, 64, 3,stride=1, padding=1,bias=False)
+        features += [conv1,nn.BatchNorm2d(64),nn.ReLU(inplace=True),nn.MaxPool2d(kernel_size=4,stride=4)] # 28x28x64
+        features += [conv2,nn.BatchNorm2d(64),nn.ReLU(inplace=True),nn.MaxPool2d(kernel_size=4,stride=4)] # 7x7x64
+        self.features = nn.Sequential(*features)
+        classifier = []
+        fc1 = nn.Linear(7*7*64,512)
+        fc2   = nn.Linear(512, 100)
+        classifier += [fc1,nn.ReLU(inplace=True)]
+        classifier += [fc2]
+
+        self.classifier = nn.Sequential(*classifier)
+
+    def forward(self, x):
+        '''
+        One forward pass through the network.
+        
+        Args:
+            x: input
+        '''
+        x = self.features(x)
+        x = torch.flatten(x,1)
+        x = self.classifier(x)
+
+        return x
 
 def lenet5(**kwargs):
     return LeNet5()
@@ -116,6 +149,9 @@ def cnn6(**kwargs):
 
 def cnn4(**kwargs):
     return CNN4()
+
+def cnn4_imgnet(**kwargs):
+    return CNN4_ImageNet()
 
 def adapt(model,modeltype,num_classes):
     """

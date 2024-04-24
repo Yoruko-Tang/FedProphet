@@ -4,6 +4,11 @@ from typing import List
 import types
 import numpy as np
 
+from torchvision.models.resnet import _resnet,BasicBlock
+
+def resnet10(**kwargs):
+    return _resnet(BasicBlock, [1, 1, 1, 1],progress=False, **kwargs)
+
 def adapt(model,modeltype,num_classes):
     """
     Adapt the network with given modeltype and number of classes
