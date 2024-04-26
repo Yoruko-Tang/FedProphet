@@ -159,7 +159,7 @@ class AT_Stat_Monitor(ST_Stat_Monitor):
             columns = ['epoch', 'mode', 'clean_loss', 'clean_accuracy', 'best_clean_accuracy','adv_loss', 'adv_accuracy', 'best_adv_accuracy']
             wf.write('\t'.join(columns) + '\n')
 
-    def collect(self,global_model,adv_test=True,epoch=None,chosen_idxs=None,test_dataset=None,log=False,save=True,**validation_kwargs):
+    def collect(self,global_model,adv_test=True,epoch=None,chosen_idxs=None,test_dataset=None,log=False,save=True,clean_adv_ratio=1.3,**validation_kwargs):
         res = super().collect(global_model,epoch,chosen_idxs,test_dataset,log,save=False,**validation_kwargs)
         if not adv_test:
             global_adv_accs = np.zeros(len(self.clients))
@@ -237,7 +237,7 @@ class AT_Stat_Monitor(ST_Stat_Monitor):
                                 "test_adv_acc":self.test_adv_accs,
                                 "test_adv_loss":self.test_adv_losses}, stat_f)
                 # store the model if it attains the highest validation loss
-                weighted_global_clean_adv_accs = 0.4*np.array(self.weighted_global_accs) + 0.6*np.array(self.weighted_global_adv_accs)
+                weighted_global_clean_adv_accs = np.array(self.weighted_global_accs) + clean_adv_ratio*np.array(self.weighted_global_adv_accs)
                 if np.argmax(weighted_global_clean_adv_accs) == len(weighted_global_clean_adv_accs)-1:
                     torch.save([global_model,[c.local_states for c in self.clients]],self.pt_file)
                     model_info = {"round":epoch,

@@ -8,7 +8,7 @@ import numpy as np
 
 
 
-# model = get_net('vgg11_bn','cifar',num_classes=10,adv_norm=True,modularization=False,norm_type='BN')
+# model = get_net('cnn3','cifar',num_classes=10,adv_norm=True,modularization=True,norm_type='BN')
 # inputsize = [64,3,32,32]
 # args = {"epochs":500,
 #         "reserved_flops":None,
@@ -19,9 +19,10 @@ import numpy as np
 #         "adv_bound":[0,1],
 #         "mu":0,
 #         "lamb":0,
-#         "psi":1}
+#         "psi":1,
+#         "target_clean_adv_ratio":2.0}
 
-model = get_net('resnet34','imagenet',num_classes=256,adv_norm=True,modularization=True,norm_type='BN')
+model = get_net('cnn4','imagenet',num_classes=256,adv_norm=True,modularization=True,norm_type='BN')
 inputsize = [32,3,224,224]
 args = {"epochs":500,
         "reserved_flops":None,
@@ -32,7 +33,8 @@ args = {"epochs":500,
         "adv_bound":[0,1],
         "mu":0,
         "lamb":0,
-        "psi":1}
+        "psi":1,
+        "target_clean_adv_ratio":2.0}
 #ms = model_summary(model,inputsize,optimizer='adam')
 ms = model_summary(model,inputsize,optimizer='sgd',momentum=0.9)
 

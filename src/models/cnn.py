@@ -75,7 +75,7 @@ class CNN6(nn.Module):
 
         return x
     
-class CNN4(nn.Module):
+class CNN3(nn.Module):
     """
     CNN model for CIFAR-like dataset only
     """
@@ -83,15 +83,13 @@ class CNN4(nn.Module):
         super().__init__()
         features = []
         conv1 = nn.Conv2d(3, 64, 3, padding=1)
-        conv2 = nn.Conv2d(64, 64, 3,padding=1)
-        features += [conv1,nn.BatchNorm2d(64),nn.ReLU(inplace=True),nn.MaxPool2d(kernel_size=2,stride=2)] # 16x16x64
-        features += [conv2,nn.BatchNorm2d(64),nn.ReLU(inplace=True),nn.MaxPool2d(kernel_size=2,stride=2)] # 8x8x64
+        conv2 = nn.Conv2d(64, 128, 3, stride=2, padding=1)
+        features += [conv1,nn.BatchNorm2d(64),nn.ReLU(inplace=True)] # 32x32x64
+        features += [conv2,nn.BatchNorm2d(128),nn.ReLU(inplace=True),nn.AdaptiveMaxPool2d([2,2])] # 2x2x128
         self.features = nn.Sequential(*features)
         classifier = []
-        fc1 = nn.Linear(8*8*64,512)
-        fc2   = nn.Linear(512, 10)
-        classifier += [fc1,nn.ReLU(inplace=True)]
-        classifier += [fc2]
+        fc   = nn.Linear(512, 10)
+        classifier += [fc]
 
         self.classifier = nn.Sequential(*classifier)
 
@@ -108,20 +106,20 @@ class CNN4(nn.Module):
 
         return x
     
-class CNN4_ImageNet(nn.Module):
+class CNN4(nn.Module):
     """
     CNN model for ImageNet-like dataset only
     """
     def __init__(self):
         super().__init__()
         features = []
-        conv1 = nn.Conv2d(3, 64, 7, stride=2, padding=3,bias=False)
-        conv2 = nn.Conv2d(64, 64, 3,stride=1, padding=1,bias=False)
-        features += [conv1,nn.BatchNorm2d(64),nn.ReLU(inplace=True),nn.MaxPool2d(kernel_size=4,stride=4)] # 28x28x64
-        features += [conv2,nn.BatchNorm2d(64),nn.ReLU(inplace=True),nn.MaxPool2d(kernel_size=4,stride=4)] # 7x7x64
+        conv1 = nn.Conv2d(3, 64, 7, stride=2, padding=3)
+        conv2 = nn.Conv2d(64, 128, 7,stride=2, padding=3)
+        features += [conv1,nn.BatchNorm2d(64),nn.ReLU(inplace=True),nn.MaxPool2d(kernel_size=2,stride=2)] # 56x56x64
+        features += [conv2,nn.BatchNorm2d(128),nn.ReLU(inplace=True),nn.AdaptiveMaxPool2d([7,7])] # 7x7x128
         self.features = nn.Sequential(*features)
         classifier = []
-        fc1 = nn.Linear(7*7*64,512)
+        fc1 = nn.Linear(7*7*128,512)
         fc2   = nn.Linear(512, 100)
         classifier += [fc1,nn.ReLU(inplace=True)]
         classifier += [fc2]
@@ -147,11 +145,11 @@ def lenet5(**kwargs):
 def cnn6(**kwargs):
     return CNN6()
 
+def cnn3(**kwargs):
+    return CNN3()
+
 def cnn4(**kwargs):
     return CNN4()
-
-def cnn4_imgnet(**kwargs):
-    return CNN4_ImageNet()
 
 def adapt(model,modeltype,num_classes):
     """

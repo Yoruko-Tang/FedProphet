@@ -42,13 +42,12 @@ class module_scheduler(base_AT_scheduler):
         self.round_per_stage = ceil(self.total_round/len(self.partition_module_list))
         self.stage = 0
         self.stage_begin_round = 0
-        self.best_weighted_acc = 0.0
         self.best_clean_adv_ratio = None
-        self.first_stage_clean_adv_ratio = None
+        #self.first_stage_clean_adv_ratio = None
         self.clean_adv_ratios = []
 
         
-        self.smooth_length = 0
+
 
         # print("=================Stage 1=================")
         self.clients = clients
@@ -175,7 +174,7 @@ class module_scheduler(base_AT_scheduler):
         # update statistical information
         if not self.args["adv_train"] or self.round >= self.args["adv_warmup"]:
             if "weighted_val_adv_acc" in stat_info:
-                weighted_acc = 0.4*stat_info["weighted_val_acc"] + 0.6*stat_info["weighted_val_adv_acc"]
+                weighted_acc = stat_info["weighted_val_acc"] + self.target_clean_adv_ratio*stat_info["weighted_val_adv_acc"]
                 clean_adv_ratio = stat_info["weighted_val_acc"]/stat_info["weighted_val_adv_acc"]
                 self.clean_adv_ratios.append(clean_adv_ratio)
             else:
@@ -194,17 +193,20 @@ class module_scheduler(base_AT_scheduler):
                 self.smooth_length += epoch-self.stage_begin_round-self.round
         
         # adaptive adjustment of alpha
-        if self.args["adapt_eps"] and self.first_stage_clean_adv_ratio is not None:
-            if len(self.clean_adv_ratios) > 0 and len(self.clean_adv_ratios)%int(0.1*self.round_per_stage) == 0:
-                screen_length = min([5,len(self.clean_adv_ratios)])
-                if np.mean(self.clean_adv_ratios[-screen_length:]) > 1.1*self.first_stage_clean_adv_ratio: # the adv acc is too low
-                    self.alpha = self.alpha + 0.1 # increase the epsilon
-                    self.smooth_length = 0 # clear the smooth length for adjusting alpha
-                    self.best_weighted_acc = 0
-                elif np.mean(self.clean_adv_ratios[-screen_length:]) < 0.9*self.first_stage_clean_adv_ratio: # the clean acc is too low
-                    self.alpha = max([0.1,self.alpha-0.1]) # decrease the epsilon
-                    self.smooth_length = 0 # clear the smooth length for adjusting alpha
-                    self.best_weighted_acc = 0
+        if self.args["adv_train"] and self.args["adapt_eps"] \
+            and self.stage>0 and self.round > self.args["adv_warmup"] \
+            and self.round%int(0.1*self.round_per_stage)==0:
+            screen_length = min([5,len(self.clean_adv_ratios)])
+            if np.mean(self.clean_adv_ratios[-screen_length:]) > 1.05*self.target_clean_adv_ratio: # the adv acc is too low
+                self.alpha = self.alpha + 0.1 # increase the epsilon
+                # self.smooth_length = 0 # clear the smooth length for adjusting alpha
+                # self.best_weighted_acc = 0
+                # self.best_clean_adv_ratio = None
+            elif np.mean(self.clean_adv_ratios[-screen_length:]) < 0.95*self.target_clean_adv_ratio: # the clean acc is too low
+                self.alpha = max([0.1,self.alpha-0.1]) # decrease the epsilon
+                # self.smooth_length = 0 # clear the smooth length for adjusting alpha
+                # self.best_weighted_acc = 0
+                # self.best_clean_adv_ratio = None
     
         
         self.round = epoch-self.stage_begin_round
@@ -218,8 +220,8 @@ class module_scheduler(base_AT_scheduler):
             self.round = 0
             self.smooth_length = 0
             self.best_weighted_acc = 0.0
-            if self.stage == 0:
-                self.first_stage_clean_adv_ratio = self.best_clean_adv_ratio
+            # if self.stage == 0:
+            #     self.first_stage_clean_adv_ratio = self.best_clean_adv_ratio
             self.best_clean_adv_ratio = None
             self.clean_adv_ratios = []
             
