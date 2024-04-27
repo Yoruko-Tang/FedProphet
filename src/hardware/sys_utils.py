@@ -400,7 +400,7 @@ class model_summary():
             communication_time = 0
         
         # we do not consider communication time right now
-        total_latency = total_comp_latency + total_mem_latency + communication_time
+        total_latency = total_comp_latency + total_mem_latency #+ communication_time
         
         return {"total":total_latency,"computation":total_comp_latency,"memory":total_mem_latency,"communication":communication_time}
         
