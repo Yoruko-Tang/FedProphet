@@ -37,6 +37,6 @@ class kd_scheduler(base_AT_scheduler):
 
         return args
 
-    def stat_update(self, epoch, sys_info, **kwargs):
+    def stat_update(self, epoch,stat_info, sys_info, **kwargs):
         self.available_memory = np.array(sys_info["available_mems"])
-        return super().stat_update(epoch)
+        return super().stat_update(epoch,stat_info)
