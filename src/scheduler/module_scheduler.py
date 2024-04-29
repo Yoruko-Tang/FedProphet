@@ -20,6 +20,7 @@ class module_scheduler(base_AT_scheduler):
     def __init__(self, args, model_profile, clients,log_path=None):
         super().__init__(args)
         self.model_profile = model_profile
+        self.stage_input_size = model_profile.inputsize
         self.atom_list = self.model_profile.module_list
         self.atom_flops_dict = self.model_profile.flops_dict
         self.atom_param_dict = self.model_profile.num_parameter_dict
@@ -31,7 +32,8 @@ class module_scheduler(base_AT_scheduler):
         self.partition_module_list,self.module_dict,self.auxiliary_model_dict,\
         self.module_flops_dict,self.module_mem_dict,self.auxiliary_model_flops_dict, \
         self.auxiliary_model_mem_dict = self.model_partition(args["reserved_flops"],
-                                                            args["reserved_mem"])
+                                                            args["reserved_mem"],
+                                                            args["adv_train"])
         
         print(f"====> Partitioned Model into {len(self.partition_module_list)} Modules.")
         print("====> Model Partitions: \n",self.partition_module_list)
@@ -90,6 +92,9 @@ class module_scheduler(base_AT_scheduler):
         avail_perf = self.available_performance[idx]
         avail_mem = self.available_memory[idx]
 
+        if args["adv_train"]:
+            # reserve memory for adversarial training
+            avail_mem -= np.prod(self.stage_input_size)*self.model_profile.data_Byte
         # config the prophet training
         # the allowed time is the time of finishing training 
         # the current module with the smallest available performance
@@ -233,6 +238,7 @@ class module_scheduler(base_AT_scheduler):
 
             # forward local feature set
             current_module_list = self.module_dict[self.partition_module_list[self.stage]]
+            self.stage_input_size = self.atom_output_dict[current_module_list[-1]]
             new_adv_epsilons = []
             lowers = []
             uppers = []
@@ -296,7 +302,7 @@ class module_scheduler(base_AT_scheduler):
         return True
         
 
-    def model_partition(self,max_module_flops=None,max_module_mem=None,**kwargs):
+    def model_partition(self,max_module_flops=None,max_module_mem=None,adv_train=True,**kwargs):
         """
         partition the model in a greedy manner, with each module in the 
         max_flops and max_mem constraints.
@@ -333,6 +339,8 @@ class module_scheduler(base_AT_scheduler):
 
         current_sum_flops = 0
         current_sum_mem = 0
+        input_size = self.model_profile.inputsize
+        adv_reserved_mem = self.model_profile.data_Byte*np.prod(input_size) if adv_train else 0
 
         for atom in self.atom_list:
             output_size = self.atom_output_dict[atom]
@@ -366,11 +374,11 @@ class module_scheduler(base_AT_scheduler):
                     + self.model_profile.data_Byte*int(np.prod(aux_output))
             
             # this module can be added into the current module
-            if added_flops <= max_module_flops and added_mem <= max_module_mem:
+            if added_flops <= max_module_flops and added_mem+adv_reserved_mem <= max_module_mem:
                 current_sum_flops += (int(self.atom_flops_dict[atom]))
                 current_sum_mem += int(self.atom_mem_dict[atom])
                 current_partition_module_list.append(atom)
-                
+
             # this module cannot be added into the current module
             else:
                 # end of this module
@@ -387,6 +395,9 @@ class module_scheduler(base_AT_scheduler):
                 # start the next module
                 current_sum_flops = int(self.atom_flops_dict[atom])
                 current_sum_mem = int(self.atom_mem_dict[atom])
+                if adv_train:
+                    # reserve memory for adversarial training
+                    adv_reserved_mem = self.model_profile.data_Byte*np.prod(input_size)
                 current_partition_module_list = [atom]
 
             last_aux_flops = aux_flops
@@ -394,6 +405,7 @@ class module_scheduler(base_AT_scheduler):
                         + self.model_profile.param_mem_scale*self.model_profile.data_Byte*aux_param \
                         + self.model_profile.data_Byte*int(np.prod(aux_output))
             last_aux_model = auxiliary_model
+            input_size = output_size
 
         # add the last module into the list
         last_module_name = "+".join(current_partition_module_list)

@@ -12,7 +12,8 @@ model = get_net('vgg16_bn','cifar',num_classes=10,adv_norm=True,modularization=T
 inputsize = [64,3,32,32]
 args = {"epochs":500,
         "reserved_flops":None,
-        "reserved_mem":6.4e7,
+        "reserved_mem":64e6,
+        "adv_train":True,
         "adv_epsilon":0,
         "adv_alpha":0,
         "adv_norm":"inf",
@@ -20,13 +21,13 @@ args = {"epochs":500,
         "mu":0,
         "lamb":0,
         "psi":1,
-        "target_clean_adv_ratio":2.0}
+        "target_clean_adv_ratio":1.25}
 
-# model = get_net('cnn4','imagenet',num_classes=256,adv_norm=True,modularization=True,norm_type='BN')
+# model = get_net('resnet34','imagenet',num_classes=256,adv_norm=True,modularization=True,norm_type='BN')
 # inputsize = [32,3,224,224]
 # args = {"epochs":500,
 #         "reserved_flops":None,
-#         "reserved_mem":224e6,
+#         "reserved_mem":240e6,
 #         "adv_epsilon":0,
 #         "adv_alpha":0,
 #         "adv_norm":"inf",
@@ -81,10 +82,18 @@ print("\n")
 
 
 msch = module_scheduler(args,ms,None,None)
-print(msch.partition_module_list)
-print(ms.training_latency(performance=17e9,
-                        memory=6.4e7,
-                        eff_bandwidth=16e9,
-                        batches=[[64,3,32,32]]*30,
-                        adv_iters=10,
-                        module_list=msch.module_dict[msch.partition_module_list[2]]))
+
+for i in range(len(msch.partition_module_list)):
+        print(ms.training_latency(performance=5e11,
+                                memory=64e6,
+                                eff_bandwidth=1.5e9,
+                                batches=[[64,3,32,32]]*1,
+                                adv_iters=10,
+                                module_list=msch.module_dict[msch.partition_module_list[i]]))
+# for i in range(len(msch.partition_module_list)):
+#         print(ms.training_latency(performance=5e11,
+#                                 memory=240e6,
+#                                 eff_bandwidth=1.5e9,
+#                                 batches=[[32,3,224,224]]*1,
+#                                 adv_iters=10,
+#                                 module_list=msch.module_dict[msch.partition_module_list[i]]))
