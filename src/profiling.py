@@ -8,25 +8,11 @@ import numpy as np
 
 
 
-# model = get_net('cnn3','cifar',num_classes=10,adv_norm=True,modularization=True,norm_type='BN')
-# inputsize = [64,3,32,32]
-# args = {"epochs":500,
-#         "reserved_flops":None,
-#         "reserved_mem":6.4e7,
-#         "adv_epsilon":0,
-#         "adv_alpha":0,
-#         "adv_norm":"inf",
-#         "adv_bound":[0,1],
-#         "mu":0,
-#         "lamb":0,
-#         "psi":1,
-#         "target_clean_adv_ratio":2.0}
-
-model = get_net('cnn4','imagenet',num_classes=256,adv_norm=True,modularization=True,norm_type='BN')
-inputsize = [32,3,224,224]
+model = get_net('vgg16_bn','cifar',num_classes=10,adv_norm=True,modularization=True,norm_type='BN')
+inputsize = [64,3,32,32]
 args = {"epochs":500,
         "reserved_flops":None,
-        "reserved_mem":224e6,
+        "reserved_mem":6.4e7,
         "adv_epsilon":0,
         "adv_alpha":0,
         "adv_norm":"inf",
@@ -35,6 +21,20 @@ args = {"epochs":500,
         "lamb":0,
         "psi":1,
         "target_clean_adv_ratio":2.0}
+
+# model = get_net('cnn4','imagenet',num_classes=256,adv_norm=True,modularization=True,norm_type='BN')
+# inputsize = [32,3,224,224]
+# args = {"epochs":500,
+#         "reserved_flops":None,
+#         "reserved_mem":224e6,
+#         "adv_epsilon":0,
+#         "adv_alpha":0,
+#         "adv_norm":"inf",
+#         "adv_bound":[0,1],
+#         "mu":0,
+#         "lamb":0,
+#         "psi":1,
+#         "target_clean_adv_ratio":2.0}
 #ms = model_summary(model,inputsize,optimizer='adam')
 ms = model_summary(model,inputsize,optimizer='sgd',momentum=0.9)
 
@@ -81,4 +81,10 @@ print("\n")
 
 
 msch = module_scheduler(args,ms,None,None)
-print(msch.auxiliary_model_dict)
+print(msch.partition_module_list)
+print(ms.training_latency(performance=17e9,
+                        memory=6.4e7,
+                        eff_bandwidth=16e9,
+                        batches=[[64,3,32,32]]*30,
+                        adv_iters=10,
+                        module_list=msch.module_dict[msch.partition_module_list[2]]))
