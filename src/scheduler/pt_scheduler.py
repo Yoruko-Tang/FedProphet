@@ -16,8 +16,11 @@ class pt_scheduler(base_AT_scheduler):
     def training_params(self, idx, **kwargs):
         args = super().training_params()
 
-        avai_mem = self.available_memory[idx]
-        frac = min([avai_mem/self.memory_req,1.0])
+        avail_mem = self.available_memory[idx]
+        if args["adv_train"]:
+            # reserve memory for adversarial training
+            avail_mem -= np.prod(self.model_profile.inputsize)*self.model_profile.data_Byte*args["adv_ratio"]
+        frac = min([avail_mem/self.memory_req,1.0])
         neuron_dict = {m:None for m in self.neuron_num}
         
         for m in neuron_dict:

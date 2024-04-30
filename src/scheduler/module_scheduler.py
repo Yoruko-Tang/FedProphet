@@ -94,7 +94,7 @@ class module_scheduler(base_AT_scheduler):
 
         if args["adv_train"]:
             # reserve memory for adversarial training
-            avail_mem -= np.prod(self.stage_input_size)*self.model_profile.data_Byte
+            avail_mem -= np.prod(self.stage_input_size)*self.model_profile.data_Byte*args["adv_ratio"]
         # config the prophet training
         # the allowed time is the time of finishing training 
         # the current module with the smallest available performance

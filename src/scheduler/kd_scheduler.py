@@ -16,10 +16,13 @@ class kd_scheduler(base_AT_scheduler):
     def training_params(self, idx, **kwargs):
         args = super().training_params()
 
-        avai_mem = self.available_memory[idx]
+        avail_mem = self.available_memory[idx]
+        if args["adv_train"]:
+            # reserve memory for adversarial training
+            avail_mem -= np.prod(self.model_profile.inputsize)*self.model_profile.data_Byte*args["adv_ratio"]
         group = None
         for i in self.mem_req_sort: # find the largest model that can fit into the memory
-            if avai_mem>self.memory_reqs[i]:
+            if avail_mem>self.memory_reqs[i]:
                 group = i
         if group is None:
             group = self.mem_req_sort[0]
