@@ -40,7 +40,7 @@ class base_scheduler():
         else:
             self.smooth_length += epoch-self.round
         self.round = epoch
-        if self.round >= self.total_round or self.smooth_length >= int(0.1*self.total_round):
+        if self.round >= self.total_round: #or self.smooth_length >= int(0.1*self.total_round):
             return False
         else:
             print('\n | Global Training Round : {} |\n'.format(self.round))
@@ -93,7 +93,7 @@ class base_AT_scheduler(base_scheduler):
             else:
                 self.smooth_length += epoch-self.round
         self.round = epoch
-        if self.round >= self.total_round or self.smooth_length >= int(0.1*self.total_round):
+        if self.round >= self.total_round: #or self.smooth_length >= int(0.1*self.total_round):
             return False
         else:
             print('\n | Global Training Round : {} |\n'.format(self.round))
