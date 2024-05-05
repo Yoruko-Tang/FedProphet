@@ -194,7 +194,7 @@ def at_option(parser):
                         help = 'Ratio of adversarial training samples in warmup phase')
     parser.add_argument('--adv_ratio', type = float,default=1.0,
                         help = 'Ratio of adversarial training samples after warmup phase')
-    parser.add_argument('--target_clean_adv_ratio', type = float, default=1.3,help="The target ratio of clean and adversarial accuracy")
+    parser.add_argument('--target_clean_adv_ratio', type = float, default=1.5,help="The target ratio of clean and adversarial accuracy")
     
     # Adversarial Test
     parser.add_argument('--adv_test', action = 'store_true',
