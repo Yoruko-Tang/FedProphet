@@ -134,3 +134,5 @@ dmypy.json
 *.pdf
 *.ipynb
 *.sh
+*.slurm
+*.out

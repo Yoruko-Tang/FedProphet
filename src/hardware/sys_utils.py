@@ -361,8 +361,10 @@ class model_summary():
             if memory is not None and eff_bandwidth is not None and access_latency is not None:
                 if batch_memory_req>memory: # the required memory exceeds the available memory
                     # we adopt load and offload method to train the module
-                    # offload feature in forward and load feature in backward + load and offload parameters in forward and backward
-                    memory_access_size = self.data_Byte*(2*calibrated_factor*total_feature_size + 4*total_params)
+                    # offload feature in forward and load feature in backward + load and offload parameters in forward and backward + load and offload opt status in backward
+                    memory_access_size = self.data_Byte*(2*calibrated_factor*total_feature_size \
+                                                         + 4*total_params \
+                                                         + 2*(self.param_mem_scale-2)*total_params)
                     forward_mem_req = self.data_Byte*(calibrated_factor*total_feature_size + total_params) # 1x parameter + 1x feature in forward
                     backward_mem_req = batch_memory_req
                     memory_access_times = ceil(forward_mem_req/memory) + ceil(backward_mem_req/memory)
@@ -374,9 +376,10 @@ class model_summary():
                         batch_memory_access_time += self.data_Byte*total_params/eff_bandwidth
             if adv_iters>0:# adversarial training part
                 batch_computation_time += 2*batch_flops_req*adv_iters*adv_ratio/performance if performance is not None else 0
-                # adversarial training only requires 1xparam+1xfeature+1xinputsize memory
-                adv_batch_memory_req = self.data_Byte*adv_ratio*(calibrated_factor*total_feature_size+np.prod(batch)) \
-                                        + self.data_Byte*total_params
+                # adversarial training only requires 1xparam+1xfeature
+                # we should reserve an extra memory for the input gradients, 
+                # but this part can usually be compensated by the released features in backward, so we did not count it here
+                adv_batch_memory_req = self.data_Byte*(adv_ratio*calibrated_factor*total_feature_size + total_params)
                 if memory is not None and eff_bandwidth is not None and access_latency is not None:
                     if adv_batch_memory_req>memory: # the required memory exceeds the available memory
                         # we adopt load and offload method to train the module
