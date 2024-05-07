@@ -1,64 +1,45 @@
 from models.model_utils import get_net
-from fvcore.nn import FlopCountAnalysis,flop_count_table, parameter_count
-import torch
 from hardware.sys_utils import model_summary
 from scheduler.module_scheduler import module_scheduler
 from client import *
-import numpy as np
+import argparse
 
+parser = argparse.ArgumentParser()
+parser.add_argument("-m","--modelfamily",default="cifar",type=str)
+a = parser.parse_args()
 
+if a.modelfamily == 'cifar':
+        model = get_net('vgg16_bn','cifar',num_classes=10,adv_norm=True,modularization=True,norm_type='BN')
+        inputsize = [64,3,32,32]
+        args = {"epochs":500,
+                "reserved_flops":None,
+                "reserved_mem":60e6,
+                "adv_train":True,
+                "adv_epsilon":0,
+                "adv_alpha":0,
+                "adv_norm":"inf",
+                "adv_bound":[0,1],
+                "mu":0,
+                "lamb":0,
+                "psi":1,
+                "target_clean_adv_ratio":1.5}
+elif a.modelfamily == 'imagenet':
+        model = get_net('resnet34','imagenet',num_classes=256,adv_norm=True,modularization=True,norm_type='BN')
+        inputsize = [32,3,224,224]
+        args = {"epochs":500,
+                "reserved_flops":None,
+                "reserved_mem":224e6,
+                "adv_epsilon":0,
+                "adv_alpha":0,
+                "adv_norm":"inf",
+                "adv_bound":[0,1],
+                "mu":0,
+                "lamb":0,
+                "psi":1,
+                "target_clean_adv_ratio":1.5}
 
-# model = get_net('vgg16_bn','cifar',num_classes=10,adv_norm=True,modularization=True,norm_type='BN')
-# inputsize = [64,3,32,32]
-# args = {"epochs":500,
-#         "reserved_flops":None,
-#         "reserved_mem":64e6,
-#         "adv_train":True,
-#         "adv_epsilon":0,
-#         "adv_alpha":0,
-#         "adv_norm":"inf",
-#         "adv_bound":[0,1],
-#         "mu":0,
-#         "lamb":0,
-#         "psi":1,
-#         "target_clean_adv_ratio":1.5}
-
-model = get_net('resnet34','imagenet',num_classes=256,adv_norm=True,modularization=True,norm_type='BN')
-inputsize = [32,3,224,224]
-args = {"epochs":500,
-        "reserved_flops":None,
-        "reserved_mem":240e6,
-        "adv_epsilon":0,
-        "adv_alpha":0,
-        "adv_norm":"inf",
-        "adv_bound":[0,1],
-        "mu":0,
-        "lamb":0,
-        "psi":1,
-        "target_clean_adv_ratio":1.5}
-#ms = model_summary(model,inputsize,optimizer='adam')
 ms = model_summary(model,inputsize,optimizer='sgd',momentum=0.9)
 
-#print(ST_Client.get_local_state_dict(model).keys())
-# # print(ms.training_latency(1e12,1e9,6.4e10,partial_frac=0.5))
-# # print(ms.training_latency(1e12,1e9,6.4e10,partial_frac=1.0))
-# print(model)
-# neuron_dict={n:np.random.choice(range(model.neuron_num[n]),int(model.neuron_num[n]*0.2),replace=False) for n in model.neuron_num}
-# print(neuron_dict)
-# x = torch.rand(inputsize)
-# model.eval()
-# a = model.partial_forward(x,neuron_dict)
-
-
-# for n,m in model.named_modules():
-#     print(n)
-#     if hasattr(m,'in_retain_idx'):
-#         print("in_features: ",m.in_retain_idx)
-#     if hasattr(m,'retain_idx'):
-#         print("out_features: ",m.retain_idx)
-# b = model(x)
-# print(a)
-# print(b)
 
 print("module list---------------------------")
 print(ms.module_list)
@@ -83,17 +64,19 @@ print("\n")
 
 msch = module_scheduler(args,ms,None,None)
 
-# for i in range(len(msch.partition_module_list)):
-#         print(ms.training_latency(performance=5e11,
-#                                 memory=64e6,
-#                                 eff_bandwidth=1.5e9,
-#                                 batches=[[64,3,32,32]]*1,
-#                                 adv_iters=10,
-#                                 module_list=msch.module_dict[msch.partition_module_list[i]]))
-for i in range(len(msch.partition_module_list)):
-        print(ms.training_latency(performance=5e11,
-                                memory=240e6,
-                                eff_bandwidth=1.5e9,
-                                batches=[[32,3,224,224]]*1,
-                                adv_iters=10,
-                                module_list=msch.module_dict[msch.partition_module_list[i]]))
+if a.modelfamily == 'cifar':
+        for i in range(len(msch.partition_module_list)):
+                print(ms.training_latency(performance=5e11,
+                                        memory=60e6,
+                                        eff_bandwidth=1.5e9,
+                                        batches=[[64,3,32,32]]*1,
+                                        adv_iters=10,
+                                        module_list=msch.module_dict[msch.partition_module_list[i]]))
+elif a.modelfamily == 'imagenet':
+        for i in range(len(msch.partition_module_list)):
+                print(ms.training_latency(performance=5e11,
+                                        memory=224e6,
+                                        eff_bandwidth=1.5e9,
+                                        batches=[[32,3,224,224]]*1,
+                                        adv_iters=10,
+                                        module_list=msch.module_dict[msch.partition_module_list[i]]))
