@@ -177,7 +177,7 @@ class module_scheduler(base_AT_scheduler):
         self.available_memory = np.array(sys_info["available_mems"])
         
         # update statistical information
-        if not self.args["adv_train"] or self.round >= self.args["adv_warmup"]:
+        if not self.args["adv_train"] or self.round >= self.args["adv_warmup"]+int(0.05*self.round_per_stage):
             if "weighted_val_adv_acc" in stat_info:
                 weighted_acc = stat_info["weighted_val_acc"] + self.target_clean_adv_ratio*stat_info["weighted_val_adv_acc"]
                 clean_adv_ratio = stat_info["weighted_val_acc"]/stat_info["weighted_val_adv_acc"]
@@ -199,7 +199,7 @@ class module_scheduler(base_AT_scheduler):
         
         # adaptive adjustment of alpha
         if self.args["adv_train"] and self.args["adapt_eps"] \
-            and self.stage>0 and self.round > self.args["adv_warmup"] \
+            and self.stage>0 and self.round > self.args["adv_warmup"]+int(0.05*self.round_per_stage) \
             and self.round%int(0.1*self.round_per_stage)==0:
             screen_length = min([5,len(self.clean_adv_ratios)])
             if np.mean(self.clean_adv_ratios[-screen_length:]) > 1.05*self.last_stage_clean_adv_ratio: # the adv acc is too low

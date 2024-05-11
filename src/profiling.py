@@ -6,10 +6,11 @@ import argparse
 
 parser = argparse.ArgumentParser()
 parser.add_argument("-m","--modelfamily",default="cifar",type=str)
+parser.add_argument("-a","--arch",default="vgg16_bn",type = str)
 a = parser.parse_args()
 
 if a.modelfamily == 'cifar':
-        model = get_net('vgg16_bn','cifar',num_classes=10,adv_norm=True,modularization=True,norm_type='BN')
+        model = get_net(a.arch,'cifar',num_classes=10,adv_norm=True,modularization=True,norm_type='BN')
         inputsize = [64,3,32,32]
         args = {"epochs":500,
                 "reserved_flops":None,
@@ -24,11 +25,12 @@ if a.modelfamily == 'cifar':
                 "psi":1,
                 "target_clean_adv_ratio":1.5}
 elif a.modelfamily == 'imagenet':
-        model = get_net('resnet34','imagenet',num_classes=256,adv_norm=True,modularization=True,norm_type='BN')
+        model = get_net(a.arch,'imagenet',num_classes=256,adv_norm=True,modularization=True,norm_type='BN')
         inputsize = [32,3,224,224]
         args = {"epochs":500,
                 "reserved_flops":None,
                 "reserved_mem":224e6,
+                "adv_train":True,
                 "adv_epsilon":0,
                 "adv_alpha":0,
                 "adv_norm":"inf",
@@ -66,7 +68,7 @@ msch = module_scheduler(args,ms,None,None)
 
 if a.modelfamily == 'cifar':
         for i in range(len(msch.partition_module_list)):
-                print(ms.training_latency(performance=5e11,
+                print(ms.training_latency(performance=1.7e10,
                                         memory=60e6,
                                         eff_bandwidth=1.5e9,
                                         batches=[[64,3,32,32]]*1,
