@@ -144,3 +144,12 @@ class Avg_Server():
                                                  chosen_idxs=chosen_idxs,
                                                  log=log)
         return self.stat_info,self.sys_info
+    
+    def load(self,save_file):
+        global_model,local_states = torch.load(save_file)
+        # some customized methods may not be loaded with torch load. load the state dict indirectly
+
+        self.global_model["model"].load_state_dict(global_model["model"].state_dict())
+        for idx,client in enumerate(self.clients):
+            client.local_states = local_states[idx]
+        self.scheduler.round = np.inf

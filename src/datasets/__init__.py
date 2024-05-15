@@ -65,16 +65,16 @@ datafamily_to_transforms = {
     'cifar': {
         'train': transforms.Compose([
             transforms.Resize([32,32]),
-            transforms.RandomCrop(32, padding=4),
-            transforms.RandomHorizontalFlip(),
+            #transforms.RandomCrop(32, padding=4),
+            #transforms.RandomHorizontalFlip(),
             transforms.ToTensor(),
             transforms.Normalize(mean=(0.4914, 0.4822, 0.4465),
                                  std=(0.2023, 0.1994, 0.2010)),
         ]),
         'adv_train': transforms.Compose([
             transforms.Resize([32,32]),
-            transforms.RandomCrop(32, padding=4),
-            transforms.RandomHorizontalFlip(),
+            #transforms.RandomCrop(32, padding=4),
+            #transforms.RandomHorizontalFlip(),
             transforms.ToTensor()
         ]),
         'test': transforms.Compose([
@@ -91,15 +91,19 @@ datafamily_to_transforms = {
 
     'imagenet': {
         'train': transforms.Compose([
-            transforms.RandomResizedCrop(224),
-            transforms.RandomHorizontalFlip(),
+            #transforms.RandomResizedCrop(224),
+            #transforms.RandomHorizontalFlip(),
+            transforms.Resize(256),
+            transforms.CenterCrop(224),
             transforms.ToTensor(),
             transforms.Normalize(mean=[0.485, 0.456, 0.406],
                                  std=[0.229, 0.224, 0.225]),
         ]),
         'adv_train': transforms.Compose([
-            transforms.RandomResizedCrop(224),
-            transforms.RandomHorizontalFlip(),
+            #transforms.RandomResizedCrop(224),
+            #transforms.RandomHorizontalFlip(),
+            transforms.Resize(256),
+            transforms.CenterCrop(224),
             transforms.ToTensor()
         ]),
         'test': transforms.Compose([

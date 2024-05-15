@@ -155,9 +155,10 @@ class AT_Stat_Monitor(ST_Stat_Monitor):
 
 
         # create log files
-        with open(self.tsv_file, 'w') as wf:
-            columns = ['epoch', 'mode', 'clean_loss', 'clean_accuracy', 'best_clean_accuracy','adv_loss', 'adv_accuracy', 'best_adv_accuracy']
-            wf.write('\t'.join(columns) + '\n')
+        if self.log_path is not None:
+            with open(self.tsv_file, 'w') as wf:
+                columns = ['epoch', 'mode', 'clean_loss', 'clean_accuracy', 'best_clean_accuracy','adv_loss', 'adv_accuracy', 'best_adv_accuracy']
+                wf.write('\t'.join(columns) + '\n')
 
     def collect(self,global_model,adv_test=True,epoch=None,chosen_idxs=None,test_dataset=None,log=False,save=True,clean_adv_ratio=1.3,**validation_kwargs):
         res = super().collect(global_model,epoch,chosen_idxs,test_dataset,log,save=False,**validation_kwargs)
