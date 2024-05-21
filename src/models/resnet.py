@@ -7,7 +7,7 @@ import numpy as np
 from torchvision.models.resnet import _resnet,BasicBlock
 
 def resnet10(**kwargs):
-    return _resnet(BasicBlock, [1, 1, 1, 1],progress=False, **kwargs)
+    return _resnet(BasicBlock, [1, 1, 1, 1],weights=None,progress=False)
 
 def adapt(model,modeltype,num_classes):
     """

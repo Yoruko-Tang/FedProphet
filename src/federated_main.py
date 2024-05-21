@@ -111,6 +111,7 @@ if __name__ == '__main__':
                                 test_adv_bound = args.advt_bound,
                                 device=device,verbose=args.verbose,
                                 random_seed=i+args.device_random_seed,
+                                reserved_performance = args.reserved_perf,
                                 reserved_memory=args.reserved_mem
                                 ) for i in range(args.num_users)]
                   
@@ -128,6 +129,7 @@ if __name__ == '__main__':
                                 test_adv_bound = args.advt_bound,
                                 device=device,verbose=args.verbose,
                                 random_seed=i+args.device_random_seed,
+                                reserved_performance = args.reserved_perf,
                                 reserved_memory=args.reserved_mem
                                 ) for i in range(args.num_users)]
             
@@ -145,6 +147,7 @@ if __name__ == '__main__':
                                      test_adv_bound = args.advt_bound,
                                      device=device,verbose=args.verbose,
                                      random_seed=i+args.device_random_seed,
+                                     reserved_performance = args.reserved_perf,
                                      reserved_memory=args.reserved_mem
                                      ) for i in range(args.num_users)]
         
@@ -162,6 +165,7 @@ if __name__ == '__main__':
                                 test_adv_bound = args.advt_bound,
                                 device=device,verbose=args.verbose,
                                 random_seed=i+args.device_random_seed,
+                                reserved_performance = args.reserved_perf,
                                 reserved_memory=args.reserved_mem
                                 ) for i in range(args.num_users)]
         elif args.flalg in ["HeteroFL",'FedDrop',"FedRolex"]:
@@ -178,6 +182,7 @@ if __name__ == '__main__':
                                 test_adv_bound = args.advt_bound,
                                 device=device,verbose=args.verbose,
                                 random_seed=i+args.device_random_seed,
+                                reserved_performance = args.reserved_perf,
                                 reserved_memory=args.reserved_mem
                                 ) for i in range(args.num_users)]
         

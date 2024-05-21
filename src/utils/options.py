@@ -60,9 +60,9 @@ def fl_options(parser):
                         help='random seed used for generate devices')
     parser.add_argument('--sys_scaling_factor',type=float,default=0.0,
                         help='the factor that controls the distribution of different devices')
-    parser.add_argument('--reserved_flops',type=float,default=None,
+    parser.add_argument('--reserved_perf',type=float,default=0,
                         help='the maximum number of flops allowed in model partition')
-    parser.add_argument('--reserved_mem',type=float,default=None,
+    parser.add_argument('--reserved_mem',type=float,default=0,
                         help='the maximum memory allowed in model partition')
     
     ## FL algorithm options

@@ -67,16 +67,26 @@ print("\n")
 msch = module_scheduler(args,ms,None,None)
 
 if a.modelfamily == 'cifar':
-        for i in range(len(msch.partition_module_list)):
-                print(ms.training_latency(performance=1.7e10,
+        print("Full Training:",ms.training_latency(performance=1e11,
                                         memory=60e6,
                                         eff_bandwidth=1.5e9,
-                                        batches=[[64,3,32,32]]*1,
+                                        batches=[[64,3,32,32]]*30,
+                                        adv_iters=10))
+        for i in range(len(msch.partition_module_list)):
+                print("Module%d:"%i,ms.training_latency(performance=1e11,
+                                        memory=60e6,
+                                        eff_bandwidth=1.5e9,
+                                        batches=[[64,3,32,32]]*30,
                                         adv_iters=10,
                                         module_list=msch.module_dict[msch.partition_module_list[i]]))
 elif a.modelfamily == 'imagenet':
+        print("Full Training: ",ms.training_latency(performance=1e12,
+                                        memory=224e6,
+                                        eff_bandwidth=1.5e9,
+                                        batches=[[32,3,224,224]]*1,
+                                        adv_iters=10))
         for i in range(len(msch.partition_module_list)):
-                print(ms.training_latency(performance=5e11,
+                print("Module%d:"%i,ms.training_latency(performance=1e12,
                                         memory=224e6,
                                         eff_bandwidth=1.5e9,
                                         batches=[[32,3,224,224]]*1,
