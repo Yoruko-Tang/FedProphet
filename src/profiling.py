@@ -39,7 +39,7 @@ elif a.modelfamily == 'imagenet':
                 "lamb":0,
                 "psi":1,
                 "target_clean_adv_ratio":1.5}
-
+print(model)
 ms = model_summary(model,inputsize,optimizer='sgd',momentum=0.9)
 
 
