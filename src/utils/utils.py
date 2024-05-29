@@ -27,7 +27,7 @@ def get_log_path(args):
         file_name += "AT{}[eps{}_T{}_tar{}]".format(int(args.adv_train)*args.adv_ratio,args.adv_epsilon,args.adv_T,args.target_clean_adv_ratio)
 
     if args.flalg == 'FedProphet':
-        file_name = os.path.join(file_name,"mu{}_lambda{}_psi{}_quan{}_ada{}_int01".format(args.mu,args.lamb,args.psi,args.eps_quantile,int(args.adapt_eps)))
+        file_name = os.path.join(file_name,"mu{}_lambda{}_psi{}_quan{}_ada{}_int005".format(args.mu,args.lamb,args.psi,args.eps_quantile,int(args.adapt_eps)))
     
     
     if not os.path.exists(file_name):

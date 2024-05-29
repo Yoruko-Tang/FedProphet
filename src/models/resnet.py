@@ -182,22 +182,39 @@ def partialization(model):
             if n.count('.') == 3 or (n.count('.') == 2 and 'downsample' not in n) or (n.count('.') == 0 and n != '' and 'layer' not in n):
                 # register retain_idx
                 if n in neuron_dict and n in self.neuron_num:
-                    if 'downsample.0' in n:
+                    if 'conv3' in n and n.replace('conv3','downsample.0') not in neuron_dict: # bottleneck
+                        first_block = n.split('.')
+                        if first_block[1] == '0': # a layer without downsampling at the first bottleneck block
+                            # use the output idx of the last layer for this block
+                            if first_block[0] == 'layer1':
+                                previous_layer = 'conv1'
+                            else:
+                                previous_layer = 'layer{}.0.conv3'.format(int(first_block[0][-1])-1)
+                            neuron_dict[n] = neuron_dict[previous_layer]
+                            m.retain_idx = neuron_dict[n]
+                        else:
+                            first_block[1] = '0'
+                            first_block = '.'.join(first_block)
+                            m.retain_idx = neuron_dict[first_block]
+                    elif 'conv2' in n and n.replace('conv2','downsample.0') not in neuron_dict and n.replace('conv2','conv3') not in neuron_dict: # basicblock
+                        first_block = n.split('.')
+                        if first_block[1] == '0': # a layer without downsampling at the first basic block
+                            # use the output idx of the last layer for this block
+                            if first_block[0] == 'layer1':
+                                previous_layer = 'conv1'
+                            else:
+                                previous_layer = 'layer{}.0.conv2'.format(int(first_block[0][-1])-1)
+                            neuron_dict[n] = neuron_dict[previous_layer]
+                            m.retain_idx = neuron_dict[n]
+                        else:
+                            first_block[1] = '0'
+                            first_block = '.'.join(first_block)
+                            m.retain_idx = neuron_dict[first_block]
+                    elif 'downsample.0' in n:
                         if n.replace('downsample.0','conv3') in neuron_dict: # bottleneck
                             m.retain_idx = neuron_dict[n.replace('downsample.0','conv3')]
                         else: # basicblock
                             m.retain_idx = neuron_dict[n.replace('downsample.0','conv2')]
-                        
-                    elif 'conv3' in n and n.replace('conv3','downsample.0') not in neuron_dict: # bottleneck
-                        first_block = n.split('.')
-                        first_block[1] = '0'
-                        first_block = '.'.join(first_block)
-                        m.retain_idx = neuron_dict[first_block]
-                    elif 'conv2' in n and n.replace('conv2','downsample.0') not in neuron_dict and n.replace('conv2','conv3') not in neuron_dict: # basicblock
-                        first_block = n.split('.')
-                        first_block[1] = '0'
-                        first_block = '.'.join(first_block)
-                        m.retain_idx = neuron_dict[first_block]
                     else:
                         m.retain_idx = neuron_dict[n]
                 

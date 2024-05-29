@@ -200,12 +200,12 @@ class module_scheduler(base_AT_scheduler):
             and self.stage>0 and self.round > self.args["adv_warmup"]+int(0.05*self.round_per_stage) \
             and self.round%int(0.1*self.round_per_stage)==0:
             screen_length = min([5,len(self.clean_adv_ratios)])
-            if np.mean(self.clean_adv_ratios[-screen_length:]) > 1.1*self.last_stage_clean_adv_ratio: # the adv acc is too low
+            if np.mean(self.clean_adv_ratios[-screen_length:]) > 1.05*self.last_stage_clean_adv_ratio: # the adv acc is too low
                 self.alpha = self.alpha + 0.1 # increase the epsilon
                 # self.smooth_length = 0 # clear the smooth length for adjusting alpha
                 # self.best_weighted_acc = 0
                 # self.best_clean_adv_ratio = None
-            elif np.mean(self.clean_adv_ratios[-screen_length:]) < 0.9*self.last_stage_clean_adv_ratio: # the clean acc is too low
+            elif np.mean(self.clean_adv_ratios[-screen_length:]) < 0.95*self.last_stage_clean_adv_ratio: # the clean acc is too low
                 self.alpha = max([self.args["eps_quantile"],self.alpha-0.1]) # decrease the epsilon
                 # self.smooth_length = 0 # clear the smooth length for adjusting alpha
                 # self.best_weighted_acc = 0
