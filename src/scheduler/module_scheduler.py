@@ -43,7 +43,7 @@ class module_scheduler(base_AT_scheduler):
         self.stage = 0
         self.stage_begin_round = 0
         self.best_clean_adv_ratio = None
-        self.last_stage_clean_adv_ratio = None
+        self.last_stage_clean_adv_ratio = 1.0
         self.clean_adv_ratios = []
 
         
@@ -177,7 +177,7 @@ class module_scheduler(base_AT_scheduler):
         # update statistical information
         if not self.args["adv_train"] or self.round >= self.args["adv_warmup"]+int(0.05*self.round_per_stage):
             if "weighted_val_adv_acc" in stat_info:
-                weighted_acc = stat_info["weighted_val_acc"] + self.target_clean_adv_ratio*stat_info["weighted_val_adv_acc"]
+                weighted_acc = stat_info["weighted_val_acc"] + self.last_stage_clean_adv_ratio*stat_info["weighted_val_adv_acc"]
                 clean_adv_ratio = stat_info["weighted_val_acc"]/stat_info["weighted_val_adv_acc"]
                 self.clean_adv_ratios.append(clean_adv_ratio)
             else:
@@ -206,7 +206,7 @@ class module_scheduler(base_AT_scheduler):
                 # self.best_weighted_acc = 0
                 # self.best_clean_adv_ratio = None
             elif np.mean(self.clean_adv_ratios[-screen_length:]) < 0.9*self.last_stage_clean_adv_ratio: # the clean acc is too low
-                self.alpha = max([0.1,self.alpha-0.1]) # decrease the epsilon
+                self.alpha = max([self.args["eps_quantile"],self.alpha-0.1]) # decrease the epsilon
                 # self.smooth_length = 0 # clear the smooth length for adjusting alpha
                 # self.best_weighted_acc = 0
                 # self.best_clean_adv_ratio = None
