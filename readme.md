@@ -28,7 +28,7 @@ python3 src/federated_main.py --gpu=0 --dataset=CIFAR10 --model_arch=cnn3 --norm
 * FedProphet
 
 ```shell
-python3 src/federated_main.py --gpu=3 --dataset=CIFAR10 --model_arch=vgg16_bn --norm=BN --pretrained --flalg=FedProphet --mu=1e-6 --lamb=1e-4 --psi=1.0 --eps_quantile=0.3 --adapt_eps  --epochs=3500 --num_user=100 --frac=0.1 --strategy=rand --local_ep=30 --local_bs=64 --optimizer=sgd --lr=0.005 --lr_decay=0.994 --momentum=0.9 --iid=0 --shards_per_client=2 --skew=0.2  --flsys_profile_info=./src/hardware/flsys_profile_info_low --device_random_seed=717 --sys_scaling_factor=0.0 --reserved_mem=6e7 --verbose --seed 1 --adv_train --adv_warmup=100 --adv_method=PGD --adv_epsilon=0.0314 --adv_alpha=0.0078 --adv_T=10  --adv_ratio=1.0  --adv_test --advt_method=PGD --advt_epsilon=0.0314 --advt_alpha=0.0078 --advt_T=20 --target_clean_adv_ratio=2.0
+python3 src/federated_main.py --gpu=0 --dataset=CIFAR10 --model_arch=vgg16_bn --norm=BN --pretrained --flalg=FedProphet --mu=0 --lamb=1e-4 --psi=1.0 --eps_quantile=0.3 --adapt_eps  --epochs=3500 --num_user=100 --frac=0.1 --strategy=rand --local_ep=30 --local_bs=64 --optimizer=sgd --lr=0.005 --lr_decay=0.994 --momentum=0.9 --iid=0 --shards_per_client=2 --skew=0.2  --flsys_profile_info=./src/hardware/flsys_profile_info_low --device_random_seed=717 --sys_scaling_factor=-1.0 --reserved_mem=6e7 --verbose --seed 1 --adv_train --adv_warmup=100 --adv_method=PGD --adv_epsilon=0.0314 --adv_alpha=0.0078 --adv_T=10  --adv_ratio=1.0  --adv_test --advt_method=PGD --advt_epsilon=0.0314 --advt_alpha=0.0078 --advt_T=20
 ```
 
 * FedDFAT
@@ -72,7 +72,7 @@ python3 src/federated_main.py --gpu=0 --dataset=Caltech256 --model_arch=cnn4 --n
 
 * FedProphet
 ```shell
-python3 src/federated_main.py --gpu=1 --dataset=Caltech256 --model_arch=resnet34 --norm=BN --pretrained --flalg=FedProphet --mu=1e-6 --lamb=1e-4 --psi=1.0 --eps_quantile=0.3 --adapt_eps --epochs=3500 --num_user=100 --frac=0.1 --strategy=rand --local_ep=30 --local_bs=32 --optimizer=sgd --lr=0.001 --momentum=0.9 --lr_decay=0.994 --iid=0 --shards_per_client=46 --skew=0.2  --flsys_profile_info=./src/hardware/flsys_profile_info_mid --device_random_seed=717 --sys_scaling_factor=0.0 --reserved_mem=2.24e8 --verbose --seed 1 2 3 --adv_train --adv_warmup=100 --adv_method=PGD --adv_epsilon=0.0314 --adv_alpha=0.0078 --adv_T=10 --adv_test --advt_method=PGD --advt_epsilon=0.0314 --advt_alpha=0.0078 --advt_T=20
+python3 src/federated_main.py --gpu=0 --dataset=Caltech256 --model_arch=resnet34 --norm=BN --pretrained --flalg=FedProphet --mu=1e-7 --lamb=1e-4 --psi=1.0 --eps_quantile=0.4 --adapt_eps --epochs=3500 --num_user=100 --frac=0.1 --strategy=rand --local_ep=30 --local_bs=32 --optimizer=sgd --lr=0.001 --momentum=0.9 --lr_decay=0.994 --iid=0 --shards_per_client=46 --skew=0.2  --flsys_profile_info=./src/hardware/flsys_profile_info_mid --device_random_seed=717 --sys_scaling_factor=0.0 --reserved_mem=2.24e8 --verbose --seed 1 --adv_train --adv_warmup=100 --adv_method=PGD --adv_epsilon=0.0314 --adv_alpha=0.0078 --adv_T=10 --adv_test --advt_method=PGD --advt_epsilon=0.0314 --advt_alpha=0.0078 --advt_T=20
 ```
 
 * FedDF
