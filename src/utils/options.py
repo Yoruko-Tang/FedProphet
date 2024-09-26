@@ -36,7 +36,7 @@ def fl_options(parser):
     # model arguments
     parser.add_argument('--model_arch', type=str, default='mlp', 
                         help='model name')
-    parser.add_argument('--norm',type=str,choices=['BN','sBN','LN','IN','GN','None'],
+    parser.add_argument('--norm',type=str,choices=['BN','sBN','LN','IN','GN','DBN','None'],
                         default='BN',help='normalization type')
     parser.add_argument('--pretrained',action="store_true",default=False,
                         help="Whether to use pretrained model from torchvision")
@@ -210,10 +210,10 @@ def at_option(parser):
 
 def fedprophet_option(parser):
     # FedProphet Args
-    parser.add_argument('--mu',type = float,default=0.0, help='mu in fedprophet')
+    parser.add_argument('--mu',type = float,default=1e-6, help='mu in fedprophet')
     parser.add_argument('--lamb',type = float,default=1e-4, help='lambda in fedprophet')
-    parser.add_argument('--psi',type = float,default=0.0, help='psi in fedprophet')
-    parser.add_argument('--eps_quantile',type = float,default=0.1, help='quantile for choosing the epsilon')
+    parser.add_argument('--psi',type = float,default=1.0, help='psi in fedprophet')
+    parser.add_argument('--eps_quantile',type = float,default=0.3, help='quantile for choosing the epsilon')
     parser.add_argument('--adapt_eps',action = 'store_true',default=False,help = "adaptively adjust the eps_quantile during training")
     parser.add_argument('--int_adv_norm', type = str, choices=['inf','l2'],default='l2')
     parser.add_argument('--stage_lr_decay',type=float,default=None,help="decay learning rate during stage forward")

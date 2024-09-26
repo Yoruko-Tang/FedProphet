@@ -66,6 +66,8 @@ if __name__ == '__main__':
 
         ## ==================================Build Model==================================
         # try to get the model from torchvision.models with pretraining
+        if args.flalg == 'FedRBN':
+            args.norm = "DBN"
         global_model = get_net(modelname = args.model_arch,
                                modeltype = dataset_to_datafamily[args.dataset],
                                num_classes = args.num_classes,
@@ -185,7 +187,23 @@ if __name__ == '__main__':
                                 reserved_performance = args.reserved_perf,
                                 reserved_memory=args.reserved_mem
                                 ) for i in range(args.num_users)]
-        
+        elif args.flalg == 'FedRBN':
+            clients = [DBN_Client(train_dataset,user_groups[i],
+                                sys_info=user_devices[i],
+                                model_profile=model_profile,
+                                init_local_state = ST_Client.get_local_state_dict(global_model),
+                                local_state_preserve = True,
+                                test_adv_method=args.advt_method,
+                                test_adv_epsilon=args.advt_epsilon,
+                                test_adv_alpha=args.advt_alpha,
+                                test_adv_T=args.advt_T,
+                                test_adv_norm = args.advt_norm,
+                                test_adv_bound = args.advt_bound,
+                                device=device,verbose=args.verbose,
+                                random_seed=i+args.device_random_seed,
+                                reserved_performance = args.reserved_perf,
+                                reserved_memory=args.reserved_mem
+                                ) for i in range(args.num_users)]
         else:
             raise RuntimeError("Not supported FL optimizer: "+args.flalg) 
 
@@ -218,6 +236,9 @@ if __name__ == '__main__':
                                      model_profile=model_profile,
                                      neuron_num=global_model.neuron_num,
                                      sample_method=args.flalg)
+        elif args.flalg == "FedRBN":
+            scheduler = rbn_scheduler(vars(args),
+                                     model_profile=model_profile)
         # Todo: Add schedulers for other baselines
         else:
             raise RuntimeError("FL optimizer {} has no registered scheduler!".format(args.flalg)) 
@@ -338,6 +359,18 @@ if __name__ == '__main__':
                                 #test_dataset=None if args.norm == 'BN' else test_dataset,
                                 device=device,
                                 test_every = args.test_every)
+        elif args.flalg == "FedRBN":
+            server = DBN_Avg_Server(global_model=global_model,
+                                    clients = clients,
+                                    selector = selector,
+                                    scheduler = scheduler,
+                                    stat_monitor=stat_monitor,
+                                    sys_monitor=sys_monitor,
+                                    frac=args.frac,
+                                    weights=weights,
+                                    test_dataset=None,
+                                    device=device,
+                                    test_every = args.test_every)
         server.monitor() # initialize the stat_info and sys_info at the beginning
         
         ## ==================================Start Training==================================
