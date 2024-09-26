@@ -5,6 +5,7 @@ import types
 import numpy as np
 
 from torchvision.models.resnet import _resnet,BasicBlock
+from models.DBN import DualBatchNorm2d,adv,clean
 
 def resnet10(**kwargs):
     return _resnet(BasicBlock, [1, 1, 1, 1],weights=None,progress=False)
@@ -45,6 +46,10 @@ def replace_norm(model, norm='BN'):
     elif norm == 'BN':
         model._norm_layer = nn.BatchNorm2d
         return model
+    elif norm == 'DBN':
+        model._norm_layer = DualBatchNorm2d
+        model.adv = types.MethodType(adv,model)
+        model.clean = types.MethodType(clean,model)
     else: # remove the normalization
         model._norm_layer = nn.Identity
     
@@ -58,6 +63,23 @@ def replace_norm(model, norm='BN'):
                 norm_layer == nn.InstanceNorm2d(m.num_features)
             elif norm == 'sBN':
                 norm_layer = nn.BatchNorm2d(m.num_features,track_running_stats=False)
+                # initialize the stat with the current clean stat
+                norm_layer.running_mean.copy_(m.running_mean) 
+                norm_layer.running_var.copy_(m.running_var)
+                norm_layer.num_batches_tracked.copy_(m.num_batches_tracked)
+                norm_layer.weight.data.copy_(m.weight.data)
+                norm_layer.bias.data.copy_(m.bias.data)
+            elif norm == 'DBN':
+                norm_layer = DualBatchNorm2d(m.num_features)
+                # initialize the adv stat with the current clean stat
+                norm_layer.running_mean.copy_(m.running_mean)
+                norm_layer.adv_running_mean.copy_(m.running_mean)
+                norm_layer.running_var.copy_(m.running_var)
+                norm_layer.adv_running_var.copy_(m.running_var)
+                norm_layer.num_batches_tracked.copy_(m.num_batches_tracked)
+                norm_layer.adv_num_batches_tracked.copy_(m.num_batches_tracked)
+                norm_layer.weight.data.copy_(m.weight.data)
+                norm_layer.bias.data.copy_(m.bias.data)
             else: # remove the normalization
                 norm_layer = nn.Identity()
             norm_layer.num_features = m.num_features

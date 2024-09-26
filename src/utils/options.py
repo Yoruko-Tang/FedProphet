@@ -36,7 +36,7 @@ def fl_options(parser):
     # model arguments
     parser.add_argument('--model_arch', type=str, default='mlp', 
                         help='model name')
-    parser.add_argument('--norm',type=str,choices=['BN','sBN','LN','IN','GN','None'],
+    parser.add_argument('--norm',type=str,choices=['BN','sBN','LN','IN','GN','DBN','None'],
                         default='BN',help='normalization type')
     parser.add_argument('--pretrained',action="store_true",default=False,
                         help="Whether to use pretrained model from torchvision")

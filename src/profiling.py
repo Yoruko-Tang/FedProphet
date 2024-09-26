@@ -12,7 +12,7 @@ a = parser.parse_args()
 if a.modelfamily == 'cifar':
         model = get_net(a.arch,'cifar',num_classes=10,adv_norm=True,modularization=True,norm_type='BN')
         inputsize = [64,3,32,32]
-        mem = 180e6
+        mem = 6e7
 
 elif a.modelfamily == 'imagenet':
         model = get_net(a.arch,'imagenet',num_classes=256,adv_norm=True,modularization=True,norm_type='BN')
