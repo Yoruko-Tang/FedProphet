@@ -51,7 +51,7 @@ if __name__ == '__main__':
 
         print("Start with Random Seed: {}".format(seed))
         
-        ## ==================================Load Dataset==================================
+        ## ================================== Load Dataset ==============================
         train_dataset, test_dataset, user_groups, weights = get_dataset(args,seed)
         data_matrix = get_data_matrix(train_dataset, user_groups, args.num_classes)
         user_devices = get_devices(args,seed)
@@ -64,7 +64,7 @@ if __name__ == '__main__':
             rest_idxs = list(set(range(len(test_dataset)))-set(subset_idxs.tolist()))
             test_dataset = Subset(test_dataset,rest_idxs)
 
-        ## ==================================Build Model==================================
+        ## ================================= Build Model =================================
         # try to get the model from torchvision.models with pretraining
         if args.flalg == 'FedRBN':
             args.norm = "DBN"
@@ -99,7 +99,7 @@ if __name__ == '__main__':
                                             default_local_eps=args.local_ep,
                                             **vars(args)))
 
-        ## ==================================Build Clients==================================
+        ## ================================ Build Clients ================================
         if args.flalg in ['FedAvg']:
             clients = [AT_Client(train_dataset,user_groups[i],
                                 sys_info=user_devices[i],
@@ -207,7 +207,7 @@ if __name__ == '__main__':
         else:
             raise RuntimeError("Not supported FL optimizer: "+args.flalg) 
 
-        ## ==================================Build Monitor==================================
+        ## =============================== Build Monitor ==================================
         # statistical monitor
         if args.adv_test:
             stat_monitor = AT_Stat_Monitor(clients=clients,weights=weights,
@@ -219,7 +219,7 @@ if __name__ == '__main__':
         # systematic monitor
         sys_monitor = Sys_Monitor(clients=clients,log_path=file_name)
         
-        ##  ==================================Build Scheduler==================================
+        ##  ============================== Build Scheduler ================================
         if args.flalg in ["FedAvg","FedBN"]:
             scheduler = base_AT_scheduler(vars(args))
         
@@ -243,7 +243,7 @@ if __name__ == '__main__':
         else:
             raise RuntimeError("FL optimizer {} has no registered scheduler!".format(args.flalg)) 
             
-        ## ==================================Build Selector==================================
+        ## ================================ Build Selector ================================
         if args.strategy == 'rand':
             selector = Random_Selector(total_client_num = args.num_users,
                                        weights = weights)
@@ -275,7 +275,7 @@ if __name__ == '__main__':
         else:
             raise NotImplementedError("Not a supported selection strategy: {}".format(args.strategy))
         
-        ## ==================================Build Server==================================
+        ## ================================= Build Server ==================================
         if args.flalg in ["FedAvg"]:
             server = Avg_Server(global_model=global_model,
                                 clients = clients,
@@ -371,29 +371,52 @@ if __name__ == '__main__':
                                     test_dataset=None,
                                     device=device,
                                     test_every = args.test_every)
-        server.monitor() # initialize the stat_info and sys_info at the beginning
         
-        ## ==================================Start Training==================================
-        for epoch in tqdm(range(args.epochs)):
-            CTN = server.train()
-            if not CTN:
-                break      
-
+        # =================== Initialize or resume from the checkpoint =====================
+        if args.resume:
+            ckpt_pth = osp.join(file_name,"best_model.pt") if not args.model_pth else args.model_pth
+            with open(ckpt_pth.replace("best_model.pt","modelinfo.json"),'r') as info_file:
+                model_info = json.load(info_file)
+            server.round = model_info["round"]
+            server.scheduler.round = model_info["round"]
+            if args.flalg == "FedProphet":
+                server.scheduler.stage = args.resume_stage
+                server.scheduler.stage_begin_round = model_info["round"]
+                server.scheduler.round = 0
+            print("===> Resume from round {} with model in {}".format(server.round,ckpt_pth))
+        stat_info,sys_info = server.monitor() # initialize the stat_info and sys_info at the beginning
         
-        ## ==================================Final Results==================================
-        print(' \n Results after {} global rounds of training:'.format(epoch+1))
-        print("|---- Final Val Accuracy: {:.2f}%".format(100*stat_monitor.weighted_global_accs[-1]))
-        print("|---- Max Val Accuracy: {:.2f}%".format(100*max(stat_monitor.weighted_global_accs)))
-        print("|---- Final Test Accuracy: {:.2f}%".format(100*stat_monitor.test_accs[-1]))
-        print("|---- Max Test Accuracy: {:.2f}%".format(100*max(stat_monitor.test_accs)))
-        
-        if args.adv_test:
-            print("|---- Final Val Adv Accuracy: {:.2f}%".format(100*stat_monitor.weighted_global_adv_accs[-1]))
-            print("|---- Max Val Adv Accuracy: {:.2f}%".format(100*max(stat_monitor.weighted_global_adv_accs)))
-            print("|---- Final Test Adv Accuracy: {:.2f}%".format(100*stat_monitor.test_adv_accs[-1]))
-            print("|---- Max Test Adv Accuracy: {:.2f}%".format(100*max(stat_monitor.test_adv_accs)))
+        ## ================================= Only Evaluation ================================
+        if args.validate:
+            print("|---- Val Accuracy: {:.2f}%".format(100*stat_info["weighted_val_acc"]))
+            if args.adv_test:
+                print("|---- Val Adv Accuracy: {:.2f}%".format(100*stat_info["weighted_val_adv_acc"]))
             
+            with open(osp.join(file_name,"val_res.json"),'w') as res_file:
+                json.dump(stat_info,res_file,indent=True)
+            
+        ## ================================= Training =======================================
+        else:
+            for epoch in tqdm(range(args.epochs)):
+                CTN = server.train()
+                if not CTN:
+                    break      
 
-        print('\n Total Run Time: {0:0.4f}'.format(time.time()-start_time))
+            
+            ## ================================ Final Results ================================
+            print(' \n Results after {} global rounds of training:'.format(epoch+1))
+            print("|---- Final Val Accuracy: {:.2f}%".format(100*stat_monitor.weighted_global_accs[-1]))
+            print("|---- Max Val Accuracy: {:.2f}%".format(100*max(stat_monitor.weighted_global_accs)))
+            print("|---- Final Test Accuracy: {:.2f}%".format(100*stat_monitor.test_accs[-1]))
+            print("|---- Max Test Accuracy: {:.2f}%".format(100*max(stat_monitor.test_accs)))
+            
+            if args.adv_test:
+                print("|---- Final Val Adv Accuracy: {:.2f}%".format(100*stat_monitor.weighted_global_adv_accs[-1]))
+                print("|---- Max Val Adv Accuracy: {:.2f}%".format(100*max(stat_monitor.weighted_global_adv_accs)))
+                print("|---- Final Test Adv Accuracy: {:.2f}%".format(100*stat_monitor.test_adv_accs[-1]))
+                print("|---- Max Test Adv Accuracy: {:.2f}%".format(100*max(stat_monitor.test_adv_accs)))
+                
+
+            print('\n Total Run Time: {0:0.4f}'.format(time.time()-start_time))
 
                 

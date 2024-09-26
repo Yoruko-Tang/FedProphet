@@ -35,7 +35,7 @@ class ST_Stat_Monitor():
             self.tsv_file = osp.join(self.log_path, 'stat.log.tsv')
             self.pkl_file = osp.join(self.log_path, 'stat.pkl')
             self.pt_file = osp.join(self.log_path,'best_model.pt')
-            with open(self.tsv_file, 'w') as wf:
+            with open(self.tsv_file, 'a') as wf:
                 columns = ['epoch', 'mode', 'loss', 'accuracy', 'best_accuracy']
                 wf.write('\t'.join(columns) + '\n')
 
@@ -156,7 +156,7 @@ class AT_Stat_Monitor(ST_Stat_Monitor):
 
         # create log files
         if self.log_path is not None:
-            with open(self.tsv_file, 'w') as wf:
+            with open(self.tsv_file, 'a') as wf:
                 columns = ['epoch', 'mode', 'clean_loss', 'clean_accuracy', 'best_clean_accuracy','adv_loss', 'adv_accuracy', 'best_adv_accuracy']
                 wf.write('\t'.join(columns) + '\n')
 

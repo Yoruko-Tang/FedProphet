@@ -43,7 +43,7 @@ class Sys_Monitor():
                 os.makedirs(self.log_path)
             self.tsv_file = osp.join(self.log_path, 'sys.log.tsv')
             self.pkl_file = osp.join(self.log_path, 'sys.pkl')
-            with open(self.tsv_file, 'w') as wf:
+            with open(self.tsv_file, 'a') as wf:
                 columns = ['epoch', 'min_avail_perf (FLOPS)', 'max_avail_perf (FLOPS)', 
                            'min_avail_mem (Byte)', 'max_avail_mem (Byte)', 
                            'round_time (s)', 'round_comp_time (s)', 
