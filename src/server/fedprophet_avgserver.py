@@ -2,6 +2,7 @@ import torch
 import numpy as np
 import copy
 from server.avgserver import Avg_Server
+from types import MethodType
 
 class Fedprophet_Avg_Server(Avg_Server):
     def __init__(self, global_model, clients, selector, scheduler, 
@@ -81,3 +82,10 @@ class Fedprophet_Avg_Server(Avg_Server):
                 aux_models[m] = super().aggregate(local_aux_models[m],aux_models[m])["model"]
 
         return {"model":model,"aux_models":aux_models}
+
+    def load(self,save_file):
+        # make the class consistent with the original saved model
+        def module_forward(self, x, module_list):
+            return None
+        type(self.global_model["model"]).module_forward = MethodType(module_forward, type(self.global_model["model"]))
+        super().load(save_file)

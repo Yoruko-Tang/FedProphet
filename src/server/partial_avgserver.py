@@ -2,6 +2,7 @@ import torch
 import copy
 import numpy as np
 from server.avgserver import Avg_Server
+from types import MethodType
 
 class Partial_Avg_Server(Avg_Server):
     def __init__(self, global_model, clients, selector, scheduler, 
@@ -39,3 +40,9 @@ class Partial_Avg_Server(Avg_Server):
         model.load_state_dict(w0)
         return {"model":model}
                 
+    def load(self,save_file):
+        # make the class consistent with the original saved model
+        def partial_forward(self,x, neuron_dict):
+            return None
+        type(self.global_model["model"]).partial_forward = MethodType(partial_forward, type(self.global_model["model"]))
+        super().load(save_file)

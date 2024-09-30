@@ -3,6 +3,7 @@ import torch.nn.functional as F
 import copy
 import numpy as np
 from server.avgserver import Avg_Server
+from types import MethodType
 
 class DBN_Avg_Server(Avg_Server):
     def __init__(self, global_model, clients, selector, scheduler, 
@@ -93,3 +94,12 @@ class DBN_Avg_Server(Avg_Server):
         
         return local_states
                 
+    def load(self,save_file):
+        # make the class consistent with the original saved model
+        def clean(self):
+            return
+        def adv(self):
+            return
+        type(self.global_model["model"]).clean = MethodType(clean, type(self.global_model["model"]))
+        type(self.global_model["model"]).adv = MethodType(adv, type(self.global_model["model"]))
+        super().load(save_file)

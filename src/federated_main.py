@@ -3,9 +3,11 @@ import time
 import datetime
 import json
 from tqdm import tqdm
+import numpy as np
 import torch
 from torch.utils.data import Subset
 from copy import deepcopy
+from types import MethodType
 
 from client import *
 from server import *
@@ -211,13 +213,13 @@ if __name__ == '__main__':
         # statistical monitor
         if args.adv_test:
             stat_monitor = AT_Stat_Monitor(clients=clients,weights=weights,
-                                           log_path=file_name)
+                                           log_path=file_name if not args.validate else None)
         else:
             stat_monitor = ST_Stat_Monitor(clients=clients,weights=weights,
-                                           log_path=file_name)
+                                           log_path=file_name if not args.validate else None)
 
         # systematic monitor
-        sys_monitor = Sys_Monitor(clients=clients,log_path=file_name)
+        sys_monitor = Sys_Monitor(clients=clients,log_path=file_name if not args.validate else None)
         
         ##  ============================== Build Scheduler ================================
         if args.flalg in ["FedAvg","FedBN"]:
@@ -227,7 +229,7 @@ if __name__ == '__main__':
             scheduler = module_scheduler(vars(args),
                                          model_profile=model_profile,
                                          clients=clients,
-                                         log_path=file_name)
+                                         log_path=file_name if not args.validate else None)
         elif args.flalg in ["FedET","FedDF"]:
             scheduler = kd_scheduler(vars(args),
                                      model_profiles=edge_model_profiles)
@@ -375,14 +377,20 @@ if __name__ == '__main__':
         # =================== Initialize or resume from the checkpoint =====================
         if args.resume:
             ckpt_pth = osp.join(file_name,"best_model.pt") if not args.model_pth else args.model_pth
-            with open(ckpt_pth.replace("best_model.pt","modelinfo.json"),'r') as info_file:
-                model_info = json.load(info_file)
-            server.round = model_info["round"]
-            server.scheduler.round = model_info["round"]
+            server.load(ckpt_pth)
             if args.flalg == "FedProphet":
+                # we did not save the resume stage currently. specify it manually.
                 server.scheduler.stage = args.resume_stage
-                server.scheduler.stage_begin_round = model_info["round"]
-                server.scheduler.round = 0
+                if args.validate and args.adv_test and args.advt_method == "AutoAttack":
+                    val_params = server.scheduler.monitor_params()
+                    module_list = val_params["module_list"]
+                    aux_module_name = val_params["aux_module_name"]
+                    def mforward(self, x):
+                        features = self.module_forward(x, module_list)
+                        res = server.global_model["aux_models"][aux_module_name](features) if server.global_model["aux_models"][aux_module_name] else features
+                        return res
+                    server.global_model["model"].forward = MethodType(mforward,server.global_model["model"])
+
             print("===> Resume from round {} with model in {}".format(server.round,ckpt_pth))
         stat_info,sys_info = server.monitor() # initialize the stat_info and sys_info at the beginning
         
@@ -391,7 +399,9 @@ if __name__ == '__main__':
             print("|---- Val Accuracy: {:.2f}%".format(100*stat_info["weighted_val_acc"]))
             if args.adv_test:
                 print("|---- Val Adv Accuracy: {:.2f}%".format(100*stat_info["weighted_val_adv_acc"]))
-            
+            for k in stat_info:
+                if isinstance(stat_info[k],np.ndarray):
+                    stat_info[k] = stat_info[k].tolist()
             with open(osp.join(file_name,"val_res.json"),'w') as res_file:
                 json.dump(stat_info,res_file,indent=True)
             

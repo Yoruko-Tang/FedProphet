@@ -1,6 +1,7 @@
 import numpy as np
 import copy
 import torch
+import json
 
 class Avg_Server():
     def __init__(self,global_model,clients,selector,scheduler,
@@ -154,4 +155,7 @@ class Avg_Server():
         self.global_model.update(global_model)
         for idx,client in enumerate(self.clients):
             client.local_states = local_states[idx]
-        self.scheduler.round = np.inf
+        with open(save_file.replace("best_model.pt","modelinfo.json"),'r') as info_file:
+            model_info = json.load(info_file)
+        self.round = model_info["round"]
+        self.scheduler.round = model_info["round"]

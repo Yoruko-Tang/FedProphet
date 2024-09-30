@@ -73,7 +73,7 @@ class module_scheduler(base_AT_scheduler):
                 os.makedirs(self.log_path)
             self.tsv_file = osp.join(self.log_path, 'scheduler.log.tsv')
             self.pkl_file = osp.join(self.log_path, 'scheduler.pkl')
-            with open(self.tsv_file, 'w') as wf:
+            with open(self.tsv_file, 'a') as wf:
                 columns = ['epoch', 'adv_epsilon', 'adv_alpha', 'adv_norm', 'adv_bound', 'mu','lamb','psi','best_weighted_acc','best_clean_adv_ratio']
                 wf.write('\t'.join(columns) + '\n')
 

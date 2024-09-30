@@ -47,7 +47,8 @@ class Adv_Sample_Generator():
             label = label[perturb_idx]
         
         if self.attack_method == 'AutoAttack':
-            adversary = AutoAttack(model, norm=self.norm, eps=self.epsilon, version='standard')
+            norm_map = {'inf':'Linf','l2':"L2"}
+            adversary = AutoAttack(model, norm=norm_map[self.norm], eps=self.epsilon, version='standard')
             x_adv = adversary.run_standard_evaluation(data, label, bs=len(data))
             if ratio < 1.0:
                 origin_data[perturb_idx] = x_adv

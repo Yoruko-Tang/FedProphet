@@ -205,7 +205,7 @@ def at_option(parser):
     # Adversarial Test
     parser.add_argument('--adv_test', action = 'store_true',
                         help = 'Use adversarial samples for test')
-    parser.add_argument('--advt_method',type = str, choices=['PGD','BIM','FGSM','FGSM_RS'],default='PGD',
+    parser.add_argument('--advt_method',type = str, choices=['PGD','BIM','FGSM','FGSM_RS','AutoAttack'],default='PGD',
                         help = 'Kind of adversarial attack in test time')
     parser.add_argument('--advt_epsilon',type = float, default=8/255)
     parser.add_argument('--advt_alpha',type = float, default=2/255)

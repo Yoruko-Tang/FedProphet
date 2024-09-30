@@ -283,6 +283,9 @@ class Module_Client(AT_Client):
         
         if aux_module_name is not None:
             aux_model = aux_models[aux_module_name]
+            if aux_model is not None:
+                aux_model.to(self.device)
+                aux_model.eval()
         else:
             aux_model = None
 
@@ -324,6 +327,9 @@ class Module_Client(AT_Client):
 
         if aux_module_name is not None:
             aux_model = aux_models[aux_module_name]
+            if aux_model is not None:
+                aux_model.to(self.device)
+                aux_model.eval()
         else:
             aux_model = None
 
