@@ -66,7 +66,7 @@ class ST_Client():
         return trainset, testset
     
     def train(self,model,local_ep,local_bs,lr,optimizer='sgd',
-              momentum=0.0,reg=0.0,
+              momentum=0.0,reg=0.0,grad_clip=None,
               criterion=torch.nn.CrossEntropyLoss(),
               model_profile=None,
               **kwargs):
@@ -104,6 +104,8 @@ class ST_Client():
                 model.zero_grad()
                 loss = standard_loss(model,datas,labels)
                 loss.backward()
+                if grad_clip is not None:
+                    torch.nn.utils.clip_grad_norm_(param, grad_clip)
                 opt.step()
                 iters += 1
                 if iters == local_ep:

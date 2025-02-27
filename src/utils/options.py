@@ -99,6 +99,8 @@ def fl_options(parser):
                         help='SGD momentum (default: 0.0)')
     parser.add_argument('--reg', default=1e-4, type=float, 
                         help='weight decay for an optimizer')
+    parser.add_argument('--grad_clip', default=None, type=float, 
+                        help='gradient clipping')
 
     
 

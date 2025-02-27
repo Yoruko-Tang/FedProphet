@@ -28,10 +28,10 @@ class ImageNet1k(TVImageNet):
 class ImageNette(ImageFolder):
 
     def __init__(self, train=True, transform=None, target_transform=None,**kwargs):
-        root = osp.join("./data", 'imagenette2-320')
+        root = osp.join("./data", 'imagenette')
         if not osp.exists(root):
             raise ValueError('Dataset not found at {}. Please download it from {}.'.format(
-                root, 'https://s3.amazonaws.com/fast-ai-imageclas/imagenette2-320.tgz'
+                root, 'https://s3.amazonaws.com/fast-ai-imageclas/imagenette.tgz'
             ))
 
         # Initialize ImageFolder

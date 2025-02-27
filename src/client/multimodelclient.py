@@ -29,7 +29,7 @@ class Multimodel_Client(AT_Client):
         
         
     def train(self,edge_models,model_idx,local_ep,local_bs,lr,optimizer='sgd',
-              momentum=0.0,reg=0.0, criterion=torch.nn.CrossEntropyLoss(),
+              momentum=0.0,reg=0.0, grad_clip=None,criterion=torch.nn.CrossEntropyLoss(),
               adv_train=True,adv_method='pgd',adv_epsilon=0.0,adv_alpha=0.0,adv_T=0,
               adv_norm='inf',adv_bound=[0.0,1.0],adv_ratio=1.0,model_profile=None,**kwargs):
         """train the model for one communication round."""
@@ -82,6 +82,8 @@ class Multimodel_Client(AT_Client):
                 
                 loss = standard_loss(model, datas, labels)
                 loss.backward()
+                if grad_clip is not None:
+                    torch.nn.utils.clip_grad_norm_(param, grad_clip)
                 opt.step()
                 iters += 1
                 if iters == local_ep:

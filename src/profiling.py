@@ -12,12 +12,12 @@ a = parser.parse_args()
 if a.modelfamily == 'cifar':
         model = get_net(a.arch,'cifar',num_classes=10,adv_norm=True,modularization=True,norm_type='BN')
         inputsize = [64,3,32,32]
-        mem = 6e7
+        mem = 60e6
 
 elif a.modelfamily == 'imagenet':
         model = get_net(a.arch,'imagenet',num_classes=256,adv_norm=True,modularization=True,norm_type='BN')
         inputsize = [32,3,224,224]
-        mem = 672e6
+        mem = 1500e6
 
 args = {"epochs":500,
         "reserved_flops":None,
@@ -32,7 +32,7 @@ args = {"epochs":500,
         "psi":1,
         "target_clean_adv_ratio":1.5}
 
-#print(model)
+print(model)
 ms = model_summary(model,inputsize,optimizer='sgd',momentum=0.9)
 
 
@@ -56,8 +56,11 @@ print("output dictionary---------------------")
 print(ms.out_feature_dict)
 print("\n")
 
+#print(model)
 
 msch = module_scheduler(args,ms,None,None)
+
+#print(msch.auxiliary_model_dict)
 
 if a.modelfamily == 'cifar':
         print("Full Training:",ms.training_latency(performance=5e10,

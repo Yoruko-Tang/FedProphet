@@ -346,7 +346,7 @@ class module_scheduler(base_AT_scheduler):
             auxiliary_in_fea = np.prod(output_size[1:])
             auxiliary_input = torch.rand(output_size)
 
-            if len(output_size)>2:
+            if len(output_size) == 4: # CNN models, nxcxhxw
                 output_width = ceil(np.sqrt(self.num_classes/output_size[1]))
                 #output_width = max([ceil(np.sqrt(self.num_classes/output_size[1])),ceil(output_size[2]/max_pooling_size)])
                 #output_width = max([int(np.sqrt(max_auxiliary_neuron/output_size[1])),1])
@@ -355,7 +355,9 @@ class module_scheduler(base_AT_scheduler):
                     auxiliary_model = nn.Sequential(nn.AdaptiveAvgPool2d((output_width,output_width)),nn.Flatten(),nn.Linear(output_size[1]*output_width**2,self.num_classes))
                 else:
                     auxiliary_model = nn.Sequential(nn.Flatten(),nn.Linear(auxiliary_in_fea,self.num_classes))
-            
+            elif len(output_size) == 3: # transformer models, nxlxd
+                auxiliary_model = nn.Sequential(#nn.LayerNorm(output_size[2]),
+                                                nnMean(),nn.Linear(output_size[2],self.num_classes))
             else:
                 auxiliary_model = nn.Sequential(nn.Linear(auxiliary_in_fea,self.num_classes))
             
@@ -418,3 +420,21 @@ class module_scheduler(base_AT_scheduler):
         partition_module_list = list(module_dict.keys())
 
         return partition_module_list,module_dict,auxiliary_model_dict,module_flops_dict,module_mem_dict,aux_model_flops_dict,aux_model_mem_dict
+    
+class nnMean(nn.Module):
+    """
+    Use as a module for the auxiliary model of transformer models
+    """
+    def __init__(self):
+        super().__init__()
+    def forward(self,x):
+        return x.mean(dim=1)
+    
+class nnCLS(nn.Module):
+    """
+    Use as a module for the auxiliary model of transformer models
+    """
+    def __init__(self):
+        super().__init__()
+    def forward(self,x):
+        return x[:,0]

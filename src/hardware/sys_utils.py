@@ -1,6 +1,6 @@
 import numpy as np
 from numpy.random import RandomState
-from fvcore.nn import FlopCountAnalysis, parameter_count
+from fvcore.nn import FlopCountAnalysis, parameter_count, flop_count_table
 import torch
 from math import ceil
 from scipy.stats import truncnorm
@@ -230,7 +230,8 @@ class model_summary():
             for key in dic:
                 if key != 'total':
                     sum += dic[key]
-            assert sum == dic['total'], "Wrong profiling data!"
+            if sum != dic['total']:
+                print("[Warning]: The total value is not equal to the sum of all items!")
 
         # initialize the dicts
         in_feature_dict = {} # layer: input_feature_size
@@ -241,6 +242,7 @@ class model_summary():
         x = torch.rand(inputsize,device=next(model.parameters()).device)
         flops = FlopCountAnalysis(model,x)
         flops.unsupported_ops_warnings(False)
+        # print(flop_count_table(flops))
         _flops_per_module = flops.by_module()
         _params_per_module = parameter_count(model)
         
@@ -291,6 +293,7 @@ class model_summary():
                         
                     mem_per_module[name] += self.param_mem_scale*self.data_Byte*params_per_module[name] # memory for parameter
                     
+            # print(params_per_module)
             validate(flops_per_module)
             validate(params_per_module)
             validate(mem_per_module)

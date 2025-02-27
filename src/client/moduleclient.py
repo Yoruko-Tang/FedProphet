@@ -114,7 +114,7 @@ class Module_Client(AT_Client):
         
     def train(self,model,aux_models,stage_module_list,prophet_module_list,
               stage_aux_model_name,prophet_aux_model_name,
-              local_ep,local_bs,lr,optimizer='sgd',momentum=0.0,reg=0.0, 
+              local_ep,local_bs,lr,optimizer='sgd',momentum=0.0,reg=0.0,grad_clip=None, 
               criterion=torch.nn.CrossEntropyLoss(),
               adv_train=True,adv_method='pgd',adv_epsilon=0.0,adv_alpha=0.0,adv_T=0,
               adv_norm='inf',adv_bound=[0.0,1.0],adv_ratio=1.0,
@@ -236,6 +236,12 @@ class Module_Client(AT_Client):
                 output_losses = {}
                 loss = fedprophet_loss(model,datas,labels,output_dict=output_losses)
                 loss.backward()
+                if grad_clip is not None:
+                    torch.nn.utils.clip_grad_norm_(param, grad_clip)
+                    if aparam:
+                        torch.nn.utils.clip_grad_norm_(aparam, grad_clip)
+                    if paparam:
+                        torch.nn.utils.clip_grad_norm_(paparam, grad_clip)
                 opt.step()
                 iters += 1
                 if iters == local_ep:
