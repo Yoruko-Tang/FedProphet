@@ -25,7 +25,7 @@ wget https://data.caltech.edu/records/nyy15-4j048/files/256_ObjectCategories.tar
 tar -xf ./256_ObjectCategories.tar
 ```
 ## Running Experiments
-To run an experiment, use one of the following commands for a specified algorthms on a dataset. 
+To run an experiment, use one of the following commands for a specified algorthm on a dataset. 
 
 ### CIFAR-10
 
